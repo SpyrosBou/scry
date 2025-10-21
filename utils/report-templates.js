@@ -4427,6 +4427,11 @@ const reportStyleOverrides = `
   color: #0f172a;
 }
 
+.nav-status.status-summary {
+  background: rgba(148, 197, 255, 0.32);
+  color: #0f172a;
+}
+
 .sidebar .nav-item.status-info {
   background: #fff6d6;
   color: #57430c;
