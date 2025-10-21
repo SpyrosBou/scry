@@ -4391,10 +4391,59 @@ const renderTestCard = (test, options = {}) => {
   `;
 };
 
-const baseStyles = fs.readFileSync(
+const baseStylesRaw = fs.readFileSync(
   path.join(__dirname, '..', 'docs', 'mocks', 'mock-styling.css'),
   'utf8'
 );
+
+const reportStyleOverrides = `
+.summary-a11y--rule-table-advisory tr[class*="impact-"] td,
+.summary-a11y--rule-table-best-practice tr[class*="impact-"] td {
+  background: #fff6d6;
+}
+
+.summary-a11y--rule-table-advisory tbody tr td,
+.summary-a11y--rule-table-best-practice tbody tr td {
+  transition: background 0.2s ease;
+}
+
+.summary-a11y--rule-table-advisory tbody tr:hover td,
+.summary-a11y--rule-table-best-practice tbody tr:hover td {
+  background: #ffe8a3;
+}
+
+.sidebar .nav-item.status-summary {
+  background: rgba(184, 211, 255, 0.24);
+  color: #0f172a;
+  border-left: 4px solid rgba(148, 197, 255, 0.45);
+}
+
+.sidebar .nav-item.status-summary:hover {
+  background: rgba(148, 197, 255, 0.32);
+}
+
+.sidebar .nav-item.status-summary .nav-status.status-summary {
+  background: rgba(148, 197, 255, 0.32);
+  color: #0f172a;
+}
+
+.sidebar .nav-item.status-info {
+  background: #fff6d6;
+  color: #57430c;
+  border-left: 4px solid rgba(234, 179, 8, 0.45);
+}
+
+.sidebar .nav-item.status-info:hover {
+  background: #ffe8a3;
+}
+
+.sidebar .nav-item.status-info .nav-status.status-info {
+  background: rgba(255, 232, 163, 0.85);
+  color: #7a4c00;
+}
+`;
+
+const baseStyles = `${baseStylesRaw}\n${reportStyleOverrides}`;
 
 const filterScript = `
 (function () {
@@ -4483,7 +4532,7 @@ function renderReportHtml(run) {
     description:
       'Pulls together pass/fail counts, timing, and standout issues from every suite. Start here to understand overall health before diving into individual checks.',
     status: 'info',
-    statusMeta: PANEL_STATUS_META.info,
+    statusMeta: { ...PANEL_STATUS_META.info, navClass: 'status-summary', specClass: 'spec-status--info' },
     content: `
       <header class="panel-header">
         <div class="panel-info">

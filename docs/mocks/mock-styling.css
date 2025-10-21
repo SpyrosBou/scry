@@ -507,6 +507,27 @@ input[name="report-view"] {
   background: rgba(14, 165, 233, 0.1);
 }
 
+.summary-a11y--rule-table-advisory tr.impact-critical td,
+.summary-a11y--rule-table-advisory tr.impact-serious td,
+.summary-a11y--rule-table-advisory tr.impact-moderate td,
+.summary-a11y--rule-table-advisory tr.impact-minor td,
+.summary-a11y--rule-table-best-practice tr.impact-critical td,
+.summary-a11y--rule-table-best-practice tr.impact-serious td,
+.summary-a11y--rule-table-best-practice tr.impact-moderate td,
+.summary-a11y--rule-table-best-practice tr.impact-minor td {
+  background: #fff6d6;
+}
+
+.summary-a11y--rule-table-advisory tbody tr td,
+.summary-a11y--rule-table-best-practice tbody tr td {
+  transition: background 0.2s ease;
+}
+
+.summary-a11y--rule-table-advisory tbody tr:hover td,
+.summary-a11y--rule-table-best-practice tbody tr:hover td {
+  background: #ffe8a3;
+}
+
 .summary-report code {
   background: #f1f5f9;
   padding: 0.15rem 0.35rem;
@@ -1029,21 +1050,66 @@ details.summary-accordion[open] summary {
   transform: none;
 }
 
-#view-accessibility-wcag:checked ~ .report-shell .sidebar label[for="view-accessibility-wcag"],
-#view-accessibility-forms:checked ~ .report-shell .sidebar label[for="view-accessibility-forms"],
-#view-accessibility-keyboard:checked ~ .report-shell .sidebar label[for="view-accessibility-keyboard"],
-#view-functionality-interactive:checked ~ .report-shell .sidebar label[for="view-functionality-interactive"],
-#view-functionality-infrastructure:checked ~ .report-shell .sidebar label[for="view-functionality-infrastructure"],
-#view-visual-regression:checked ~ .report-shell .sidebar label[for="view-visual-regression"] {
-  background: rgba(220, 38, 38, 0.28);
-  color: #101828;
+.sidebar .nav-item.status-summary {
+  background: rgba(184, 211, 255, 0.24);
+  color: #0f172a;
+  border-left: 4px solid rgba(148, 197, 255, 0.45);
 }
 
-#view-accessibility-landmarks:checked ~ .report-shell .sidebar label[for="view-accessibility-landmarks"],
-#view-functionality-links:checked ~ .report-shell .sidebar label[for="view-functionality-links"],
-#view-responsive-layout:checked ~ .report-shell .sidebar label[for="view-responsive-layout"] {
+.sidebar .nav-item.status-summary:hover {
+  background: rgba(148, 197, 255, 0.32);
+}
+
+.sidebar .nav-item.status-summary .nav-status.status-summary {
+  background: rgba(148, 197, 255, 0.32);
+  color: #0f172a;
+}
+
+.sidebar .nav-item.status-info {
+  background: #fff6d6;
+  color: #57430c;
+  border-left: 4px solid rgba(234, 179, 8, 0.45);
+}
+
+.sidebar .nav-item.status-info:hover {
+  background: #ffe8a3;
+}
+
+.sidebar .nav-item.status-info .nav-status.status-info {
+  background: rgba(255, 232, 163, 0.85);
+  color: #7a4c00;
+}
+
+:is(
+    #view-summary:checked ~ .report-shell .sidebar label[for="view-summary"].status-fail,
+    #view-accessibility-wcag:checked ~ .report-shell .sidebar label[for="view-accessibility-wcag"].status-fail,
+    #view-accessibility-forms:checked ~ .report-shell .sidebar label[for="view-accessibility-forms"].status-fail,
+    #view-accessibility-keyboard:checked ~ .report-shell .sidebar label[for="view-accessibility-keyboard"].status-fail,
+    #view-accessibility-landmarks:checked ~ .report-shell .sidebar label[for="view-accessibility-landmarks"].status-fail,
+    #view-functionality-links:checked ~ .report-shell .sidebar label[for="view-functionality-links"].status-fail,
+    #view-functionality-interactive:checked ~ .report-shell .sidebar label[for="view-functionality-interactive"].status-fail,
+    #view-functionality-infrastructure:checked ~ .report-shell .sidebar label[for="view-functionality-infrastructure"].status-fail,
+    #view-responsive-layout:checked ~ .report-shell .sidebar label[for="view-responsive-layout"].status-fail,
+    #view-visual-regression:checked ~ .report-shell .sidebar label[for="view-visual-regression"].status-fail
+) {
+  background: rgba(220, 38, 38, 0.28);
+  color: #7f1d1d;
+}
+
+:is(
+    #view-summary:checked ~ .report-shell .sidebar label[for="view-summary"].status-pass,
+    #view-accessibility-wcag:checked ~ .report-shell .sidebar label[for="view-accessibility-wcag"].status-pass,
+    #view-accessibility-forms:checked ~ .report-shell .sidebar label[for="view-accessibility-forms"].status-pass,
+    #view-accessibility-keyboard:checked ~ .report-shell .sidebar label[for="view-accessibility-keyboard"].status-pass,
+    #view-accessibility-landmarks:checked ~ .report-shell .sidebar label[for="view-accessibility-landmarks"].status-pass,
+    #view-functionality-links:checked ~ .report-shell .sidebar label[for="view-functionality-links"].status-pass,
+    #view-functionality-interactive:checked ~ .report-shell .sidebar label[for="view-functionality-interactive"].status-pass,
+    #view-functionality-infrastructure:checked ~ .report-shell .sidebar label[for="view-functionality-infrastructure"].status-pass,
+    #view-responsive-layout:checked ~ .report-shell .sidebar label[for="view-responsive-layout"].status-pass,
+    #view-visual-regression:checked ~ .report-shell .sidebar label[for="view-visual-regression"].status-pass
+) {
   background: rgba(16, 185, 129, 0.24);
-  color: #101828;
+  color: #065f46;
 }
 
 @media (max-width: 1080px) {
