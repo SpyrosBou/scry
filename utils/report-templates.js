@@ -257,17 +257,52 @@ const deriveWcagPageStatus = (summary) => {
       pageClass: 'summary-page--warn',
     };
   }
-  if ((summary?.gatingViolations || 0) > 0) {
+  const violationsCount =
+    summary?.gatingViolations ??
+    (Array.isArray(summary?.violations) ? summary.violations.length : 0);
+
+  if (violationsCount > 0) {
     return {
       pillClass: 'status-error',
       pillLabel: 'Accessibility violations',
       pageClass: 'summary-page--fail',
     };
   }
+
+  const advisoriesList =
+    (Array.isArray(summary?.advisoriesList) && summary.advisoriesList.length
+      ? summary.advisoriesList
+      : Array.isArray(summary?.advisories) && summary.advisories.length
+        ? summary.advisories
+        : Array.isArray(summary?.advisory)
+          ? summary.advisory
+          : []) || [];
+
+  const bestPracticesList =
+    (Array.isArray(summary?.bestPracticesList) && summary.bestPracticesList.length
+      ? summary.bestPracticesList
+      : Array.isArray(summary?.bestPractices) && summary.bestPractices.length
+        ? summary.bestPractices
+        : Array.isArray(summary?.bestPractice)
+          ? summary.bestPractice
+          : []) || [];
+
+  const advisoryCount = summary?.advisoryFindings ?? advisoriesList.length;
+  const bestPracticeCount = summary?.bestPracticeFindings ?? bestPracticesList.length;
+  const hasAdvisories = (advisoryCount || 0) + (bestPracticeCount || 0) > 0;
+
+  if (hasAdvisories) {
+    return {
+      pillClass: 'status-advisory',
+      pillLabel: 'Advisories',
+      pageClass: 'summary-page--advisory',
+    };
+  }
+
   return {
-    pillClass: 'status-success',
+    pillClass: 'status-ok',
     pillLabel: 'Pass',
-    pageClass: 'summary-page--pass',
+    pageClass: 'summary-page--ok',
   };
 };
 
@@ -1127,8 +1162,9 @@ const renderAccessibilityGroupHtmlLegacy = (group) => {
   `;
 };
 
-const renderWcagPageIssueTable = (entries, heading) => {
+const renderWcagPageIssueTable = (entries, heading, options = {}) => {
   if (!Array.isArray(entries) || entries.length === 0) return '';
+  const headingClass = options.headingClass ? ` class="${escapeHtml(options.headingClass)}"` : '';
   const rows = entries
     .map((entry) => {
       const impact = entry.impact || entry.category || 'info';
@@ -1150,7 +1186,7 @@ const renderWcagPageIssueTable = (entries, heading) => {
     .join('');
 
   return `
-    <h4>${escapeHtml(heading)}</h4>
+    <h4${headingClass}>${escapeHtml(heading)}</h4>
     <div class="page-card__table">
       <table>
         <thead><tr><th>Impact</th><th>Rule</th><th>Nodes</th><th>Help</th><th>WCAG level</th><th>Sample targets</th></tr></thead>
@@ -3985,7 +4021,8 @@ const renderWcagPageCard = (summary, { viewportLabel, failThreshold } = {}) => {
   const bestPracticeSection = bestPractices.length
     ? renderWcagPageIssueTable(
         bestPractices,
-        `Best-practice advisories (${formatCount(bestPractices.length)})`
+        `Best-practice advisories (${formatCount(bestPractices.length)})`,
+        { headingClass: 'summary-heading-best-practice' }
       )
     : '';
 
@@ -4412,6 +4449,16 @@ const reportStyleOverrides = `
   background: #ffe8a3;
 }
 
+.summary-heading-best-practice {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.25rem 0.55rem;
+  border-radius: 8px;
+  background: rgba(255, 232, 163, 0.9);
+  color: #7a4c00;
+}
+
 .sidebar .nav-item.status-summary {
   background: rgba(184, 211, 255, 0.24);
   color: #0f172a;
@@ -4422,11 +4469,7 @@ const reportStyleOverrides = `
   background: rgba(148, 197, 255, 0.32);
 }
 
-.sidebar .nav-item.status-summary .nav-status.status-summary {
-  background: rgba(148, 197, 255, 0.32);
-  color: #0f172a;
-}
-
+.sidebar .nav-item.status-summary .nav-status.status-summary,
 .nav-status.status-summary {
   background: rgba(148, 197, 255, 0.32);
   color: #0f172a;
@@ -4445,6 +4488,29 @@ const reportStyleOverrides = `
 .sidebar .nav-item.status-info .nav-status.status-info {
   background: rgba(255, 232, 163, 0.85);
   color: #7a4c00;
+}
+
+.status-advisory {
+  background: rgba(255, 232, 163, 0.85);
+  color: #7a4c00;
+}
+
+.summary-page--advisory {
+  border: 1px solid rgba(234, 179, 8, 0.35);
+  background: rgba(255, 232, 163, 0.4);
+  box-shadow: inset 0 0 0 1px rgba(234, 179, 8, 0.2);
+}
+
+.summary-page--advisory > summary {
+  color: #7a4c00;
+}
+
+.summary-page--advisory[open] > summary {
+  border-bottom: 1px solid rgba(234, 179, 8, 0.35);
+}
+
+.summary-page--advisory .summary-page__body {
+  background: rgba(255, 249, 219, 0.92);
 }
 `;
 
