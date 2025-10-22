@@ -4460,18 +4460,26 @@ const reportStyleOverrides = `
 }
 
 .sidebar .nav-item.status-summary {
-  background: rgba(184, 211, 255, 0.24);
+  background: rgba(227, 238, 255, 0.9);
   color: #0f172a;
-  border-left: 4px solid rgba(148, 197, 255, 0.45);
+  border: 1px solid rgba(59, 130, 246, 0.28);
+  border-radius: 12px;
+  padding: 0.8rem 1rem;
+  box-shadow: 0 14px 28px rgba(37, 99, 235, 0.18);
 }
 
 .sidebar .nav-item.status-summary:hover {
-  background: rgba(148, 197, 255, 0.32);
+  background: rgba(217, 233, 255, 0.96);
+  box-shadow: 0 18px 32px rgba(37, 99, 235, 0.22);
+}
+
+.sidebar .nav-item.status-summary .nav-item__header {
+  width: 100%;
 }
 
 .sidebar .nav-item.status-summary .nav-status.status-summary,
 .nav-status.status-summary {
-  background: rgba(148, 197, 255, 0.32);
+  background: rgba(148, 197, 255, 0.6);
   color: #0f172a;
 }
 
