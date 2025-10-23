@@ -4428,14 +4428,27 @@ const renderTestCard = (test, options = {}) => {
   `;
 };
 
-const baseStylesRaw = fs.readFileSync(
-  path.join(__dirname, '..', 'docs', 'mocks', 'mock-styling.css'),
-  'utf8'
-);
+const sass = require('sass');
 
-const reportStyleOverrides = `/* Overrides consolidated in docs/mocks/mock-styling.css */`;
+const styleSourcePath = path.join(__dirname, '..', 'docs', 'mocks', 'mock-styling.scss');
 
-const baseStyles = `${baseStylesRaw}\n${reportStyleOverrides}`;
+function compileReportStyles() {
+  try {
+    const result = sass.compile(styleSourcePath, { style: 'expanded' });
+    const css = `${result.css.trim()}\n`;
+    const legacyPath = styleSourcePath.replace(/\.scss$/, '.css');
+    try {
+      fs.writeFileSync(legacyPath, css);
+    } catch (writeError) {
+      console.warn(`⚠️  Unable to write compiled CSS to ${legacyPath}: ${writeError.message}`);
+    }
+    return css;
+  } catch (error) {
+    throw new Error(`Failed to compile report styles from ${styleSourcePath}: ${error.message}`);
+  }
+}
+
+const baseStyles = compileReportStyles();
 
 const filterScript = `
 (function () {

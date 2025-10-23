@@ -1,4 +1,3 @@
-@charset "UTF-8";
 :root {
   --bg-primary: #f4f6fb;
   --font-body: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -49,7 +48,7 @@ h4,
   padding: 3rem clamp(1rem, 4vw, 3rem);
 }
 
-input[name=report-view] {
+input[name="report-view"] {
   position: absolute;
   opacity: 0;
   pointer-events: none;
@@ -137,7 +136,12 @@ input[name=report-view] {
   background: rgba(255, 255, 255, 0.45);
   border: 1px solid rgba(29, 78, 216, 0.08);
   cursor: pointer;
-  transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
   gap: 0.55rem;
   width: 100%;
 }
@@ -657,7 +661,10 @@ input[name=report-view] {
   font-size: 0.8rem;
   font-weight: 500;
   cursor: pointer;
-  transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .summary-toggle-button:hover {
@@ -1009,7 +1016,7 @@ details.summary-accordion[open] summary {
 }
 
 .checks li::before {
-  content: "✖";
+  content: "\2716";
   color: #dc2626;
   margin-right: 0.5rem;
 }
@@ -1039,34 +1046,38 @@ details.summary-accordion[open] summary {
     transform: translateY(0);
   }
 }
-#view-summary:checked ~ .report-shell .panel[data-view=view-summary],
-#view-accessibility-wcag:checked ~ .report-shell .panel[data-view=view-accessibility-wcag],
-#view-accessibility-forms:checked ~ .report-shell .panel[data-view=view-accessibility-forms],
-#view-accessibility-keyboard:checked ~ .report-shell .panel[data-view=view-accessibility-keyboard],
-#view-accessibility-landmarks:checked ~ .report-shell .panel[data-view=view-accessibility-landmarks],
-#view-functionality-links:checked ~ .report-shell .panel[data-view=view-functionality-links],
-#view-functionality-interactive:checked ~ .report-shell .panel[data-view=view-functionality-interactive],
-#view-functionality-infrastructure:checked ~ .report-shell .panel[data-view=view-functionality-infrastructure],
-#view-responsive-layout:checked ~ .report-shell .panel[data-view=view-responsive-layout],
-#view-visual-regression:checked ~ .report-shell .panel[data-view=view-visual-regression] {
+
+#view-summary:checked ~ .report-shell .panel[data-view="view-summary"],
+#view-accessibility-wcag:checked ~ .report-shell .panel[data-view="view-accessibility-wcag"],
+#view-accessibility-forms:checked ~ .report-shell .panel[data-view="view-accessibility-forms"],
+#view-accessibility-keyboard:checked ~ .report-shell .panel[data-view="view-accessibility-keyboard"],
+#view-accessibility-landmarks:checked ~ .report-shell .panel[data-view="view-accessibility-landmarks"],
+#view-functionality-links:checked ~ .report-shell .panel[data-view="view-functionality-links"],
+#view-functionality-interactive:checked ~ .report-shell .panel[data-view="view-functionality-interactive"],
+#view-functionality-infrastructure:checked ~ .report-shell .panel[data-view="view-functionality-infrastructure"],
+#view-responsive-layout:checked ~ .report-shell .panel[data-view="view-responsive-layout"],
+#view-visual-regression:checked ~ .report-shell .panel[data-view="view-visual-regression"] {
   display: grid;
 }
 
-#view-summary:checked ~ .report-shell .sidebar label[for=view-summary],
-#view-accessibility-wcag:checked ~ .report-shell .sidebar label[for=view-accessibility-wcag],
-#view-accessibility-forms:checked ~ .report-shell .sidebar label[for=view-accessibility-forms],
-#view-accessibility-keyboard:checked ~ .report-shell .sidebar label[for=view-accessibility-keyboard],
-#view-accessibility-landmarks:checked ~ .report-shell .sidebar label[for=view-accessibility-landmarks],
-#view-functionality-links:checked ~ .report-shell .sidebar label[for=view-functionality-links],
-#view-functionality-interactive:checked ~ .report-shell .sidebar label[for=view-functionality-interactive],
-#view-functionality-infrastructure:checked ~ .report-shell .sidebar label[for=view-functionality-infrastructure],
-#view-responsive-layout:checked ~ .report-shell .sidebar label[for=view-responsive-layout],
-#view-visual-regression:checked ~ .report-shell .sidebar label[for=view-visual-regression] {
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.18), 0 12px 28px rgba(30, 64, 175, 0.18);
+#view-summary:checked ~ .report-shell .sidebar label[for="view-summary"],
+#view-accessibility-wcag:checked ~ .report-shell .sidebar label[for="view-accessibility-wcag"],
+#view-accessibility-forms:checked ~ .report-shell .sidebar label[for="view-accessibility-forms"],
+#view-accessibility-keyboard:checked ~ .report-shell .sidebar label[for="view-accessibility-keyboard"],
+#view-accessibility-landmarks:checked ~ .report-shell .sidebar label[for="view-accessibility-landmarks"],
+#view-functionality-links:checked ~ .report-shell .sidebar label[for="view-functionality-links"],
+#view-functionality-interactive:checked ~ .report-shell .sidebar label[for="view-functionality-interactive"],
+#view-functionality-infrastructure:checked ~ .report-shell .sidebar label[for="view-functionality-infrastructure"],
+#view-responsive-layout:checked ~ .report-shell .sidebar label[for="view-responsive-layout"],
+#view-visual-regression:checked ~ .report-shell .sidebar label[for="view-visual-regression"] {
+  box-shadow:
+    0 0 0 2px rgba(37, 99, 235, 0.18),
+    0 12px 28px rgba(30, 64, 175, 0.18);
   outline: 1px solid rgba(37, 99, 235, 0.25);
   outline-offset: -1px;
   transform: none;
 }
+
 
 .sidebar .nav-item.status-summary {
   background: rgba(227, 238, 255, 0.9);
@@ -1106,30 +1117,34 @@ details.summary-accordion[open] summary {
   color: #7a4c00;
 }
 
-:is(#view-summary:checked ~ .report-shell .sidebar label[for=view-summary].status-fail,
-#view-accessibility-wcag:checked ~ .report-shell .sidebar label[for=view-accessibility-wcag].status-fail,
-#view-accessibility-forms:checked ~ .report-shell .sidebar label[for=view-accessibility-forms].status-fail,
-#view-accessibility-keyboard:checked ~ .report-shell .sidebar label[for=view-accessibility-keyboard].status-fail,
-#view-accessibility-landmarks:checked ~ .report-shell .sidebar label[for=view-accessibility-landmarks].status-fail,
-#view-functionality-links:checked ~ .report-shell .sidebar label[for=view-functionality-links].status-fail,
-#view-functionality-interactive:checked ~ .report-shell .sidebar label[for=view-functionality-interactive].status-fail,
-#view-functionality-infrastructure:checked ~ .report-shell .sidebar label[for=view-functionality-infrastructure].status-fail,
-#view-responsive-layout:checked ~ .report-shell .sidebar label[for=view-responsive-layout].status-fail,
-#view-visual-regression:checked ~ .report-shell .sidebar label[for=view-visual-regression].status-fail) {
+:is(
+    #view-summary:checked ~ .report-shell .sidebar label[for="view-summary"].status-fail,
+    #view-accessibility-wcag:checked ~ .report-shell .sidebar label[for="view-accessibility-wcag"].status-fail,
+    #view-accessibility-forms:checked ~ .report-shell .sidebar label[for="view-accessibility-forms"].status-fail,
+    #view-accessibility-keyboard:checked ~ .report-shell .sidebar label[for="view-accessibility-keyboard"].status-fail,
+    #view-accessibility-landmarks:checked ~ .report-shell .sidebar label[for="view-accessibility-landmarks"].status-fail,
+    #view-functionality-links:checked ~ .report-shell .sidebar label[for="view-functionality-links"].status-fail,
+    #view-functionality-interactive:checked ~ .report-shell .sidebar label[for="view-functionality-interactive"].status-fail,
+    #view-functionality-infrastructure:checked ~ .report-shell .sidebar label[for="view-functionality-infrastructure"].status-fail,
+    #view-responsive-layout:checked ~ .report-shell .sidebar label[for="view-responsive-layout"].status-fail,
+    #view-visual-regression:checked ~ .report-shell .sidebar label[for="view-visual-regression"].status-fail
+) {
   background: rgba(220, 38, 38, 0.28);
   color: #7f1d1d;
 }
 
-:is(#view-summary:checked ~ .report-shell .sidebar label[for=view-summary].status-pass,
-#view-accessibility-wcag:checked ~ .report-shell .sidebar label[for=view-accessibility-wcag].status-pass,
-#view-accessibility-forms:checked ~ .report-shell .sidebar label[for=view-accessibility-forms].status-pass,
-#view-accessibility-keyboard:checked ~ .report-shell .sidebar label[for=view-accessibility-keyboard].status-pass,
-#view-accessibility-landmarks:checked ~ .report-shell .sidebar label[for=view-accessibility-landmarks].status-pass,
-#view-functionality-links:checked ~ .report-shell .sidebar label[for=view-functionality-links].status-pass,
-#view-functionality-interactive:checked ~ .report-shell .sidebar label[for=view-functionality-interactive].status-pass,
-#view-functionality-infrastructure:checked ~ .report-shell .sidebar label[for=view-functionality-infrastructure].status-pass,
-#view-responsive-layout:checked ~ .report-shell .sidebar label[for=view-responsive-layout].status-pass,
-#view-visual-regression:checked ~ .report-shell .sidebar label[for=view-visual-regression].status-pass) {
+:is(
+    #view-summary:checked ~ .report-shell .sidebar label[for="view-summary"].status-pass,
+    #view-accessibility-wcag:checked ~ .report-shell .sidebar label[for="view-accessibility-wcag"].status-pass,
+    #view-accessibility-forms:checked ~ .report-shell .sidebar label[for="view-accessibility-forms"].status-pass,
+    #view-accessibility-keyboard:checked ~ .report-shell .sidebar label[for="view-accessibility-keyboard"].status-pass,
+    #view-accessibility-landmarks:checked ~ .report-shell .sidebar label[for="view-accessibility-landmarks"].status-pass,
+    #view-functionality-links:checked ~ .report-shell .sidebar label[for="view-functionality-links"].status-pass,
+    #view-functionality-interactive:checked ~ .report-shell .sidebar label[for="view-functionality-interactive"].status-pass,
+    #view-functionality-infrastructure:checked ~ .report-shell .sidebar label[for="view-functionality-infrastructure"].status-pass,
+    #view-responsive-layout:checked ~ .report-shell .sidebar label[for="view-responsive-layout"].status-pass,
+    #view-visual-regression:checked ~ .report-shell .sidebar label[for="view-visual-regression"].status-pass
+) {
   background: rgba(16, 185, 129, 0.24);
   color: #065f46;
 }
@@ -1138,27 +1153,34 @@ details.summary-accordion[open] summary {
   .report-shell {
     grid-template-columns: 1fr;
   }
+
   .sidebar {
     position: static;
   }
+
   .report-content {
     order: 2;
   }
 }
+
 @media (max-width: 720px) {
   .report-app {
     padding: 2rem 1rem 3rem;
   }
+
   .panel {
     padding: 1.8rem 1.25rem;
   }
+
   .panel-header {
     flex-direction: column;
     align-items: flex-start;
   }
+
   .summary-grid {
     grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   }
+
   .suite-grid {
     grid-template-columns: 1fr;
   }
