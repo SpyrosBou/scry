@@ -183,7 +183,7 @@ input[name="report-view"] {
 }
 
 .nav-status.status-summary {
-  background: rgba(148, 197, 255, 0.32);
+  background: rgba(148, 197, 255, 0.6);
   color: #0f172a;
 }
 
@@ -1097,8 +1097,7 @@ details.summary-accordion[open] summary {
   width: 100%;
 }
 
-.sidebar .nav-item.status-summary .nav-status.status-summary,
-.nav-status.status-summary {
+.sidebar .nav-item.status-summary .nav-status.status-summary {
   background: rgba(148, 197, 255, 0.6);
   color: #0f172a;
 }
