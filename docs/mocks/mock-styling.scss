@@ -64,7 +64,7 @@ input[name="report-view"] {
 
 .sidebar {
   background: rgba(255, 255, 255, 0.78);
-  border-radius: var(--radius-lg);
+  border-radius: 12px;
   box-shadow: 0 24px 40px rgba(15, 23, 42, 0.12);
   padding: 1.75rem 1.5rem 2rem;
   backdrop-filter: blur(12px);
@@ -161,7 +161,7 @@ input[name="report-view"] {
   font-size: 0.75rem;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  border-radius: 999px;
+  border-radius: 12px;
   padding: 0.15rem 0.65rem;
   font-weight: 500;
   white-space: nowrap;
@@ -220,7 +220,7 @@ input[name="report-view"] {
 .panel {
   display: none;
   background: var(--bg-card);
-  border-radius: var(--radius-lg);
+  border-radius: 12px;
   box-shadow: var(--pill-shadow);
   padding: 2.4rem clamp(1.5rem, 3vw, 2.6rem);
   animation: fadeIn 0.25s ease;
@@ -261,7 +261,7 @@ input[name="report-view"] {
   align-items: center;
   gap: 0.35rem;
   padding: 0.45rem 1rem;
-  border-radius: 999px;
+  border-radius: 12px;
   font-size: 0.9rem;
   text-transform: uppercase;
   font-weight: 500;
@@ -297,7 +297,7 @@ input[name="report-view"] {
 
 .summary-card {
   background: var(--bg-card);
-  border-radius: var(--radius-lg);
+  border-radius: 12px;
   padding: 1.5rem 1.7rem;
   box-shadow: var(--pill-shadow);
   position: relative;
@@ -356,7 +356,7 @@ input[name="report-view"] {
 }
 
 .suite-card {
-  border-radius: var(--radius-lg);
+  border-radius: 12px;
   padding: 1.35rem 1.45rem;
   background: #f8fafc;
   border: 1px solid rgba(15, 23, 42, 0.05);
@@ -408,7 +408,7 @@ input[name="report-view"] {
   width: 100%;
   border-collapse: collapse;
   background: #ffffff;
-  border-radius: var(--radius-lg);
+  border-radius: 12px;
   overflow: hidden;
   box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
 }
@@ -446,7 +446,7 @@ input[name="report-view"] {
 
 .summary-report {
   background: var(--bg-card);
-  border-radius: var(--radius-lg);
+  border-radius: 12px;
   border: 1px solid rgba(15, 23, 42, 0.08);
   padding: 1.35rem 1.5rem;
   box-shadow: 0 18px 30px rgba(15, 23, 42, 0.12);
@@ -476,7 +476,7 @@ input[name="report-view"] {
 .summary-report table {
   width: 100%;
   border-collapse: collapse;
-  border-radius: var(--radius-md);
+  border-radius: 12px;
   overflow: hidden;
   background: #ffffff;
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
@@ -536,7 +536,7 @@ input[name="report-view"] {
 .summary-report code {
   background: #f1f5f9;
   padding: 0.15rem 0.35rem;
-  border-radius: 4px;
+  border-radius: 12px;
   font-size: 0.85rem;
   color: #0f172a;
 }
@@ -550,7 +550,7 @@ input[name="report-view"] {
 
 .schema-metrics__item {
   background: rgba(29, 78, 216, 0.05);
-  border-radius: var(--radius-md);
+  border-radius: 12px;
   padding: 0.85rem 1rem;
   display: grid;
   gap: 0.35rem;
@@ -594,7 +594,7 @@ input[name="report-view"] {
   display: inline-flex;
   align-items: center;
   padding: 0.2rem 0.55rem;
-  border-radius: 999px;
+  border-radius: 12px;
   font-size: 0.75rem;
   font-weight: 500;
   letter-spacing: 0.04em;
@@ -627,7 +627,7 @@ input[name="report-view"] {
   align-items: center;
   gap: 0.4rem;
   padding: 0.25rem 0.55rem;
-  border-radius: 8px;
+  border-radius: 12px;
   background: rgba(255, 232, 163, 0.9);
   color: #7a4c00;
 }
@@ -656,7 +656,7 @@ input[name="report-view"] {
   border: 1px solid rgba(37, 99, 235, 0.25);
   background: rgba(29, 78, 216, 0.1);
   color: #3b82f6;
-  border-radius: 999px;
+  border-radius: 12px;
   padding: 0.45rem 0.9rem;
   font-size: 0.8rem;
   font-weight: 500;
@@ -813,7 +813,7 @@ input[name="report-view"] {
   width: 100%;
   border-collapse: collapse;
   background: #ffffff;
-  border-radius: var(--radius-md);
+  border-radius: 12px;
   overflow: hidden;
   box-shadow: 0 12px 22px rgba(15, 23, 42, 0.1);
 }
@@ -846,7 +846,7 @@ input[name="report-view"] {
   margin: 0;
   background: #ffffff;
   border: 1px solid rgba(15, 23, 42, 0.08);
-  border-radius: 8px;
+  border-radius: 12px;
   padding: 0.75rem;
   display: grid;
   gap: 0.5rem;
@@ -856,7 +856,7 @@ input[name="report-view"] {
 .visual-previews img {
   width: 100%;
   height: auto;
-  border-radius: 6px;
+  border-radius: 12px;
   border: 1px solid rgba(15, 23, 42, 0.08);
   background: #f8fafc;
 }
@@ -870,7 +870,7 @@ input[name="report-view"] {
   display: inline-flex;
   align-items: center;
   padding: 0.25rem 0.65rem;
-  border-radius: 999px;
+  border-radius: 12px;
   font-size: 0.75rem;
   font-weight: 500;
   letter-spacing: 0.03em;
@@ -899,7 +899,7 @@ input[name="report-view"] {
   color: #f8fafc;
   font-weight: 500;
   padding: 0.25rem 0.65rem;
-  border-radius: 999px;
+  border-radius: 12px;
   box-shadow: 0 6px 16px rgba(37, 99, 235, 0.25);
   letter-spacing: 0.03em;
   font-size: 0.75rem;
@@ -912,7 +912,7 @@ input[name="report-view"] {
   margin: 0.15rem 0.3rem 0.15rem 0;
   padding: 0.2rem 0.6rem;
   background: rgba(14, 165, 233, 0.15);
-  border-radius: 999px;
+  border-radius: 12px;
   color: #0369a1;
   font-size: 0.8rem;
   font-weight: 500;
@@ -920,7 +920,7 @@ input[name="report-view"] {
 
 details.summary-accordion {
   background: #f8fafc;
-  border-radius: var(--radius-lg);
+  border-radius: 12px;
   overflow: hidden;
   box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.08);
 }
@@ -951,7 +951,7 @@ details.summary-accordion[open] summary {
 
 .page-card {
   background: #f8fafc;
-  border-radius: var(--radius-md);
+  border-radius: 12px;
   padding: 1.1rem 1.3rem;
   box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.18);
 }
@@ -967,7 +967,7 @@ details.summary-accordion[open] summary {
   display: inline-flex;
   align-items: center;
   padding: 0.25rem 0.65rem;
-  border-radius: 999px;
+  border-radius: 12px;
   font-size: 0.75rem;
   font-weight: 500;
   letter-spacing: 0.04em;
