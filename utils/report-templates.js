@@ -4430,7 +4430,7 @@ const renderTestCard = (test, options = {}) => {
 
 const sass = require('sass');
 
-const styleSourcePath = path.join(__dirname, '..', 'docs', 'mocks', 'mock-styling.scss');
+const styleSourcePath = path.join(__dirname, '..', 'docs', 'mocks', 'report-styles.scss');
 
 function compileReportStyles() {
   try {

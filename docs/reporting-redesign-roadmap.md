@@ -3,7 +3,7 @@
 The mock HTML report is now approved and locked. All future work happens on the feature branch that carries the production reporter changes; keep this document updated alongside that branch.
 
 ## Phase 0 · Prep
-- Take a fresh copy of `docs/mocks/full-run-report.html` and `docs/mocks/mock-styling.scss` into the branch for quick comparison.
+- Take a fresh copy of `docs/mocks/full-run-report.html` and `docs/mocks/report-styles.scss` into the branch for quick comparison.
 - Snapshot the current reporter output (`reports/run-*/report.html`) so we can diff structure and CSS after each phase.
 - File tracking tickets for every spec panel so QA can sign off individually once they match the mock.
 
@@ -21,7 +21,7 @@ The mock HTML report is now approved and locked. All future work happens on the 
 - ⏳ Surface visual regression deltas, previews, and notes inside the new visual panel once the panel migration lands.
 
 ## Phase 3 · Styling Integration
-- ✅ Reporter now compiles `docs/mocks/mock-styling.scss`; legacy inline styles (`SUMMARY_STYLES`) are gone, so every panel inherits the mock tokens without spec-specific CSS.
+- ✅ Reporter now compiles `docs/mocks/report-styles.scss`; legacy inline styles (`SUMMARY_STYLES`) are gone, so every panel inherits the mock tokens without spec-specific CSS.
 - Continue folding mock styling into `utils/report-templates.js` until all panels match the mock (Inter typography, pills, card shadows). Remaining work is tied to the outstanding suite panels above.
 - Specs should emit structured data only—no inline HTML styling—so the shared renderer controls layout, spacing, and color.
 
