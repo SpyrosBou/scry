@@ -628,7 +628,7 @@ class TestRunner {
         } else {
           console.log('❌ Test run completed with issues.');
         }
-        console.log('📰 View report: npm run read-reports');
+        console.log('📰 View report: npm run reports:read');
         console.log('📁 Reports directory: ./reports/');
         console.log('📸 Test artifacts: ./test-results/');
 
