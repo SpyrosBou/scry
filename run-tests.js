@@ -6,10 +6,9 @@ const path = require('path');
 const TestRunner = require('./utils/test-runner');
 
 const argv = minimist(process.argv.slice(2), {
-  string: ['site', 'sites', 'project', 'browser', 'browsers', 'workers', 'spec', 'pages', 'output'],
+  string: ['site', 'test', 'pages', 'browsers', 'workers', 'output'],
   boolean: [
     'help',
-    'list',
     'list-sites',
     'discover',
     'local',
@@ -21,24 +20,10 @@ const argv = minimist(process.argv.slice(2), {
     'update-baselines',
   ],
   alias: {
-    h: 'help',
-    l: 'list',
     s: 'site',
-    S: 'sites',
-    w: 'workers',
-    b: 'browsers',
-    t: 'spec',
-    d: 'discover',
-    c: 'local',
-    v: 'visual',
-    r: 'responsive',
-    F: 'functionality',
-    g: 'accessibility',
-    D: 'debug',
-    B: 'update-baselines',
-    L: 'list-sites',
+    t: 'test',
     p: 'pages',
-    'list-sites': ['ls'],
+    b: 'browsers',
   },
 });
 
@@ -81,30 +66,30 @@ function showUsage() {
     'Smart Playwright runner',
     '',
     'Usage:',
-    '  node run-tests.js [options] --site <site> [extra sites...] [spec patterns...]',
+    '  node run-tests.js [options] --site <site> [extra sites...] [test patterns...]',
     '',
     'Core selections:',
-    '  Step 1 – Site(s):        --site <name> (repeat or comma-separate)',
-    '  Step 2 – Specs (optional): --spec <pattern> (repeat as needed)',
-    '  Step 3 – Page scope:     --pages <n> (caps pages across all suites)',
-    '  Step 4 – Projects:       --project=<list> (default Chrome, use "all" for every project)',
+    '  Step 1 – Site(s):        --site, -s <name> (repeat or comma-separate)',
+    '  Step 2 – Tests (optional): --test, -t <pattern> (repeat as needed)',
+    '  Step 3 – Page scope:     --pages, -p <n> (caps pages across all suites)',
+    '  Step 4 – Projects:       --browsers, -b <list> (default Chrome, use "all" for every project)',
     '',
     'Advanced options:',
-    '  --visual, -v             Run only visual regression specs',
-    '  --responsive, -r         Run only responsive structure specs',
-    '  --functionality, -F      Run only functionality specs',
-    '  --accessibility, -g      Run only accessibility specs',
-    '  --workers, -w            Worker count (number or "auto", default auto)',
-    '  --discover, -d           Refresh sitemap-backed pages before running',
-    '  --local, -c              Attempt DDEV preflight for local ".ddev.site" hosts',
+    '  --visual                Run only visual regression specs',
+    '  --responsive            Run only responsive structure specs',
+    '  --functionality         Run only functionality specs',
+    '  --accessibility         Run only accessibility specs',
+    '  --workers               Worker count (number or "auto", default auto)',
+    '  --discover              Refresh sitemap-backed pages before running',
+    '  --local                 Attempt DDEV preflight for local ".ddev.site" hosts',
     '  --output <path>         Persist manifest + run summary JSON to disk',
-    '  --list-sites, -L         Print site configs for reference',
-    '  --update-baselines, -B  Update visual baselines for the chosen site(s)',
-    '  --debug, -D              Enable Playwright debug mode',
-    '  --help, -h               Show this help message',
+    '  --list-sites            Print site configs for reference',
+    '  --update-baselines      Update visual baselines for the chosen site(s)',
+    '  --debug                 Enable Playwright debug mode',
+    '  --help                  Show this help message',
     '',
     'Tips:',
-    '  - Append spec globs after the options (e.g. "node run-tests.js --site foo tests/*.spec.js").',
+    '  - Append test globs after the options (e.g. "node run-tests.js --site foo tests/*.spec.js").',
     '  - Combine page cap and project selection to mirror the GUI flow you plan to build.',
     '  - Use env vars like REPORT_BROWSER to override the default browser opener when viewing reports.',
     '',
@@ -113,7 +98,7 @@ function showUsage() {
 }
 
 function parseSites() {
-  const explicitSites = [...toStringArray(argv.site), ...toStringArray(argv.sites)];
+  const explicitSites = toStringArray(argv.site);
   const positional = argv._.map((item) => String(item).trim()).filter(Boolean);
   const inferredSites = positional.filter(
     (value) => !/\.(spec\.[jt]s|[jt]s)$/i.test(value) && !value.includes('/')
@@ -129,7 +114,7 @@ function parseSpecs() {
   const positionalSpecs = positional.filter(
     (value) => /\.(spec\.[jt]s|[jt]s)$/i.test(value) || value.includes('/') || value.includes('*')
   );
-  const specOptions = toStringArray(argv.spec);
+  const specOptions = toStringArray(argv.test);
   const inputs = [...specOptions, ...positionalSpecs];
   return Array.from(new Set(inputs));
 }
@@ -224,7 +209,7 @@ async function main() {
     return;
   }
 
-  if (argv['list-sites'] || argv.list) {
+  if (argv['list-sites']) {
     await handleListSites();
     return;
   }
@@ -248,7 +233,7 @@ async function main() {
     debug: coerceBoolean(argv.debug),
     discover: coerceBoolean(argv.discover),
     local: coerceBoolean(argv.local),
-    project: argv.browsers || argv.browser || argv.project,
+    project: argv.browsers,
     limit: argv.pages,
     specs,
     workers: argv.workers,
