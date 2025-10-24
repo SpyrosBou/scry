@@ -41,4 +41,4 @@ This note captures the remaining tasks to harden our Playwright-based visual reg
 - Update visual baselines for a site (visuals only):
   - `npm run baselines:update -- <name>`
 - Run visual regression only (defaults to Chrome desktop):
-  - `node run-tests.js --site=<name> --visual`
+  - `node run-tests.js --site=<name> --pages=5 --visual`
