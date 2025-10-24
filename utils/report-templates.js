@@ -2787,7 +2787,7 @@ const renderSidebar = (panels, run, summaryMap) => {
             <label class="nav-item ${escapeHtml(statusMeta.navClass || '')}" for="view-${panel.id}">
               <span class="nav-item__header">
                 <span class="nav-name">${escapeHtml(panel.label)}</span>
-                <span class="nav-status${statusMeta.navClass ? ` ${escapeHtml(statusMeta.navClass)}` : ''}">${escapeHtml(statusMeta.label)}</span>
+                <span class="nav-status">${escapeHtml(statusMeta.label)}</span>
               </span>
             </label>
           `;
