@@ -1,3 +1,5 @@
+@use 'sass:map';
+
 :root {
   --bg-primary: #f4f6fb;
   --font-body: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -12,6 +14,69 @@
   --radius-lg: 16px;
   --radius-md: 10px;
   --grid-gap: 1.5rem;
+}
+
+$badge-statuses: (
+  error: (bg: rgba(220, 38, 38, 0.14), color: #b91c1c),
+  warning: (bg: rgba(217, 119, 6, 0.2), color: #92400e),
+  info: (bg: rgba(14, 165, 233, 0.18), color: #0369a1),
+  advisory: (bg: rgba(255, 232, 163, 0.85), color: #7a4c00),
+  ok: (bg: rgba(16, 185, 129, 0.16), color: #047857)
+);
+
+$filter-chip-statuses: (
+  failed: (bg: rgba(220, 38, 38, 0.18), color: #b91c1c, border: rgba(220, 38, 38, 0.2)),
+  timedOut: (bg: rgba(220, 38, 38, 0.18), color: #b91c1c, border: rgba(220, 38, 38, 0.2)),
+  interrupted: (bg: rgba(220, 38, 38, 0.18), color: #b91c1c, border: rgba(220, 38, 38, 0.2)),
+  flaky: (bg: rgba(234, 179, 8, 0.22), color: #92400e, border: rgba(234, 179, 8, 0.22)),
+  passed: (bg: rgba(16, 185, 129, 0.18), color: #065f46, border: rgba(16, 185, 129, 0.18)),
+  skipped: (bg: rgba(59, 130, 246, 0.18), color: #1d4ed8, border: rgba(59, 130, 246, 0.24)),
+  unknown: (bg: rgba(59, 130, 246, 0.18), color: #1d4ed8, border: rgba(59, 130, 246, 0.24))
+);
+
+$test-card-statuses: (
+  failed: rgba(220, 38, 38, 0.7),
+  timedOut: rgba(220, 38, 38, 0.5),
+  interrupted: rgba(220, 38, 38, 0.5),
+  passed: rgba(16, 185, 129, 0.6),
+  flaky: rgba(234, 179, 8, 0.6),
+  skipped: rgba(59, 130, 246, 0.5),
+  unknown: rgba(59, 130, 246, 0.5)
+);
+
+@mixin status-pill-theme($name, $theme) {
+  .status-#{$name} {
+    background: map.get($theme, bg);
+    color: map.get($theme, color);
+  }
+}
+
+@mixin filter-chip-theme($status, $styles) {
+  .filter-chip.status-#{$status} {
+    input:checked + span {
+      background: map.get($styles, bg);
+      color: map.get($styles, color);
+      border-color: map.get($styles, border);
+    }
+  }
+}
+
+@mixin test-card-border($status, $color) {
+  .test-card.status-#{$status} {
+    border-left: 4px solid #{$color};
+  }
+}
+
+@each $status, $theme in $badge-statuses {
+  @include status-pill-theme($status, $theme);
+}
+
+@each $status, $theme in $filter-chip-statuses {
+  @include filter-chip-theme($status, $theme);
+}
+
+@each $status, $color in $test-card-statuses {
+  @include test-card-border($status, $color);
 }
 
 *,
@@ -306,113 +371,88 @@ input[name="report-view"] {
   box-shadow: 0 14px 28px rgba(15, 23, 42, 0.08);
 }
 
-.status-filters {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.6rem;
-}
+.filters {
+  .status-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+  }
 
-.filter-chip {
-  position: relative;
-  display: inline-flex;
-  border-radius: 12px;
-}
+  .filter-chip {
+    position: relative;
+    display: inline-flex;
+    border-radius: 12px;
 
-.filter-chip input {
-  position: absolute;
-  opacity: 0;
-  pointer-events: none;
-}
+    input {
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
+    }
 
-.filter-chip span {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.45rem 0.75rem;
-  border-radius: 12px;
-  background: rgba(15, 23, 42, 0.06);
-  color: var(--text-strong);
-  font-size: 0.85rem;
-  font-weight: 500;
-  border: 1px solid transparent;
-  transition:
-    background 0.2s ease,
-    border-color 0.2s ease,
-    color 0.2s ease,
-    box-shadow 0.2s ease;
-}
+    span {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.45rem 0.75rem;
+      border-radius: 12px;
+      background: rgba(15, 23, 42, 0.06);
+      color: var(--text-strong);
+      font-size: 0.85rem;
+      font-weight: 500;
+      border: 1px solid transparent;
+      transition:
+        background 0.2s ease,
+        border-color 0.2s ease,
+        color 0.2s ease,
+        box-shadow 0.2s ease;
+    }
 
-.filter-chip input:not(:checked) + span {
-  opacity: 0.65;
-}
+    input:not(:checked) + span {
+      opacity: 0.65;
+    }
 
-.filter-chip input:checked + span {
-  opacity: 1;
-  box-shadow: 0 12px 22px rgba(15, 23, 42, 0.12);
-  border-color: rgba(29, 78, 216, 0.2);
-}
+    input:checked + span {
+      opacity: 1;
+      box-shadow: 0 12px 22px rgba(15, 23, 42, 0.12);
+      border-color: rgba(29, 78, 216, 0.2);
+    }
+  }
 
-.filter-chip.status-failed input:checked + span,
-.filter-chip.status-timedOut input:checked + span,
-.filter-chip.status-interrupted input:checked + span {
-  background: rgba(220, 38, 38, 0.18);
-  color: #b91c1c;
-  border-color: rgba(220, 38, 38, 0.2);
-}
+  .filter-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.4rem;
+    padding: 0.1rem 0.4rem;
+    border-radius: 12px;
+    background: rgba(15, 23, 42, 0.1);
+    font-size: 0.75rem;
+  }
 
-.filter-chip.status-flaky input:checked + span {
-  background: rgba(234, 179, 8, 0.22);
-  color: #92400e;
-  border-color: rgba(234, 179, 8, 0.22);
-}
+  .search-filter {
+    flex: 1 1 220px;
+    display: flex;
+    justify-content: flex-end;
 
-.filter-chip.status-passed input:checked + span {
-  background: rgba(16, 185, 129, 0.18);
-  color: #065f46;
-  border-color: rgba(16, 185, 129, 0.18);
-}
+    input {
+      width: 100%;
+      max-width: 320px;
+      padding: 0.55rem 0.85rem;
+      border-radius: 12px;
+      border: 1px solid rgba(15, 23, 42, 0.15);
+      background: rgba(255, 255, 255, 0.9);
+      font-size: 0.9rem;
+      transition:
+        border-color 0.2s ease,
+        box-shadow 0.2s ease;
 
-.filter-chip.status-skipped input:checked + span,
-.filter-chip.status-unknown input:checked + span {
-  background: rgba(59, 130, 246, 0.18);
-  color: #1d4ed8;
-  border-color: rgba(59, 130, 246, 0.24);
-}
-
-.filter-count {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 1.4rem;
-  padding: 0.1rem 0.4rem;
-  border-radius: 12px;
-  background: rgba(15, 23, 42, 0.1);
-  font-size: 0.75rem;
-}
-
-.search-filter {
-  flex: 1 1 220px;
-  display: flex;
-  justify-content: flex-end;
-}
-
-.search-filter input {
-  width: 100%;
-  max-width: 320px;
-  padding: 0.55rem 0.85rem;
-  border-radius: 12px;
-  border: 1px solid rgba(15, 23, 42, 0.15);
-  background: rgba(255, 255, 255, 0.9);
-  font-size: 0.9rem;
-  transition:
-    border-color 0.2s ease,
-    box-shadow 0.2s ease;
-}
-
-.search-filter input:focus {
-  outline: none;
-  border-color: rgba(29, 78, 216, 0.4);
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.18);
+      &:focus {
+        outline: none;
+        border-color: rgba(29, 78, 216, 0.4);
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.18);
+      }
+    }
+  }
 }
 
 .visually-hidden {
@@ -608,28 +648,6 @@ input[name="report-view"] {
   font-size: 0.9rem;
   font-weight: 500;
   box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.05);
-}
-
-.test-card.status-failed {
-  border-left: 4px solid rgba(220, 38, 38, 0.7);
-}
-
-.test-card.status-passed {
-  border-left: 4px solid rgba(16, 185, 129, 0.6);
-}
-
-.test-card.status-skipped,
-.test-card.status-unknown {
-  border-left: 4px solid rgba(59, 130, 246, 0.5);
-}
-
-.test-card.status-timedOut,
-.test-card.status-interrupted {
-  border-left: 4px solid rgba(220, 38, 38, 0.5);
-}
-
-.test-card.status-flaky {
-  border-left: 4px solid rgba(234, 179, 8, 0.6);
 }
 
 .test-card.is-flaky {
@@ -1415,31 +1433,6 @@ details.summary-accordion[open] summary {
   font-weight: 500;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-}
-
-.status-error {
-  background: rgba(220, 38, 38, 0.14);
-  color: #b91c1c;
-}
-
-.status-warning {
-  background: rgba(217, 119, 6, 0.2);
-  color: #92400e;
-}
-
-.status-info {
-  background: rgba(14, 165, 233, 0.18);
-  color: #0369a1;
-}
-
-.status-advisory {
-  background: rgba(255, 232, 163, 0.85);
-  color: #7a4c00;
-}
-
-.status-ok {
-  background: rgba(16, 185, 129, 0.16);
-  color: #047857;
 }
 
 .checks {
