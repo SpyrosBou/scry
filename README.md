@@ -210,7 +210,7 @@ node run-tests.js --site=my-site --workers 4 --browsers Chrome,Firefox
 node run-tests.js -s my-site -w 4 -b Chrome,Firefox
 
 # Update visual baselines for a site (visual regression only)
-npm run update-baselines -- --site=my-site
+npm run baselines:update -- my-site
 
 # Refresh test pages from sitemap (no tests run)
 npm run discover -- my-site

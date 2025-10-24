@@ -20,7 +20,7 @@ Whilst working on this repo you can assume we are concerned with the functionali
 - `npm run clean-test-results` resets Playwright's `test-results/` folder.
 - `npm run test:unit` runs the Node test suite in `tests/unit/`.
 - `npm run discover -- <site>` hits sitemap discovery and updates the matching config; review the diff before committing.
-- `npm run update-baselines` refreshes visual regression snapshots for `example-site`.
+- `npm run baselines:update -- <site>` refreshes visual regression snapshots for any configured site.
 - Prefer `ddev exec` when interacting with containerized WordPress instances in `/home/warui/sites`.
 
 ## Coding Style & Naming Conventions

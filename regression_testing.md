@@ -17,7 +17,7 @@ This note captures the remaining tasks to harden our Playwright-based visual reg
 
 ## Nice‑to‑Have
 - Baseline management guidance
-  - Checklist for intentional UI changes: run locally, inspect diffs, update baselines via `npm run update-baselines -- --site=<name>`.
+  - Checklist for intentional UI changes: run locally, inspect diffs, update baselines via `npm run baselines:update -- <name>`.
   - Encourage small, scoped UI changes to keep diffs readable.
 - CI profile tuning
   - Run visual tests only on Chrome in CI; keep Firefox/WebKit for functional coverage.
@@ -39,6 +39,6 @@ This note captures the remaining tasks to harden our Playwright-based visual reg
 
 ## Quick Commands
 - Update visual baselines for a site (visuals only):
-  - `npm run update-baselines -- --site=<name>`
+  - `npm run baselines:update -- <name>`
 - Run visual regression only (defaults to Chrome desktop):
   - `node run-tests.js --site=<name> --visual`
