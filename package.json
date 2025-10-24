@@ -10,7 +10,7 @@
     "clean-test-results": "node scripts/cleanup.js clean-test-results",
     "clean-reports": "node scripts/cleanup.js clean-reports",
     "clean-manifests": "node scripts/cleanup.js clean-manifests",
-    "discover:site": "node scripts/discover-pages.js",
+    "discover": "node scripts/discover-pages.js",
     "lint": "eslint run-tests.js utils/**/*.js scripts/**/*.js playwright.config.js",
     "lint:fix": "eslint run-tests.js utils/**/*.js scripts/**/*.js playwright.config.js --fix",
     "lint:teardown": "node scripts/check-browser-teardown.js",

@@ -213,7 +213,7 @@ node run-tests.js -s my-site -w 4 -b Chrome,Firefox
 npm run update-baselines -- --site=my-site
 
 # Refresh test pages from sitemap (no tests run)
-npm run discover:site -- my-site
+npm run discover -- my-site
 
 ## Smoke Site Config
 - A minimal CI-friendly config is provided at `sites/nfsmediation-smoke.json` (points to `https://nfs.atelierdev.uk`, homepage only).
