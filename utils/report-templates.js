@@ -2756,6 +2756,14 @@ const renderSidebar = (panels, run, summaryMap) => {
     )
     .join('\n');
 
+  const themeToggleButton = `
+    <button class="theme-toggle" type="button" aria-pressed="false" aria-label="Toggle Solarized theme" data-theme-toggle>
+      <span class="theme-toggle__icon theme-toggle__icon--sun" aria-hidden="true">☀️</span>
+      <span class="theme-toggle__icon theme-toggle__icon--moon" aria-hidden="true">🌙</span>
+      <span class="theme-toggle__label" data-theme-label>Solarized Dark</span>
+    </button>
+  `;
+
   const groups = new Map();
   const order = [];
   panels.forEach((panel) => {
@@ -2792,7 +2800,10 @@ const renderSidebar = (panels, run, summaryMap) => {
   return `
     <aside class="sidebar">
       <div class="sidebar-header">
-        <h1>${escapeHtml(siteName)}</h1>
+        <div class="sidebar-header__top">
+          <h1>${escapeHtml(siteName)}</h1>
+          ${themeToggleButton}
+        </div>
         ${metadataHtml ? `<dl class="metadata">${metadataHtml}</dl>` : ''}
       </div>
       <nav class="sidebar-nav">
@@ -4388,6 +4399,69 @@ const filterScript = `
   statusInputs.forEach((input) => input.addEventListener('change', applyFilters));
   searchInput?.addEventListener('input', applyFilters);
   applyFilters();
+
+  const THEME_STORAGE_KEY = 'report-theme';
+  const themeToggle = document.querySelector('[data-theme-toggle]');
+  const themeLabel = themeToggle?.querySelector('[data-theme-label]');
+  const prefersDarkQuery =
+    typeof window.matchMedia === 'function' ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+
+  const safeGetStoredTheme = () => {
+    try {
+      return window.localStorage ? window.localStorage.getItem(THEME_STORAGE_KEY) : null;
+    } catch (_error) {
+      return null;
+    }
+  };
+
+  const safeSetStoredTheme = (value) => {
+    try {
+      if (window.localStorage) {
+        window.localStorage.setItem(THEME_STORAGE_KEY, value);
+      }
+    } catch (_error) {
+      // Ignore storage failures (private mode, etc.)
+    }
+  };
+
+  const updateToggleUi = (theme) => {
+    if (!themeToggle) return;
+    const isDark = theme === 'dark';
+    themeToggle.setAttribute('aria-pressed', isDark ? 'true' : 'false');
+    if (themeLabel) {
+      themeLabel.textContent = isDark ? 'Solarized Light' : 'Solarized Dark';
+    }
+  };
+
+  const applyTheme = (theme, options = {}) => {
+    const normalized = theme === 'dark' ? 'dark' : 'light';
+    document.body.dataset.theme = normalized;
+    if (options.persist !== false) {
+      safeSetStoredTheme(normalized);
+    }
+    updateToggleUi(normalized);
+  };
+
+  const storedTheme = safeGetStoredTheme();
+  const initialTheme =
+    storedTheme || (prefersDarkQuery && prefersDarkQuery.matches ? 'dark' : 'light');
+  applyTheme(initialTheme, { persist: false });
+
+  themeToggle?.addEventListener('click', () => {
+    const nextTheme = document.body.dataset.theme === 'dark' ? 'light' : 'dark';
+    applyTheme(nextTheme);
+  });
+
+  if (!storedTheme && prefersDarkQuery) {
+    const handlePreferenceChange = (event) => {
+      applyTheme(event.matches ? 'dark' : 'light', { persist: false });
+    };
+    if (typeof prefersDarkQuery.addEventListener === 'function') {
+      prefersDarkQuery.addEventListener('change', handlePreferenceChange);
+    } else if (typeof prefersDarkQuery.addListener === 'function') {
+      prefersDarkQuery.addListener(handlePreferenceChange);
+    }
+  }
 })();
 `;
 
@@ -4523,7 +4597,7 @@ ${toggleStyles}
   </style>
   ${SUMMARY_STYLES}
 </head>
-<body class="report-app">
+<body class="report-app" data-theme="light">
   ${radioInputs}
   <div class="report-shell">
     ${sidebarHtml}

@@ -1,18 +1,59 @@
 @charset "UTF-8";
 :root {
+  --bg-app: linear-gradient(180deg, #eef2ff 0%, #f9fafb 100%);
   --bg-primary: #f4f6fb;
-  --font-body: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --font-heading: "Work Sans", "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --bg-card: #ffffff;
-  --border: #d9e2ec;
+  --surface-sidebar: rgba(255, 255, 255, 0.78);
+  --surface-panel: #ffffff;
+  --surface-card: rgba(255, 255, 255, 0.92);
+  --surface-subtle: rgba(248, 250, 252, 0.95);
+  --surface-inset: rgba(249, 250, 251, 0.9);
+  --surface-outline: rgba(15, 23, 42, 0.06);
+  --border-default: rgba(15, 23, 42, 0.08);
+  --border-strong: rgba(29, 78, 216, 0.08);
   --text-strong: #1f2933;
   --text-muted: #475467;
+  --text-subtle: rgba(15, 23, 42, 0.58);
+  --text-inverse: #0f172a;
   --accent: #3b82f6;
   --accent-soft: rgba(29, 78, 216, 0.12);
-  --pill-shadow: 0 14px 32px rgba(15, 23, 42, 0.12);
+  --shadow-elevated: 0 24px 40px rgba(15, 23, 42, 0.12);
+  --shadow-floating: 0 14px 28px rgba(15, 23, 42, 0.08);
+  --shadow-card: 0 16px 32px rgba(15, 23, 42, 0.12);
+  --shadow-card-hover: 0 28px 44px rgba(15, 23, 42, 0.14);
+  --shadow-inset: inset 0 0 0 1px rgba(15, 23, 42, 0.04);
+  --code-bg: rgba(15, 23, 42, 0.08);
+  --code-border: rgba(15, 23, 42, 0.12);
+  --font-body: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-heading: "Work Sans", "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --radius-lg: 16px;
   --radius-md: 10px;
   --grid-gap: 1.5rem;
+}
+
+[data-theme=dark] {
+  --bg-app: linear-gradient(180deg, #001b22 0%, #002b36 100%);
+  --bg-primary: #002b36;
+  --surface-sidebar: rgba(0, 43, 54, 0.88);
+  --surface-panel: #073642;
+  --surface-card: rgba(7, 54, 66, 0.92);
+  --surface-subtle: rgba(0, 43, 54, 0.85);
+  --surface-inset: rgba(0, 59, 74, 0.8);
+  --surface-outline: rgba(88, 110, 117, 0.3);
+  --border-default: rgba(88, 110, 117, 0.35);
+  --border-strong: rgba(38, 139, 210, 0.35);
+  --text-strong: #fdf6e3;
+  --text-muted: #93a1a1;
+  --text-subtle: rgba(147, 161, 161, 0.7);
+  --text-inverse: #002b36;
+  --accent: #268bd2;
+  --accent-soft: rgba(38, 139, 210, 0.24);
+  --shadow-elevated: 0 24px 40px rgba(0, 15, 20, 0.65);
+  --shadow-floating: 0 14px 28px rgba(0, 0, 0, 0.55);
+  --shadow-card: 0 16px 32px rgba(0, 0, 0, 0.55);
+  --shadow-card-hover: 0 32px 52px rgba(0, 0, 0, 0.65);
+  --shadow-inset: inset 0 0 0 1px rgba(147, 161, 161, 0.18);
+  --code-bg: rgba(7, 54, 66, 0.7);
+  --code-border: rgba(0, 43, 54, 0.8);
 }
 
 .status-error {
@@ -120,6 +161,8 @@ body {
   margin: 0;
   font-family: var(--font-body);
   color: var(--text-strong);
+  background-color: var(--bg-primary);
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 h1,
@@ -140,8 +183,11 @@ h4,
 
 .report-app {
   min-height: 100vh;
-  background: linear-gradient(180deg, #eef2ff 0%, #f9fafb 100%);
+  background: var(--bg-app);
+  background-color: var(--bg-primary);
   padding: 3rem clamp(1rem, 4vw, 3rem);
+  color: var(--text-strong);
+  transition: background 0.3s ease, color 0.3s ease;
 }
 
 input[name=report-view] {
@@ -159,19 +205,99 @@ input[name=report-view] {
 }
 
 .sidebar {
-  background: rgba(255, 255, 255, 0.78);
+  background: var(--surface-sidebar);
   border-radius: 12px;
-  box-shadow: 0 24px 40px rgba(15, 23, 42, 0.12);
+  box-shadow: var(--shadow-elevated);
   padding: 1.75rem 1.5rem 2rem;
   backdrop-filter: blur(12px);
   position: sticky;
   top: 2rem;
+  border: 1px solid var(--border-default);
+  transition: background 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+}
+
+.sidebar-header {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.sidebar-header__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
 }
 
 .sidebar-header h1 {
   margin: 0 0 0.75rem;
   font-size: 1.8rem;
   color: var(--accent);
+}
+
+.theme-toggle {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.45rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-card);
+  color: var(--text-strong);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.theme-toggle:hover {
+  border-color: var(--accent);
+  background: var(--surface-subtle);
+}
+
+.theme-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.theme-toggle[aria-pressed=true] {
+  background: var(--accent-soft);
+  color: var(--text-inverse);
+  border-color: var(--accent);
+}
+
+.theme-toggle__icon {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.theme-toggle__icon--moon {
+  display: none;
+}
+
+.theme-toggle__label {
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+body[data-theme=dark] .theme-toggle {
+  background: var(--surface-card);
+  border-color: var(--border-strong);
+  color: var(--text-strong);
+}
+
+body[data-theme=dark] .theme-toggle[aria-pressed=true] {
+  color: var(--text-inverse);
+}
+
+body[data-theme=dark] .theme-toggle__icon--sun {
+  display: none;
+}
+
+body[data-theme=dark] .theme-toggle__icon--moon {
+  display: inline;
 }
 
 .sidebar .metadata {
@@ -190,7 +316,7 @@ input[name=report-view] {
   font-size: 0.7rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: rgba(15, 23, 42, 0.5);
+  color: var(--text-subtle);
   font-weight: 500;
 }
 
@@ -217,7 +343,7 @@ input[name=report-view] {
   font-size: 0.75rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: rgba(15, 23, 42, 0.58);
+  color: var(--text-subtle);
 }
 
 .nav-item {
@@ -229,18 +355,19 @@ input[name=report-view] {
   border-radius: 12px;
   font-size: 0.95rem;
   color: var(--text-strong);
-  background: rgba(255, 255, 255, 0.45);
-  border: 1px solid rgba(29, 78, 216, 0.08);
+  background: var(--surface-card);
+  border: 1px solid var(--border-strong);
   cursor: pointer;
   transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
   gap: 0.55rem;
   width: 100%;
+  box-shadow: var(--shadow-floating);
 }
 
 .nav-item:hover {
   transform: translateX(2px);
-  border-color: rgba(37, 99, 235, 0.25);
-  box-shadow: 0 12px 22px rgba(15, 23, 42, 0.12);
+  border-color: var(--accent);
+  box-shadow: var(--shadow-card);
 }
 
 .nav-name {
@@ -310,11 +437,13 @@ input[name=report-view] {
 
 .panel {
   display: none;
-  background: var(--bg-card);
+  background: var(--surface-panel);
   border-radius: 12px;
-  box-shadow: var(--pill-shadow);
+  box-shadow: var(--shadow-elevated);
   padding: 2.4rem clamp(1.5rem, 3vw, 2.6rem);
   animation: fadeIn 0.25s ease;
+  border: 1px solid var(--border-default);
+  transition: background 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
 }
 
 .panel-header {
@@ -323,7 +452,7 @@ input[name=report-view] {
   align-items: flex-start;
   gap: 1.5rem;
   margin-bottom: 2rem;
-  border-bottom: 1px solid rgba(29, 78, 216, 0.08);
+  border-bottom: 1px solid var(--border-strong);
   padding-bottom: 1.75rem;
 }
 
@@ -336,7 +465,7 @@ input[name=report-view] {
   font-size: 0.75rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: rgba(15, 23, 42, 0.58);
+  color: var(--text-subtle);
   font-weight: 500;
 }
 
@@ -392,9 +521,10 @@ input[name=report-view] {
   gap: 1rem;
   padding: 1rem 1.25rem;
   border-radius: 12px;
-  border: 1px solid rgba(29, 78, 216, 0.1);
-  background: rgba(255, 255, 255, 0.8);
-  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.08);
+  border: 1px solid var(--border-strong);
+  background: var(--surface-card);
+  box-shadow: var(--shadow-floating);
+  transition: background 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
 .filters .status-filters {
@@ -418,7 +548,7 @@ input[name=report-view] {
   gap: 0.4rem;
   padding: 0.45rem 0.75rem;
   border-radius: 12px;
-  background: rgba(15, 23, 42, 0.06);
+  background: var(--surface-outline);
   color: var(--text-strong);
   font-size: 0.85rem;
   font-weight: 500;
@@ -430,8 +560,10 @@ input[name=report-view] {
 }
 .filters .filter-chip input:checked + span {
   opacity: 1;
-  box-shadow: 0 12px 22px rgba(15, 23, 42, 0.12);
-  border-color: rgba(29, 78, 216, 0.2);
+  box-shadow: var(--shadow-card);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--text-inverse);
 }
 .filters .filter-count {
   display: inline-flex;
@@ -440,7 +572,7 @@ input[name=report-view] {
   min-width: 1.4rem;
   padding: 0.1rem 0.4rem;
   border-radius: 12px;
-  background: rgba(15, 23, 42, 0.1);
+  background: var(--surface-outline);
   font-size: 0.75rem;
 }
 .filters .search-filter {
@@ -453,15 +585,15 @@ input[name=report-view] {
   max-width: 320px;
   padding: 0.55rem 0.85rem;
   border-radius: 12px;
-  border: 1px solid rgba(15, 23, 42, 0.15);
-  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid var(--border-default);
+  background: var(--surface-subtle);
   font-size: 0.9rem;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 .filters .search-filter input:focus {
   outline: none;
-  border-color: rgba(29, 78, 216, 0.4);
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.18);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
 .visually-hidden {
@@ -481,13 +613,14 @@ input[name=report-view] {
   gap: 1rem;
   padding: 1.4rem 1.5rem;
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.92);
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  box-shadow: 0 18px 30px rgba(15, 23, 42, 0.12);
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
+  box-shadow: var(--shadow-floating);
   max-height: 70vh;
   overflow-y: auto;
   position: sticky;
   top: 2rem;
+  transition: background 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
 }
 
 .test-navigation h2 {
@@ -495,7 +628,7 @@ input[name=report-view] {
   font-size: 0.9rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: rgba(15, 23, 42, 0.55);
+  color: var(--text-subtle);
 }
 
 .test-navigation ul {
@@ -534,7 +667,7 @@ input[name=report-view] {
   gap: 0.75rem;
   padding: 0.4rem 0.5rem;
   border-radius: 12px;
-  background: rgba(15, 23, 42, 0.04);
+  background: var(--surface-outline);
   font-size: 0.85rem;
 }
 
@@ -549,13 +682,14 @@ input[name=report-view] {
 }
 
 .test-group {
-  background: rgba(255, 255, 255, 0.92);
+  background: var(--surface-card);
   border-radius: 12px;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  box-shadow: 0 24px 40px rgba(15, 23, 42, 0.12);
+  border: 1px solid var(--border-default);
+  box-shadow: var(--shadow-elevated);
   padding: 1.5rem 1.8rem;
   display: grid;
   gap: 1.25rem;
+  transition: background 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
 }
 
 .test-group__header {
@@ -574,7 +708,7 @@ input[name=report-view] {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  background: rgba(15, 23, 42, 0.08);
+  background: var(--surface-outline);
   border-radius: 12px;
   padding: 0.2rem 0.6rem;
   font-size: 0.8rem;
@@ -592,19 +726,19 @@ input[name=report-view] {
 }
 
 .test-card {
-  background: var(--bg-card);
+  background: var(--surface-card);
   border-radius: 12px;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  box-shadow: 0 16px 32px rgba(15, 23, 42, 0.12);
+  border: 1px solid var(--border-default);
+  box-shadow: var(--shadow-card);
   padding: 1.25rem 1.5rem;
   display: grid;
   gap: 1rem;
-  transition: transform 0.2s ease, box-shadow 0.3s ease;
+  transition: transform 0.2s ease, box-shadow 0.3s ease, border-color 0.3s ease, background 0.3s ease;
 }
 
 .test-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 28px 44px rgba(15, 23, 42, 0.14);
+  box-shadow: var(--shadow-card-hover);
 }
 
 .test-card__header {
@@ -619,7 +753,7 @@ input[name=report-view] {
   flex-wrap: wrap;
   gap: 0.5rem;
   font-size: 0.8rem;
-  color: rgba(15, 23, 42, 0.7);
+  color: var(--text-muted);
 }
 
 .test-card__meta .meta-item {
@@ -628,7 +762,7 @@ input[name=report-view] {
   gap: 0.35rem;
   padding: 0.2rem 0.6rem;
   border-radius: 12px;
-  background: rgba(15, 23, 42, 0.06);
+  background: var(--surface-outline);
 }
 
 .test-card__meta .meta-item.flaky {
@@ -637,7 +771,7 @@ input[name=report-view] {
 }
 
 .test-card__location code {
-  background: rgba(15, 23, 42, 0.08);
+  background: var(--surface-outline);
   border-radius: 12px;
   padding: 0.25rem 0.6rem;
   font-size: 0.8rem;
@@ -654,7 +788,9 @@ input[name=report-view] {
   padding: 0.75rem 0.9rem;
   font-size: 0.9rem;
   font-weight: 500;
-  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.05);
+  background: var(--surface-subtle);
+  box-shadow: var(--shadow-inset);
+  color: var(--text-strong);
 }
 
 .test-card.is-flaky {
@@ -669,11 +805,12 @@ input[name=report-view] {
 
 .test-attempts {
   border-radius: 12px;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  background: rgba(249, 250, 251, 0.9);
+  border: 1px solid var(--border-default);
+  background: var(--surface-inset);
   padding: 1rem 1.1rem;
   display: grid;
   gap: 0.75rem;
+  box-shadow: var(--shadow-floating);
 }
 
 .test-attempts__header h4 {
@@ -683,9 +820,10 @@ input[name=report-view] {
 
 .attempt-card {
   border-radius: 12px;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  background: #ffffff;
+  border: 1px solid var(--border-default);
+  background: var(--surface-card);
   overflow: hidden;
+  transition: background 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
 .attempt-card summary {
@@ -714,7 +852,7 @@ input[name=report-view] {
   display: inline-flex;
   gap: 0.6rem;
   font-size: 0.8rem;
-  color: rgba(15, 23, 42, 0.6);
+  color: var(--text-muted);
 }
 
 .attempt-card .attempt-meta span {
@@ -724,19 +862,19 @@ input[name=report-view] {
 }
 
 .attempt-card[open] {
-  box-shadow: 0 16px 28px rgba(15, 23, 42, 0.12);
+  box-shadow: var(--shadow-card);
 }
 
 .attempt-body {
   padding: 0.9rem 1rem 1.15rem;
-  border-top: 1px solid rgba(15, 23, 42, 0.08);
+  border-top: 1px solid var(--border-default);
   display: grid;
   gap: 0.75rem;
 }
 
 .attempt-note {
   margin: 0;
-  color: rgba(15, 23, 42, 0.6);
+  color: var(--text-muted);
   font-size: 0.9rem;
 }
 
@@ -762,13 +900,14 @@ input[name=report-view] {
 }
 
 .summary-card {
-  background: var(--bg-card);
+  background: var(--surface-card);
   border-radius: 12px;
   padding: 1.5rem 1.7rem;
-  box-shadow: var(--pill-shadow);
+  box-shadow: var(--shadow-card);
   position: relative;
   overflow: hidden;
-  border: 1px solid rgba(15, 23, 42, 0.05);
+  border: 1px solid var(--border-default);
+  transition: background 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
 }
 
 .summary-card::after {
@@ -787,7 +926,7 @@ input[name=report-view] {
   font-size: 0.85rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #0f172a;
+  color: var(--text-subtle);
   margin: 0 0 0.4rem;
   white-space: nowrap;
 }
@@ -907,21 +1046,22 @@ input[name=report-view] {
 .schema-group > header h3 {
   margin: 0;
   font-size: 1.35rem;
-  color: #0f172a;
+  color: var(--text-strong);
 }
 
 .summary-report {
-  background: var(--bg-card);
+  background: var(--surface-card);
   border-radius: 12px;
-  border: 1px solid rgba(15, 23, 42, 0.08);
+  border: 1px solid var(--border-default);
   padding: 1.35rem 1.5rem;
-  box-shadow: 0 18px 30px rgba(15, 23, 42, 0.12);
+  box-shadow: var(--shadow-elevated);
+  transition: background 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
 .summary-report h3 {
   margin: 0 0 0.75rem;
   font-size: 1.25rem;
-  color: #0f172a;
+  color: var(--text-strong);
 }
 
 .summary-report .details {
@@ -1141,10 +1281,11 @@ input[name=report-view] {
 }
 
 .summary-page {
-  border: 1px solid rgba(15, 23, 42, 0.08);
+  border: 1px solid var(--border-default);
   border-radius: 12px;
-  background: #ffffff;
-  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.04);
+  background: var(--surface-card);
+  box-shadow: var(--shadow-inset);
+  transition: background 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
 .summary-page > summary {
@@ -1155,7 +1296,7 @@ input[name=report-view] {
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  color: #0f172a;
+  color: var(--text-strong);
 }
 
 .summary-page > summary::-webkit-details-marker {
@@ -1163,12 +1304,12 @@ input[name=report-view] {
 }
 
 .summary-page[open] > summary {
-  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  border-bottom: 1px solid var(--border-default);
 }
 
 .summary-page__body {
   padding: 1rem 1.25rem 1.35rem;
-  background: #f8fafc;
+  background: var(--surface-subtle);
 }
 
 .summary-page--ok {
