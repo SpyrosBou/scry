@@ -6,9 +6,7 @@ const openBrowser = openModule.default || openModule;
 
 const minimist = require('minimist');
 
-const normalisedArgv = process.argv
-  .slice(2)
-  .map((arg) => (arg === '-past' ? '--past' : arg));
+const normalisedArgv = process.argv.slice(2).map((arg) => (arg === '-past' ? '--past' : arg));
 
 const args = minimist(normalisedArgv, {
   alias: {

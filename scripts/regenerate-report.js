@@ -66,9 +66,7 @@ function main() {
   }
 
   if (index > entries.length) {
-    console.log(
-      `Requested report #${index}, but only ${entries.length} run(s) are available.`
-    );
+    console.log(`Requested report #${index}, but only ${entries.length} run(s) are available.`);
     process.exit(1);
   }
 

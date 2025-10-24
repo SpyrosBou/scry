@@ -57,7 +57,8 @@ const renderPerPageAccordion = (items, options = {}) => {
       const cardHtml = renderCard(entry);
       if (!cardHtml) return '';
       const summaryLabel = escapeHtml(labelFormatter(entry));
-      const extraSummaryClass = entry && entry._summaryClass ? ` ${escapeHtml(entry._summaryClass)}` : '';
+      const extraSummaryClass =
+        entry && entry._summaryClass ? ` ${escapeHtml(entry._summaryClass)}` : '';
       return `
         <details class="${summaryClassName}${extraSummaryClass}">
           <summary>${summaryLabel}</summary>

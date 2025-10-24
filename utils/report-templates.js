@@ -179,13 +179,7 @@ const renderWcagTagBadges = (tags) => {
   if (!Array.isArray(tags) || tags.length === 0) {
     return '<span class="badge badge-neutral">No WCAG tag</span>';
   }
-  const labels = Array.from(
-    new Set(
-      tags
-        .map((tag) => formatWcagTagLabel(tag))
-        .filter(Boolean)
-    )
-  );
+  const labels = Array.from(new Set(tags.map((tag) => formatWcagTagLabel(tag)).filter(Boolean)));
   if (labels.length === 0) {
     return '<span class="badge badge-neutral">No WCAG tag</span>';
   }
@@ -212,9 +206,7 @@ const extractNodeTargets = (nodes, limit = 3) => {
   });
   if (!targets.length) return null;
   const unique = Array.from(new Set(targets)).slice(0, limit);
-  return unique
-    .map((target) => `<code>${escapeHtml(target)}</code>`)
-    .join('<br />');
+  return unique.map((target) => `<code>${escapeHtml(target)}</code>`).join('<br />');
 };
 
 const formatMilliseconds = (value) => {
@@ -1039,129 +1031,6 @@ const statusClassFromStatus = (status) => {
   return 'status-ok';
 };
 
-const accessibilityStatusClass = (status) => {
-  const map = {
-    violations: 'status-error',
-    'http-error': 'status-error',
-    'scan-error': 'status-warning',
-    'stability-timeout': 'status-warning',
-    skipped: 'status-neutral',
-    passed: 'status-ok',
-  };
-  return map[status] || 'status-ok';
-};
-
-const formatAccessibilityNotesHtml = (summary) => {
-  const notes = Array.isArray(summary.notes) ? summary.notes.slice(0, 10) : [];
-  const extra = [];
-  if (summary.stability) {
-    const stability = summary.stability || {};
-    const label = stability.ok ? 'Stable' : 'Stability issue';
-    const detail = stability.strategy ? `${label} (strategy: ${stability.strategy})` : label;
-    extra.push(detail);
-  }
-  if (summary.httpStatus && summary.httpStatus !== 200) {
-    extra.push(`HTTP ${summary.httpStatus}`);
-  }
-  const combined = [...notes, ...extra];
-  if (combined.length === 0) {
-    return '<span class="details">None</span>';
-  }
-  const items = combined
-    .map((note) => `<li class="details">${escapeHtml(String(note))}</li>`)
-    .join('');
-  return `
-        <ul class="checks">${items}</ul>
-      `;
-};
-
-const renderAccessibilityGroupHtmlLegacy = (group) => {
-  const buckets = collectSchemaProjects(group);
-  if (buckets.length === 0) return '';
-
-  const multiProject = buckets.length > 1;
-
-  const sections = buckets
-    .map((bucket) => {
-      const runPayload = firstRunPayload(bucket);
-      const pages = bucket.pageEntries
-        .map((entry) => entry.payload || {})
-        .filter((payload) => payload.kind === KIND_PAGE_SUMMARY);
-      const projectLabel = runPayload?.metadata?.projectName || bucket.projectName || 'default';
-      const suppressPageEntries = Boolean(
-        runPayload?.metadata?.suppressPageEntries || group.suppressPageEntries
-      );
-      const hasCustomRunHtml = Boolean(runPayload?.htmlBody);
-      const shouldRenderPageCards = !hasCustomRunHtml && !suppressPageEntries;
-      const defaultOverviewHtml =
-        !hasCustomRunHtml && runPayload?.overview ? renderSchemaMetrics(runPayload.overview) : '';
-
-      const pageCards = pages
-        .map((payload) => {
-          const summary = payload.summary || {};
-          if (summary.cardHtml) return summary.cardHtml;
-
-          const status = summary.status || 'passed';
-          const statusLabel = status.replace(/[-_/]+/g, ' ');
-          const notesHtml = formatAccessibilityNotesHtml(summary);
-          return `
-      <section class="summary-report summary-a11y summary-a11y--page-summary">
-        <h3>${escapeHtml(payload.page || 'unknown')}</h3>
-        <table>
-          <thead><tr><th>Status</th><th>Gating</th><th>Advisory</th><th>Best practice</th><th>HTTP</th><th>Notes</th></tr></thead>
-          <tbody>
-            <tr class="${accessibilityStatusClass(status)}">
-              <td>${escapeHtml(statusLabel)}</td>
-              <td>${summary.gatingViolations ?? 0}</td>
-              <td>${summary.advisoryFindings ?? 0}</td>
-              <td>${summary.bestPracticeFindings ?? 0}</td>
-              <td>${summary.httpStatus ?? '—'}</td>
-              <td>${notesHtml}</td>
-            </tr>
-          </tbody>
-        </table>
-      </section>
-    `;
-        })
-        .join('\n');
-
-      if (hasCustomRunHtml) {
-        const projectHeading = multiProject
-          ? `<header class="schema-group__project"><h3>${escapeHtml(projectLabel)}</h3></header>`
-          : '';
-        return `
-      <section class="schema-group__project-block">
-        ${projectHeading}
-        ${runPayload.htmlBody}
-      </section>
-    `;
-      }
-
-      const headingLabel = multiProject ? `${projectLabel} – WCAG findings` : 'WCAG findings';
-
-      const pagesHtml = shouldRenderPageCards ? pageCards : '';
-
-      return `
-      <section class="schema-group__project-block">
-        <section class="summary-report summary-a11y summary-a11y--project-summary">
-          <h3>${escapeHtml(headingLabel)}</h3>
-          ${defaultOverviewHtml}
-          ${pagesHtml}
-        </section>
-      </section>
-    `;
-    })
-    .join('\n');
-
-  const headline = escapeHtml(group.title || 'WCAG findings summary');
-  return `
-    <article class="schema-group">
-      <header><h2>${headline}</h2></header>
-      ${sections}
-    </article>
-  `;
-};
-
 const renderWcagPageIssueTable = (entries, heading, options = {}) => {
   if (!Array.isArray(entries) || entries.length === 0) return '';
   const headingClass = options.headingClass ? ` class="${escapeHtml(options.headingClass)}"` : '';
@@ -1201,14 +1070,12 @@ const renderWcagRunSummary = (overview, details, { viewportLabel, viewportsCount
   const totalPages = overview?.totalPages ?? pages.length;
   const failThreshold = details?.failThreshold || overview?.failThreshold;
   const gatingPages =
-    overview?.gatingPages ??
-    pages.filter((page) => (page.gatingViolations || 0) > 0).length;
+    overview?.gatingPages ?? pages.filter((page) => (page.gatingViolations || 0) > 0).length;
+  const advisoryPages =
+    overview?.advisoryPages ?? pages.filter((page) => (page.advisoryFindings || 0) > 0).length;
   const bestPracticePages =
     overview?.bestPracticePages ??
     pages.filter((page) => (page.bestPracticeFindings || 0) > 0).length;
-  const advisoryPages =
-    overview?.advisoryPages ??
-    pages.filter((page) => (page.advisoryFindings || 0) > 0).length;
   const scanIssues = pages.filter((page) =>
     ['scan-error', 'http-error', 'stability-timeout'].includes(page.status)
   ).length;
@@ -1224,6 +1091,12 @@ const renderWcagRunSummary = (overview, details, { viewportLabel, viewportsCount
       label: 'Accessibility violations',
       tone: 'status-error',
       count: gatingPages,
+      suffix: 'page(s)',
+    },
+    {
+      label: 'Advisory findings',
+      tone: 'status-advisory',
+      count: advisoryPages,
       suffix: 'page(s)',
     },
     {
@@ -1245,12 +1118,19 @@ const renderWcagRunSummary = (overview, details, { viewportLabel, viewportsCount
 
   const statusSummary = renderStatusSummaryList(summaryItems, { className: 'status-summary' });
 
+  const advisoryNote =
+    totalAdvisories > 0
+      ? `<p class="details">Advisory findings appeared ${escapeHtml(
+          formatCount(totalAdvisories)
+        )} time(s) across ${escapeHtml(formatCount(advisoryPages))} page(s).</p>`
+      : '';
   const bestPracticeNote =
     totalBestPractice > 0
-      ? `<p class="details">Best-practice advisories surfaced on ${escapeHtml(
-          formatCount(bestPracticePages)
-        )} page(s).</p>`
+      ? `<p class="details">Best-practice advisories appeared ${escapeHtml(
+          formatCount(totalBestPractice)
+        )} time(s) across ${escapeHtml(formatCount(bestPracticePages))} page(s).</p>`
       : '';
+  const detailNotes = [advisoryNote, bestPracticeNote].filter(Boolean).join('\n');
 
   return `
     <section class="summary-report summary-a11y summary-a11y--run-summary">
@@ -1266,7 +1146,7 @@ const renderWcagRunSummary = (overview, details, { viewportLabel, viewportsCount
           ? `<p class="details">Gating threshold: ${escapeHtml(String(failThreshold))}</p>`
           : ''
       }
-      ${bestPracticeNote}
+      ${detailNotes}
       <p class="legend">
         <span class="badge badge-critical">Critical</span>
         <span class="badge badge-serious">Serious</span>
@@ -1276,51 +1156,83 @@ const renderWcagRunSummary = (overview, details, { viewportLabel, viewportsCount
   `;
 };
 
-
 const renderKeyboardRunSummary = (overview = {}, pages = [], references = []) => {
   const totalPages = overview.totalPagesAudited ?? pages.length;
-  const gatingPages = overview.pagesWithGatingIssues ?? pages.filter((page) => (page.gating || []).length > 0).length;
-  const advisoryPages = overview.pagesWithAdvisories ?? pages.filter((page) => (page.advisories || []).length > 0).length;
-  const skipLinksDetected = overview.skipLinksDetected ?? pages.filter((page) => Boolean(page.skipLink)).length;
+  const gatingPages =
+    overview.pagesWithGatingIssues ?? pages.filter((page) => (page.gating || []).length > 0).length;
+  const advisoryPages =
+    overview.pagesWithAdvisories ??
+    pages.filter((page) => (page.advisories || []).length > 0).length;
+  const skipLinksDetected =
+    overview.skipLinksDetected ?? pages.filter((page) => Boolean(page.skipLink)).length;
   const pagesMissingSkip = Math.max(totalPages - skipLinksDetected, 0);
   const totalFocusable = pages.reduce((sum, page) => sum + (page.focusableCount || 0), 0);
   const totalVisited = pages.reduce((sum, page) => sum + (page.visitedCount || 0), 0);
-  const coveragePercent = totalFocusable > 0 ? Math.round((totalVisited / totalFocusable) * 100) : null;
+  const coveragePercent =
+    totalFocusable > 0 ? Math.round((totalVisited / totalFocusable) * 100) : null;
 
   const wcagBadges = Array.isArray(references)
     ? references
-        .map((ref) => `<span class="badge badge-wcag">${escapeHtml(`${ref.id} ${ref.name}`)}</span>`)
+        .map(
+          (ref) => `<span class="badge badge-wcag">${escapeHtml(`${ref.id} ${ref.name}`)}</span>`
+        )
         .join(' ')
     : '';
 
   const statusItems = [];
   if (gatingPages > 0) {
-    statusItems.push(`<li><span class="status-pill status-error">Gating issues</span><span>${formatNumber(gatingPages)} page(s)</span></li>`);
+    statusItems.push(
+      `<li><span class="status-pill status-error">Gating issues</span><span>${formatNumber(
+        gatingPages
+      )} page(s)</span></li>`
+    );
   } else {
-    statusItems.push('<li><span class="status-pill status-ok">No gating issues</span><span>All pages</span></li>');
+    statusItems.push(
+      '<li><span class="status-pill status-ok">No gating issues</span><span>All pages</span></li>'
+    );
   }
   if (advisoryPages > 0) {
-    statusItems.push(`<li><span class="status-pill status-info">Advisories</span><span>${formatNumber(advisoryPages)} page(s)</span></li>`);
+    statusItems.push(
+      `<li><span class="status-pill status-info">Advisories</span><span>${formatNumber(
+        advisoryPages
+      )} page(s)</span></li>`
+    );
   }
   if (pagesMissingSkip > 0) {
-    statusItems.push(`<li><span class="status-pill status-warning">Skip link missing</span><span>${formatNumber(pagesMissingSkip)} page(s)</span></li>`);
+    statusItems.push(
+      `<li><span class="status-pill status-warning">Skip link missing</span><span>${formatNumber(
+        pagesMissingSkip
+      )} page(s)</span></li>`
+    );
   } else if (totalPages > 0) {
-    statusItems.push(`<li><span class="status-pill status-ok">Skip links detected</span><span>${formatNumber(skipLinksDetected)} page(s)</span></li>`);
+    statusItems.push(
+      `<li><span class="status-pill status-ok">Skip links detected</span><span>${formatNumber(
+        skipLinksDetected
+      )} page(s)</span></li>`
+    );
   }
 
   const statusSummary = statusItems.length
     ? `<ul class="status-summary">${statusItems.join('')}</ul>`
     : '';
 
-  const coverageNote = totalFocusable > 0
-    ? `<p class="details">Visited ${formatNumber(totalVisited)} of ${formatNumber(totalFocusable)} focusable elements${coveragePercent != null ? ` (~${coveragePercent}% coverage)` : ''}.</p>`
-    : '';
-
-  const skipNote = pagesMissingSkip > 0
-    ? `<p class="details">Skip links missing on ${formatNumber(pagesMissingSkip)} page(s).</p>`
-    : skipLinksDetected > 0
-      ? `<p class="details">Skip links detected on ${formatNumber(skipLinksDetected)} page(s).</p>`
+  const coverageNote =
+    totalFocusable > 0
+      ? `<p class="details">Visited ${formatNumber(totalVisited)} of ${formatNumber(
+          totalFocusable
+        )} focusable elements${
+          coveragePercent != null ? ` (~${coveragePercent}% coverage)` : ''
+        }.</p>`
       : '';
+
+  const skipNote =
+    pagesMissingSkip > 0
+      ? `<p class="details">Skip links missing on ${formatNumber(pagesMissingSkip)} page(s).</p>`
+      : skipLinksDetected > 0
+        ? `<p class="details">Skip links detected on ${formatNumber(
+            skipLinksDetected
+          )} page(s).</p>`
+        : '';
 
   return `
     <section class="summary-report summary-a11y summary-a11y--keyboard-summary">
@@ -1414,9 +1326,15 @@ const renderAccessibilityGroupHtml = (group) => {
       });
 
       const ruleSnapshots = Array.isArray(runPayload.ruleSnapshots) ? runPayload.ruleSnapshots : [];
-      const gatingRules = ruleSnapshots.filter((snapshot) => (snapshot.category || '').toLowerCase() === 'gating');
-      const advisoryRules = ruleSnapshots.filter((snapshot) => (snapshot.category || '').toLowerCase() === 'advisory');
-      const bestPracticeRules = ruleSnapshots.filter((snapshot) => (snapshot.category || '').toLowerCase() === 'best-practice');
+      const gatingRules = ruleSnapshots.filter(
+        (snapshot) => (snapshot.category || '').toLowerCase() === 'gating'
+      );
+      const advisoryRules = ruleSnapshots.filter(
+        (snapshot) => (snapshot.category || '').toLowerCase() === 'advisory'
+      );
+      const bestPracticeRules = ruleSnapshots.filter(
+        (snapshot) => (snapshot.category || '').toLowerCase() === 'best-practice'
+      );
 
       const ruleSections = [
         renderAccessibilityRuleTable(
@@ -1446,9 +1364,7 @@ const renderAccessibilityGroupHtml = (group) => {
         failThreshold: details.failThreshold || overview.failThreshold || metadata.failOn,
       });
 
-      const content = [runSummaryHtml, ruleSections, perPageHtml]
-        .filter(Boolean)
-        .join('\n');
+      const content = [runSummaryHtml, ruleSections, perPageHtml].filter(Boolean).join('\n');
       if (!content.trim()) return '';
 
       if (multiBucket) {
@@ -2709,13 +2625,14 @@ const buildSuitePanels = (schemaGroups, summaryMap) => {
     if (!groups || groups.length === 0) continue;
 
     const specNames = new Set();
-    const filteredGroups = definition.summaryType === 'wcag'
-      ? groups.filter((group) => {
-          const runEntries = group.runEntries || [];
-          if (runEntries.length === 0) return false;
-          return runEntries.some((entry) => (entry.payload?.metadata?.scope || '') !== 'run');
-        })
-      : groups;
+    const filteredGroups =
+      definition.summaryType === 'wcag'
+        ? groups.filter((group) => {
+            const runEntries = group.runEntries || [];
+            if (runEntries.length === 0) return false;
+            return runEntries.some((entry) => (entry.payload?.metadata?.scope || '') !== 'run');
+          })
+        : groups;
 
     if (filteredGroups.length === 0) continue;
 
@@ -2933,7 +2850,6 @@ const renderFormsPageCard = (summary) => {
   `;
 };
 
-
 const renderKeyboardPageCard = (summary) => {
   if (!summary) return '';
   const gating = Array.isArray(summary.gatingIssues)
@@ -2952,17 +2868,15 @@ const renderKeyboardPageCard = (summary) => {
   const gatingList = gating
     .map((item) => `<li class="check-fail">${escapeHtml(String(item))}</li>`)
     .join('');
-  const warningList = warnings
-    .map((item) => `<li>${escapeHtml(String(item))}</li>`)
-    .join('');
-  const advisoryList = advisories
-    .map((item) => `<li>${escapeHtml(String(item))}</li>`)
-    .join('');
+  const warningList = warnings.map((item) => `<li>${escapeHtml(String(item))}</li>`).join('');
+  const advisoryList = advisories.map((item) => `<li>${escapeHtml(String(item))}</li>`).join('');
   const sequenceItems = focusSequence
     .slice(0, 25)
     .map((entry, index) => {
       const summaryText = entry.summary || `Stop ${index + 1}`;
-      const indicatorLabel = entry.hasIndicator ? 'Focus indicator detected' : 'No focus indicator found';
+      const indicatorLabel = entry.hasIndicator
+        ? 'Focus indicator detected'
+        : 'No focus indicator found';
       return `
         <li>
           <strong>Step ${index + 1}</strong>: ${escapeHtml(summaryText)} — ${indicatorLabel}
@@ -3010,8 +2924,6 @@ const renderKeyboardPageCard = (summary) => {
   `;
 };
 
-
-
 const renderKeyboardGroupHtml = (group) => {
   const buckets = collectSchemaProjects(group);
   if (buckets.length === 0) return '';
@@ -3042,7 +2954,8 @@ const renderKeyboardGroupHtml = (group) => {
 
       const totalVisited = pagesData.reduce((sum, page) => sum + (page.visitedCount || 0), 0);
       const totalFocusable = pagesData.reduce((sum, page) => sum + (page.focusableCount || 0), 0);
-      const skipLinksDetected = overview.skipLinksDetected ?? pagesData.filter((page) => Boolean(page.skipLink)).length;
+      const skipLinksDetected =
+        overview.skipLinksDetected ?? pagesData.filter((page) => Boolean(page.skipLink)).length;
 
       const metrics = renderSummaryMetrics([
         { label: 'Tab stops visited', value: totalVisited },
@@ -3108,7 +3021,14 @@ const renderKeyboardGroupHtml = (group) => {
         formatSummaryLabel: (entrySummary) => entrySummary?.page || 'Unknown page',
       });
 
-      const contentParts = [runSummaryHtml, metrics ? `<section class="summary-report summary-a11y summary-a11y--keyboard-metrics"><h3>Focus metrics</h3>${metrics}</section>` : '', coverageTableHtml, accordionHtml]
+      const contentParts = [
+        runSummaryHtml,
+        metrics
+          ? `<section class="summary-report summary-a11y summary-a11y--keyboard-metrics"><h3>Focus metrics</h3>${metrics}</section>`
+          : '',
+        coverageTableHtml,
+        accordionHtml,
+      ]
         .filter(Boolean)
         .join('\n');
       if (!contentParts) return '';
@@ -3137,7 +3057,6 @@ const renderKeyboardGroupHtml = (group) => {
     </section>
   `;
 };
-
 
 const renderReducedMotionPageCard = (summary) => {
   if (!summary) return '';
@@ -3916,53 +3835,6 @@ const renderFormsGroupHtml = (group) => {
   `;
 };
 
-const renderWcagIssueTable = (entries, heading) => {
-  if (!Array.isArray(entries) || entries.length === 0) return '';
-  const rows = entries
-    .map((entry) => {
-      const impact = entry.impact || entry.category || 'info';
-      const ruleId = entry.id || entry.rule || 'rule';
-      const wcagTags = Array.isArray(entry.tags)
-        ? entry.tags.filter((tag) => /^wcag/i.test(tag)).join(', ')
-        : Array.isArray(entry.wcagTags)
-          ? entry.wcagTags.join(', ')
-          : '—';
-      const nodes = Array.isArray(entry.nodes)
-        ? entry.nodes
-            .map((node) => {
-              if (Array.isArray(node.target) && node.target.length > 0) {
-                return `<code>${escapeHtml(String(node.target[0]))}</code>`;
-              }
-              return node.html ? `<code>${escapeHtml(node.html)}</code>` : null;
-            })
-            .filter(Boolean)
-            .slice(0, 5)
-            .join('<br />')
-        : '—';
-      const helpUrl = entry.helpUrl || entry.help || null;
-      return `
-        <tr class="impact-${impact.toLowerCase?.() || 'info'}">
-          <td>${escapeHtml(String(impact))}</td>
-          <td>${escapeHtml(String(ruleId))}</td>
-          <td>${wcagTags ? escapeHtml(wcagTags) : '—'}</td>
-          <td>${nodes || '—'}</td>
-          <td>${helpUrl ? `<a href="${escapeHtml(helpUrl)}" target="_blank" rel="noopener noreferrer">rule docs</a>` : '—'}</td>
-        </tr>
-      `;
-    })
-    .join('');
-
-  return `
-    <section class="summary-report summary-a11y summary-a11y--issues-table">
-      <h3>${escapeHtml(heading)}</h3>
-      <table>
-        <thead><tr><th>Impact</th><th>Rule</th><th>WCAG tags</th><th>Sample targets</th><th>Help</th></tr></thead>
-        <tbody>${rows}</tbody>
-      </table>
-    </section>
-  `;
-};
-
 const renderWcagPageCard = (summary, { viewportLabel, failThreshold } = {}) => {
   if (!summary) return '';
   if (summary.cardHtml) return summary.cardHtml;
@@ -3993,6 +3865,16 @@ const renderWcagPageCard = (summary, { viewportLabel, failThreshold } = {}) => {
     `<p class="details"><strong>Gating:</strong> ${escapeHtml(
       summary.gatingLabel || failThreshold || 'Not recorded'
     )}</p>`,
+    advisoryCount
+      ? `<p class="details"><strong>Advisory findings:</strong> ${escapeHtml(
+          formatCount(advisoryCount)
+        )}</p>`
+      : '',
+    bestPracticeCount
+      ? `<p class="details"><strong>Best-practice advisories:</strong> ${escapeHtml(
+          formatCount(bestPracticeCount)
+        )}</p>`
+      : '',
   ]
     .filter(Boolean)
     .join('\n');
@@ -4525,7 +4407,8 @@ function renderReportHtml(run) {
   const testsHtml = groupedTests
     .map((group) => renderTestGroup(group, { promotedSummaryBaseNames: baseNamesUsed }))
     .join('\n');
-  const summarySections = [summaryOverviewHtml, runSummariesHtml].filter((section) => Boolean(section && section.trim()))
+  const summarySections = [summaryOverviewHtml, runSummariesHtml]
+    .filter((section) => Boolean(section && section.trim()))
     .join('\n');
 
   const summaryPanel = {
@@ -4537,7 +4420,11 @@ function renderReportHtml(run) {
     description:
       'Pulls together pass/fail counts, timing, and standout issues from every suite. Start here to understand overall health before diving into individual checks.',
     status: 'info',
-    statusMeta: { ...PANEL_STATUS_META.info, navClass: 'status-summary', specClass: 'spec-status--info' },
+    statusMeta: {
+      ...PANEL_STATUS_META.info,
+      navClass: 'status-summary',
+      specClass: 'spec-status--info',
+    },
     content: `
       <header class="panel-header">
         <div class="panel-info">
@@ -4552,7 +4439,57 @@ function renderReportHtml(run) {
     `,
   };
 
-  const panels = [summaryPanel, ...suitePanels];
+  const testsPanel =
+    groupedTests.length > 0
+      ? (() => {
+          const testCounts = summariseStatuses(run.tests || []);
+          const filtersHtml = renderStatusFilters(testCounts);
+          const testsStatus =
+            (testCounts.failed || 0) > 0 ||
+            (testCounts.timedOut || 0) > 0 ||
+            (testCounts.interrupted || 0) > 0
+              ? 'fail'
+              : (testCounts.flaky || 0) > 0
+                ? 'warn'
+                : 'pass';
+          const testsStatusMeta = PANEL_STATUS_META[testsStatus] || PANEL_STATUS_META.info;
+          return {
+            id: 'tests',
+            navGroup: 'Diagnostics',
+            label: 'Test details',
+            specLabel: 'Test diagnostics',
+            title: 'Detailed test results',
+            description:
+              'Explore every Playwright spec, filter by status, and review logs or attachments for failing cases.',
+            status: testsStatus,
+            statusMeta: {
+              ...testsStatusMeta,
+              navClass: testsStatusMeta.navClass || 'status-info',
+            },
+            content: `
+        <header class="panel-header">
+          <div class="panel-info">
+            <span class="spec-label">${escapeHtml('Test diagnostics')}</span>
+            <h2>Detailed test results</h2>
+            <p class="panel-description">Explore every Playwright spec, filter by status, and review logs or attachments for failing cases.</p>
+          </div>
+          <span class="spec-status ${testsStatusMeta.specClass}">${escapeHtml(
+            testsStatusMeta.label
+          )}</span>
+        </header>
+        <div class="panel-body panel-body--tests">
+          ${filtersHtml}
+          ${navigationHtml}
+          <div class="test-groups">
+            ${testsHtml}
+          </div>
+        </div>
+      `,
+          };
+        })()
+      : null;
+
+  const panels = [summaryPanel, ...suitePanels, ...(testsPanel ? [testsPanel] : [])];
   const toggleStyles = buildPanelToggleStyles(panels);
   const radioInputs = panels
     .map(
