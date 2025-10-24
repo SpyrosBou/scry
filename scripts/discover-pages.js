@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 const minimist = require('minimist');
+const fs = require('fs');
 const path = require('path');
 const TestRunner = require(path.join(__dirname, '..', 'utils', 'test-runner'));
 
@@ -9,7 +10,13 @@ async function main() {
   const siteName = args.site || args._[0];
 
   if (!siteName) {
-    console.error('Usage: npm run discover_pages -- --site=<site-name> [--local]');
+    console.error('Usage: npm run discover:site -- <site-name> [--local]');
+    process.exit(1);
+  }
+
+  const siteConfigPath = path.join(__dirname, '..', 'sites', `${siteName}.json`);
+  if (!fs.existsSync(siteConfigPath)) {
+    console.error(`❌ Unknown site "${siteName}". Create ${siteName}.json under ./sites/ first.`);
     process.exit(1);
   }
 

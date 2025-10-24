@@ -15,11 +15,11 @@ Whilst working on this repo you can assume we are concerned with the functionali
 - `node run-tests.js --site=<name>` executes the default Chrome desktop run. Layer `--responsive`, `--functionality`, `--accessibility`, or `--visual` to target suite families, or pass one or more spec paths/Globs via `--spec` / trailing arguments (for example `node run-tests.js --site=createarts-live --spec tests/a11y.audit.wcag.spec.js`).
 - `--pages <n>` caps the resolved manifest to the first _n_ pages (e.g. `node run-tests.js --site=createarts-live --spec tests/a11y.audit.wcag.spec.js --pages 5`); `A11Y_SAMPLE=<n>` remains available as an environment override for accessibility runs.
 - `--project=<name>` (or comma-separated list) lets you choose Playwright projects; omit for the Chrome desktop default.
-- `npm run read-reports [count]` opens the latest HTML report(s); set `REPORT_BROWSER`/`REPORT_BROWSER_ARGS` to force a specific viewer.
+- `npm run reports:read [count]` opens the latest HTML report(s); set `REPORT_BROWSER`/`REPORT_BROWSER_ARGS` to force a specific viewer.
 - `npm run clean-reports` keeps the 10 newest `reports/run-*` directories (append `-- --all` or `-- -a` to purge everything) and `npm run clean-manifests` prunes cached manifest files.
 - `npm run clean-test-results` resets Playwright's `test-results/` folder.
 - `npm run test:unit` runs the Node test suite in `tests/unit/`.
-- `npm run discover_pages` hits sitemap discovery and updates a site config; review the diff before committing.
+- `npm run discover:site -- <site>` hits sitemap discovery and updates the matching config; review the diff before committing.
 - `npm run update-baselines` refreshes visual regression snapshots for `example-site`.
 - Prefer `ddev exec` when interacting with containerized WordPress instances in `/home/warui/sites`.
 

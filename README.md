@@ -11,7 +11,7 @@ On every run (`node run-tests.js --site=your-site`):
 - The suite loads the config, opens each page, and checks the layout on mobile, tablet, and desktop sizes.
 - It makes sure critical pieces like headers, menus, and footers are visible, and it compares screenshots to catch visual regressions.
 - It looks for broken links, slow or failing responses, JavaScript errors, and accessibility issues using axe-core plus targeted keyboard/resilience/form/structure audits that call out the relevant WCAG success criteria.
-- It writes a self-contained HTML report to `reports/run-<timestamp>/report.html` (plus JSON snapshots) with a run headline, cross-browser summary tables, per-page accordions, and a collapsible "Debug testing" deck for raw Playwright output. Open the latest run anytime with `npm run read-reports` (append a number like `npm run read-reports 3` to open multiple recent runs).
+- It writes a self-contained HTML report to `reports/run-<timestamp>/report.html` (plus JSON snapshots) with a run headline, cross-browser summary tables, per-page accordions, and a collapsible "Debug testing" deck for raw Playwright output. Open the latest run anytime with `npm run reports:read` (append a number like `npm run reports:read 3` to open multiple recent runs).
 
 To try it locally: run `npm run setup` (this installs dependencies and caches Playwright browsers under `.pw-browsers/`), copy `sites/example-site.json` to your own file, update the URLs, then execute `node run-tests.js --site=<your-site>`. The HTML report will show you exactly what passed and what needs attention before users notice.
 
@@ -49,9 +49,9 @@ To try it locally: run `npm run setup` (this installs dependencies and caches Pl
 
 5. **Open the latest report**
    ```bash
-   npm run read-reports
+   npm run reports:read
    ```
-   This launches the most recent `reports/run-*/report.html` in your default browser. Use `npm run read-reports 3` to open the latest three runs.
+   This launches the most recent `reports/run-*/report.html` in your default browser. Use `npm run reports:read 3` to open the latest three runs.
 
 ### Focused runs & advanced options
 
@@ -85,7 +85,7 @@ npm run setup
 node run-tests.js --site=nfsmediation-live --functionality --pages=1 --project=Chrome
 
 # 3) Open the report
-npm run read-reports
+npm run reports:read
 ```
 
 ## Site Configuration
@@ -213,7 +213,7 @@ node run-tests.js -s my-site -w 4 -b Chrome,Firefox
 npm run update-baselines -- --site=my-site
 
 # Refresh test pages from sitemap (no tests run)
-npm run discover_pages -- --site=my-site
+npm run discover:site -- my-site
 
 ## Smoke Site Config
 - A minimal CI-friendly config is provided at `sites/nfsmediation-smoke.json` (points to `https://nfs.atelierdev.uk`, homepage only).
@@ -290,14 +290,14 @@ Each Allure summary now includes a “WCAG coverage” banner for these manual a
 ## Test Results
 
 - **Custom HTML Report**: Every run writes `reports/run-<timestamp>/report.html`, a self-contained artifact with inline screenshots, logs, and per-test narratives. Matching JSON lives under `reports/run-<timestamp>/data/` for dashboards or scripting.
-- **Run History**: pass a number (e.g. `npm run read-reports 5`) to open multiple recent runs in one go.
+- **Run History**: pass a number (e.g. `npm run reports:read 5`) to open multiple recent runs in one go.
 - **Test Artifacts**: Screenshots, videos, and traces remain in `test-results/` (cleared by global setup unless `PW_SKIP_RESULT_CLEAN=true`).
-- **Console Output**: After each run, the CLI points to the matching report folder and reminds you about `npm run read-reports`.
+- **Console Output**: After each run, the CLI points to the matching report folder and reminds you about `npm run reports:read`.
 
 ### Viewing Reports
 
-- `npm run read-reports` — open the most recent report in your default browser.
-- `npm run read-reports <n>` — open the newest `<n>` reports.
+- `npm run reports:read` — open the most recent report in your default browser.
+- `npm run reports:read <n>` — open the newest `<n>` reports.
 - When adding a new suite, prefer emitting schema payloads via `attachSchemaSummary` (use `attachSummary` only as a transitional fallback) so the reporter can render the same inline HTML/Markdown blocks automatically.
 - The current mock and implementation plan for the refreshed report layout live in `docs/mocks/` and `docs/reporting-redesign-roadmap.md`.
 - Treat WCAG findings surfaced by the suites as defects to address. We do **not** suppress or whitelist contrast (or any other WCAG-level) violations in the harness; our automated results must stay faithful to a real audit even when product/design decides to accept the risk.
@@ -362,8 +362,8 @@ Run `npm run clean-manifests` to delete run manifest files older than 15 days (p
 
   ```bash
   SITE_NAME=createarts-live npx playwright test tests/a11y.audit.wcag.spec.js --project=Chrome
-  npm run read-reports 3   # opens the three most recent reports (Chrome windows by default)
-  npm run read-reports     # open the single latest report
+  npm run reports:read 3   # opens the three most recent reports (Chrome windows by default)
+  npm run reports:read     # open the single latest report
   ```
 
 - The metadata header displays the domain if `SITE_BASE_URL` or `BASE_URL` is exported. Running via `node run-tests.js` is recommended because it sets that env automatically (fallback loads it from `sites/<SITE_NAME>.json`).

@@ -510,7 +510,7 @@ class TestRunner {
             .map((entry) => entry.trim())
             .filter(Boolean);
     if (usingDefaultProject && projectSpecifier.toLowerCase() !== 'all') {
-      console.log('ℹ️  Defaulting to Chrome project (override with --project)');
+      console.log('ℹ️  Defaulting to Chrome project (override with --browsers)');
     } else if (projectSpecifier.toLowerCase() === 'all') {
       console.log('ℹ️  Running across all configured Playwright projects');
     }
@@ -628,7 +628,7 @@ class TestRunner {
         } else {
           console.log('❌ Test run completed with issues.');
         }
-        console.log('📰 View report: npm run read-reports');
+        console.log('📰 View report: npm run reports:read');
         console.log('📁 Reports directory: ./reports/');
         console.log('📸 Test artifacts: ./test-results/');
 
