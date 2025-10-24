@@ -19,6 +19,7 @@ Whilst working on this repo you can assume we are concerned with the functionali
 - `npm run clean-reports` keeps the 10 newest `reports/run-*` directories (append `-- --all` or `-- -a` to purge everything) and `npm run clean-manifests` prunes cached manifest files.
 - `npm run clean-test-results` resets Playwright's `test-results/` folder.
 - `npm run test:unit` runs the Node test suite in `tests/unit/`.
+- Suite shortcuts: `npm run test:visual -- --site=<name>`, `npm run test:responsive -- --site=<name>`, `npm run test:functionality -- --site=<name>`, `npm run test:accessibility -- --site=<name>`.
 - `npm run discover -- <site>` hits sitemap discovery and updates the matching config; review the diff before committing.
 - `npm run baselines:update -- <site>` refreshes visual regression snapshots for any configured site.
 - Prefer `ddev exec` when interacting with containerized WordPress instances in `/home/warui/sites`.

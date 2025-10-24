@@ -220,6 +220,7 @@ npm run discover -- my-site
 - For CI, set the repository Actions variable `SMOKE_SITE=nfsmediation-live` or `nfsmediation-smoke`.
 
 # Run only visual regression tests (defaults to Chrome desktop)
+npm run test:visual -- --site=my-site
 node run-tests.js --site=my-site --visual
 
 # Expand coverage (examples)
@@ -227,9 +228,11 @@ node run-tests.js --site=my-site --visual --project=all
 node run-tests.js --site=my-site --visual --project=Chrome,Firefox
 
 # Run only responsive structure tests
+npm run test:responsive -- --site=my-site
 node run-tests.js --site=my-site --responsive
 
 # Run only functionality tests
+npm run test:functionality -- --site=my-site
 node run-tests.js --site=my-site --functionality
 
 # Test specific browser (defaults to Chrome when omitted)
