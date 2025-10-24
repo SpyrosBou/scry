@@ -30,6 +30,30 @@
   --summary-highlight-badge-bg: rgba(148, 197, 255, 0.6);
   --summary-highlight-shadow: 0 14px 28px rgba(37, 99, 235, 0.18);
   --summary-highlight-hover-shadow: 0 18px 32px rgba(37, 99, 235, 0.22);
+  --summary-ok-bg: rgba(16, 185, 129, 0.12);
+  --summary-ok-border: rgba(16, 185, 129, 0.22);
+  --summary-ok-shadow: rgba(16, 185, 129, 0.18);
+  --summary-ok-text: #065f46;
+  --summary-ok-body: rgba(240, 253, 244, 0.92);
+  --summary-fail-bg: rgba(220, 38, 38, 0.12);
+  --summary-fail-border: rgba(220, 38, 38, 0.22);
+  --summary-fail-shadow: rgba(220, 38, 38, 0.18);
+  --summary-fail-text: #7f1d1d;
+  --summary-fail-body: rgba(254, 242, 242, 0.92);
+  --summary-advisory-bg: rgba(255, 232, 163, 0.4);
+  --summary-advisory-border: rgba(234, 179, 8, 0.35);
+  --summary-advisory-shadow: rgba(234, 179, 8, 0.2);
+  --summary-advisory-text: #7a4c00;
+  --summary-advisory-body: rgba(255, 249, 219, 0.92);
+  --summary-warn-bg: rgba(217, 119, 6, 0.12);
+  --summary-warn-border: rgba(217, 119, 6, 0.22);
+  --summary-warn-shadow: rgba(217, 119, 6, 0.18);
+  --summary-warn-text: #78350f;
+  --summary-warn-body: rgba(255, 247, 237, 0.92);
+  --table-advisory-bg: #fff6d6;
+  --table-advisory-hover-bg: #ffe8a3;
+  --summary-heading-advisory-bg: rgba(255, 232, 163, 0.9);
+  --summary-heading-advisory-text: #7a4c00;
   --font-body: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-heading: "Work Sans", "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --radius-lg: 16px;
@@ -68,6 +92,30 @@
   --summary-highlight-badge-bg: rgba(38, 139, 210, 0.5);
   --summary-highlight-shadow: 0 14px 28px rgba(38, 139, 210, 0.32);
   --summary-highlight-hover-shadow: 0 18px 36px rgba(38, 139, 210, 0.38);
+  --summary-ok-bg: rgba(133, 153, 0, 0.24);
+  --summary-ok-border: rgba(133, 153, 0, 0.5);
+  --summary-ok-shadow: rgba(133, 153, 0, 0.35);
+  --summary-ok-text: #fdf6e3;
+  --summary-ok-body: rgba(133, 153, 0, 0.18);
+  --summary-fail-bg: rgba(220, 50, 47, 0.26);
+  --summary-fail-border: rgba(220, 50, 47, 0.55);
+  --summary-fail-shadow: rgba(220, 50, 47, 0.4);
+  --summary-fail-text: #fdf6e3;
+  --summary-fail-body: rgba(220, 50, 47, 0.18);
+  --summary-advisory-bg: rgba(181, 137, 0, 0.28);
+  --summary-advisory-border: rgba(181, 137, 0, 0.55);
+  --summary-advisory-shadow: rgba(181, 137, 0, 0.38);
+  --summary-advisory-text: #fdf6e3;
+  --summary-advisory-body: rgba(181, 137, 0, 0.2);
+  --summary-warn-bg: rgba(203, 75, 22, 0.28);
+  --summary-warn-border: rgba(203, 75, 22, 0.58);
+  --summary-warn-shadow: rgba(203, 75, 22, 0.4);
+  --summary-warn-text: #fdf6e3;
+  --summary-warn-body: rgba(203, 75, 22, 0.2);
+  --table-advisory-bg: rgba(181, 137, 0, 0.22);
+  --table-advisory-hover-bg: rgba(181, 137, 0, 0.32);
+  --summary-heading-advisory-bg: rgba(181, 137, 0, 0.35);
+  --summary-heading-advisory-text: #fdf6e3;
 }
 
 .status-error {
@@ -1142,7 +1190,7 @@ body[data-theme=dark] .theme-toggle__icon--moon {
 .summary-a11y--rule-table-best-practice tr.impact-serious td,
 .summary-a11y--rule-table-best-practice tr.impact-moderate td,
 .summary-a11y--rule-table-best-practice tr.impact-minor td {
-  background: #fff6d6;
+  background: var(--table-advisory-bg);
 }
 
 .summary-a11y--rule-table-advisory tbody tr td,
@@ -1152,7 +1200,7 @@ body[data-theme=dark] .theme-toggle__icon--moon {
 
 .summary-a11y--rule-table-advisory tbody tr:hover td,
 .summary-a11y--rule-table-best-practice tbody tr:hover td {
-  background: #ffe8a3;
+  background: var(--table-advisory-hover-bg);
 }
 
 .summary-report code {
@@ -1251,8 +1299,8 @@ body[data-theme=dark] .theme-toggle__icon--moon {
   gap: 0.4rem;
   padding: 0.25rem 0.55rem;
   border-radius: 12px;
-  background: rgba(255, 232, 163, 0.9);
-  color: #7a4c00;
+  background: var(--summary-heading-advisory-bg);
+  color: var(--summary-heading-advisory-text);
 }
 
 .summary-toggle-controls {
@@ -1330,75 +1378,75 @@ body[data-theme=dark] .theme-toggle__icon--moon {
 }
 
 .summary-page--ok {
-  border: 1px solid rgba(16, 185, 129, 0.22);
-  background: rgba(16, 185, 129, 0.12);
-  box-shadow: inset 0 0 0 1px rgba(16, 185, 129, 0.18);
+  border: 1px solid var(--summary-ok-border);
+  background: var(--summary-ok-bg);
+  box-shadow: inset 0 0 0 1px var(--summary-ok-shadow);
 }
 
 .summary-page--ok > summary {
-  color: #065f46;
+  color: var(--summary-ok-text);
 }
 
 .summary-page--ok[open] > summary {
-  border-bottom: 1px solid rgba(16, 185, 129, 0.25);
+  border-bottom: 1px solid var(--summary-ok-border);
 }
 
 .summary-page--ok .summary-page__body {
-  background: rgba(240, 253, 244, 0.92);
+  background: var(--summary-ok-body);
 }
 
 .summary-page--fail {
-  border: 1px solid rgba(220, 38, 38, 0.22);
-  background: rgba(220, 38, 38, 0.12);
-  box-shadow: inset 0 0 0 1px rgba(220, 38, 38, 0.18);
+  border: 1px solid var(--summary-fail-border);
+  background: var(--summary-fail-bg);
+  box-shadow: inset 0 0 0 1px var(--summary-fail-shadow);
 }
 
 .summary-page--fail > summary {
-  color: #7f1d1d;
+  color: var(--summary-fail-text);
 }
 
 .summary-page--fail[open] > summary {
-  border-bottom: 1px solid rgba(220, 38, 38, 0.25);
+  border-bottom: 1px solid var(--summary-fail-border);
 }
 
 .summary-page--fail .summary-page__body {
-  background: rgba(254, 242, 242, 0.92);
+  background: var(--summary-fail-body);
 }
 
 .summary-page--advisory {
-  border: 1px solid rgba(234, 179, 8, 0.35);
-  background: rgba(255, 232, 163, 0.4);
-  box-shadow: inset 0 0 0 1px rgba(234, 179, 8, 0.2);
+  border: 1px solid var(--summary-advisory-border);
+  background: var(--summary-advisory-bg);
+  box-shadow: inset 0 0 0 1px var(--summary-advisory-shadow);
 }
 
 .summary-page--advisory > summary {
-  color: #7a4c00;
+  color: var(--summary-advisory-text);
 }
 
 .summary-page--advisory[open] > summary {
-  border-bottom: 1px solid rgba(234, 179, 8, 0.35);
+  border-bottom: 1px solid var(--summary-advisory-border);
 }
 
 .summary-page--advisory .summary-page__body {
-  background: rgba(255, 249, 219, 0.92);
+  background: var(--summary-advisory-body);
 }
 
 .summary-page--warn {
-  border: 1px solid rgba(217, 119, 6, 0.22);
-  background: rgba(217, 119, 6, 0.12);
-  box-shadow: inset 0 0 0 1px rgba(217, 119, 6, 0.18);
+  border: 1px solid var(--summary-warn-border);
+  background: var(--summary-warn-bg);
+  box-shadow: inset 0 0 0 1px var(--summary-warn-shadow);
 }
 
 .summary-page--warn > summary {
-  color: #78350f;
+  color: var(--summary-warn-text);
 }
 
 .summary-page--warn[open] > summary {
-  border-bottom: 1px solid rgba(217, 119, 6, 0.25);
+  border-bottom: 1px solid var(--summary-warn-border);
 }
 
 .summary-page--warn .summary-page__body {
-  background: rgba(255, 247, 237, 0.92);
+  background: var(--summary-warn-body);
 }
 
 .page-card__header {
@@ -1709,6 +1757,46 @@ details.summary-accordion[open] summary {
 .sidebar .nav-item.status-info .nav-status.status-info {
   background: rgba(255, 232, 163, 0.85);
   color: #7a4c00;
+}
+
+body[data-theme=dark] .status-error {
+  background: rgba(220, 50, 47, 0.38);
+  color: #fdf6e3;
+}
+
+body[data-theme=dark] .status-warning {
+  background: rgba(203, 75, 22, 0.36);
+  color: #fdf6e3;
+}
+
+body[data-theme=dark] .status-info {
+  background: rgba(38, 139, 210, 0.32);
+  color: #002b36;
+}
+
+body[data-theme=dark] .status-advisory {
+  background: rgba(181, 137, 0, 0.36);
+  color: #002b36;
+}
+
+body[data-theme=dark] .status-ok {
+  background: rgba(133, 153, 0, 0.32);
+  color: #002b36;
+}
+
+body[data-theme=dark] .sidebar .nav-item.status-info {
+  background: rgba(181, 137, 0, 0.18);
+  color: #fdf6e3;
+  border-left: 4px solid rgba(181, 137, 0, 0.4);
+}
+
+body[data-theme=dark] .sidebar .nav-item.status-info:hover {
+  background: rgba(181, 137, 0, 0.28);
+}
+
+body[data-theme=dark] .sidebar .nav-item.status-info .nav-status.status-info {
+  background: rgba(181, 137, 0, 0.45);
+  color: #002b36;
 }
 
 :is(#view-summary:checked ~ .report-shell .sidebar label[for=view-summary].status-fail,
