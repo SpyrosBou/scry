@@ -226,13 +226,6 @@ input[name="report-view"] {
   gap: 1rem;
 }
 
-.sidebar-header__top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-}
-
 .sidebar-header h1 {
   margin: 0 0 0.75rem;
   font-size: 1.8rem;
@@ -306,6 +299,15 @@ body[data-theme='dark'] .theme-toggle__icon--sun {
 
 body[data-theme='dark'] .theme-toggle__icon--moon {
   display: inline;
+}
+
+.report-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0 0 1.5rem;
+  width: 100%;
 }
 
 .sidebar .metadata {

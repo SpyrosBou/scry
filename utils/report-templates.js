@@ -2756,14 +2756,6 @@ const renderSidebar = (panels, run, summaryMap) => {
     )
     .join('\n');
 
-  const themeToggleButton = `
-    <button class="theme-toggle" type="button" aria-pressed="false" aria-label="Toggle Solarized theme" data-theme-toggle>
-      <span class="theme-toggle__icon theme-toggle__icon--sun" aria-hidden="true">☀️</span>
-      <span class="theme-toggle__icon theme-toggle__icon--moon" aria-hidden="true">🌙</span>
-      <span class="theme-toggle__label" data-theme-label>Solarized Dark</span>
-    </button>
-  `;
-
   const groups = new Map();
   const order = [];
   panels.forEach((panel) => {
@@ -2800,10 +2792,7 @@ const renderSidebar = (panels, run, summaryMap) => {
   return `
     <aside class="sidebar">
       <div class="sidebar-header">
-        <div class="sidebar-header__top">
-          <h1>${escapeHtml(siteName)}</h1>
-          ${themeToggleButton}
-        </div>
+        <h1>${escapeHtml(siteName)}</h1>
         ${metadataHtml ? `<dl class="metadata">${metadataHtml}</dl>` : ''}
       </div>
       <nav class="sidebar-nav">
@@ -4475,6 +4464,14 @@ function renderReportHtml(run) {
     summary?.baseName ? !baseNamesUsed.has(summary.baseName) : true
   );
 
+  const themeToggleButton = `
+    <button class="theme-toggle" type="button" aria-pressed="false" aria-label="Toggle Solarized theme" data-theme-toggle>
+      <span class="theme-toggle__icon theme-toggle__icon--sun" aria-hidden="true">☀️</span>
+      <span class="theme-toggle__icon theme-toggle__icon--moon" aria-hidden="true">🌙</span>
+      <span class="theme-toggle__label" data-theme-label>Solarized Dark</span>
+    </button>
+  `;
+
   const summaryOverviewHtml = renderSummaryOverview(run, run.schemaSummaries || []);
   const runSummariesHtml = renderRunSummaries(filteredRunSummaries);
 
@@ -4602,6 +4599,9 @@ ${toggleStyles}
   <div class="report-shell">
     ${sidebarHtml}
     <main class="report-content">
+      <div class="report-toolbar">
+        ${themeToggleButton}
+      </div>
       ${panelsHtml}
     </main>
   </div>
