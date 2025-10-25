@@ -31,7 +31,7 @@ The mock HTML report is now approved and locked. All future work happens on the 
 - Confirm that “notes” cells read clearly with example production content, not placeholder authoring copy.
 
 ## Phase 5 · QA & Verification
-- Run `node run-tests.js --site=<example>` for representative sites; capture `reports/run-*/data/run.json` for payload verification.
+- Run `node run-tests.js --site=<example> --pages=5 --functionality` for representative sites; capture `reports/run-*/data/run.json` for payload verification.
 - Compare generated HTML against the mock using diff tooling and spot-check responsive breakpoints.
 - Take full-page screenshots of each suite tab (desktop + mobile widths) and attach them to the implementation PR.
 - Log any discrepancies in the tracking board; do not merge until the live report visually matches the mock.

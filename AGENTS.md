@@ -12,15 +12,17 @@ Whilst working on this repo you can assume we are concerned with the functionali
 ## Build, Test, and Development Commands
 
 - `npm run setup` installs all dependencies and Playwright browsers; use `npm run install-browsers` if you only need to refresh the browser binaries.
-- `node run-tests.js --site=<name>` executes the default Chrome desktop run. Layer `--responsive`, `--functionality`, `--accessibility`, or `--visual` to target suite families, or pass one or more spec paths/Globs via `--spec` / trailing arguments (for example `node run-tests.js --site=createarts-live --spec tests/a11y.audit.wcag.spec.js`).
-- `--pages <n>` caps the resolved manifest to the first _n_ pages (e.g. `node run-tests.js --site=createarts-live --spec tests/a11y.audit.wcag.spec.js --pages 5`); `A11Y_SAMPLE=<n>` remains available as an environment override for accessibility runs.
+- `node run-tests.js --site=<name> --pages=<n> --functionality` executes the default Chrome desktop run. Layer `--responsive`, `--functionality`, `--accessibility`, or `--visual` to target suite families, or pass one or more spec paths/Globs via `--test` / trailing arguments (for example `node run-tests.js --site=createarts-live --pages 5 tests/a11y.audit.wcag.spec.js`).
+- `--pages <n>` (required) caps the resolved manifest to the first _n_ pages (e.g. `node run-tests.js --site=createarts-live --pages 5 --functionality`); `A11Y_SAMPLE=<n>` remains available as an environment override for accessibility runs.
 - `--project=<name>` (or comma-separated list) lets you choose Playwright projects; omit for the Chrome desktop default.
 - `npm run reports:read [count]` opens the latest HTML report(s); set `REPORT_BROWSER`/`REPORT_BROWSER_ARGS` to force a specific viewer.
-- `npm run clean-reports` keeps the 10 newest `reports/run-*` directories (append `-- --all` or `-- -a` to purge everything) and `npm run clean-manifests` prunes cached manifest files.
-- `npm run clean-test-results` resets Playwright's `test-results/` folder.
+- `npm run clean:reports` keeps the 10 newest `reports/run-*` directories (append `-- --all` or `-- -a` to purge everything) and `npm run clean:manifests` prunes cached manifest files.
+- `npm run clean:test-results` resets Playwright's `test-results/` folder.
 - `npm run test:unit` runs the Node test suite in `tests/unit/`.
-- `npm run discover:site -- <site>` hits sitemap discovery and updates the matching config; review the diff before committing.
-- `npm run update-baselines` refreshes visual regression snapshots for `example-site`.
+- Suite shortcuts: `npm run test:visual -- --site=<name> --pages=<n>`, `npm run test:responsive -- --site=<name> --pages=<n>`, `npm run test:functionality -- --site=<name> --pages=<n>`, `npm run test:accessibility -- --site=<name> --pages=<n>`.
+- Suite flags and `--test` patterns are mutually exclusive—choose one style per invocation.
+- `npm run discover -- <site>` hits sitemap discovery and updates the matching config; review the diff before committing.
+- `npm run baselines:update -- <site>` refreshes visual regression snapshots for any configured site.
 - Prefer `ddev exec` when interacting with containerized WordPress instances in `/home/warui/sites`.
 
 ## Coding Style & Naming Conventions
@@ -41,11 +43,11 @@ Whilst working on this repo you can assume we are concerned with the functionali
 ## Commit & Pull Request Guidelines
 
 - Follow Conventional Commits (`feat:`, `fix:`, `chore:`, etc.), e.g., `fix: harden wcag report filtering`.
-- Stage related changes only; run pertinent suites (`node run-tests.js --site=<name>`) and mention report paths or artifacts in the PR description.
+- Stage related changes only; run pertinent suites (`node run-tests.js --site=<name> --pages=<n> --functionality`) and mention report paths or artifacts in the PR description.
 - PRs should describe scope, reproduction steps, linked issues, and highlight any failing tests or required follow-ups.
 
 ## Security & Configuration Tips
 
 - Never commit secrets or `.env` files. Use `*-local.json` for non-production endpoints.
 - Keep `SITE_BASE_URL` accurate; accessibility and infrastructure suites treat 4xx/5xx responses as failures.
-- When enabling sitemap discovery, run `node run-tests.js --site=<name> --discover` and validate the generated `testPages` list before committing.
+- When enabling sitemap discovery, run `npm run discover -- <name>` and validate the generated `testPages` list before committing.

@@ -6,14 +6,16 @@ Automated testing suite for WordPress websites with responsive design, functiona
 
 Think of this suite as an automated QA teammate for WordPress sites. You give it a small JSON config in `sites/` that lists the URLs you care about, and it drives real browsers (via Playwright) to make sure those pages still look and behave correctly.
 
-On every run (`node run-tests.js --site=your-site`):
+On every run (`node run-tests.js --site=your-site --pages=5 --functionality`):
 
 - The suite loads the config, opens each page, and checks the layout on mobile, tablet, and desktop sizes.
 - It makes sure critical pieces like headers, menus, and footers are visible, and it compares screenshots to catch visual regressions.
 - It looks for broken links, slow or failing responses, JavaScript errors, and accessibility issues using axe-core plus targeted keyboard/resilience/form/structure audits that call out the relevant WCAG success criteria.
 - It writes a self-contained HTML report to `reports/run-<timestamp>/report.html` (plus JSON snapshots) with a run headline, cross-browser summary tables, per-page accordions, and a collapsible "Debug testing" deck for raw Playwright output. Open the latest run anytime with `npm run reports:read` (append a number like `npm run reports:read 3` to open multiple recent runs).
 
-To try it locally: run `npm run setup` (this installs dependencies and caches Playwright browsers under `.pw-browsers/`), copy `sites/example-site.json` to your own file, update the URLs, then execute `node run-tests.js --site=<your-site>`. The HTML report will show you exactly what passed and what needs attention before users notice.
+To try it locally: run `npm run setup` (this installs dependencies and caches Playwright browsers under `.pw-browsers/`), copy `sites/example-site.json` to your own file, update the URLs, then execute `node run-tests.js --site=<your-site> --pages=5 --functionality`. The HTML report will show you exactly what passed and what needs attention before users notice.
+
+> **Required launch arguments:** every `run-tests.js` invocation must include `--site`, a suite flag (or `--test` pattern), and `--pages <positive integer>` so runs stay scoped and predictable. Suite flags and `--test` patterns are mutually exclusive—pick one approach per run.
 
 ## Quick Start
 
@@ -36,7 +38,7 @@ To try it locally: run `npm run setup` (this installs dependencies and caches Pl
 3. **Run tests**
 
    ```bash
-   node run-tests.js --site=your-site-name
+   node run-tests.js --site=your-site-name --pages=5 --functionality
    ```
 
 4. **Run smoke test (functionality only, Chrome, homepage)**
@@ -55,10 +57,10 @@ To try it locally: run `npm run setup` (this installs dependencies and caches Pl
 
 ### Focused runs & advanced options
 
-- **Single spec globs**: `node run-tests.js --site=my-site tests/a11y.audit.wcag.spec.js`
-- **Multiple sites**: repeat `--site` (e.g. `node run-tests.js --site=daygroup-local --site=daygroup-live`)
-- **Project overrides**: `node run-tests.js --site=my-site --browsers Chrome,Firefox`
-- **Worker overrides**: `node run-tests.js --site=my-site --workers 4` (defaults to `auto`)
+- **Single spec globs**: `node run-tests.js --site=my-site --pages=5 tests/a11y.audit.wcag.spec.js`
+- **Multiple sites**: repeat `--site` (e.g. `node run-tests.js --site=daygroup-local --site=daygroup-live --pages=5 --functionality`)
+- **Project overrides**: `node run-tests.js --site=my-site --pages=5 --functionality --browsers Chrome,Firefox`
+- **Worker overrides**: `node run-tests.js --site=my-site --pages=5 --functionality --workers 4` (defaults to `auto`)
 - **Site lookup**: `node run-tests.js --list-sites`
 
 ### Report layout
@@ -182,20 +184,20 @@ An experimental generator lives under `specs/`. These YAML definitions map to th
 node run-tests.js --list-sites
 
 # Test a specific site (defaults to Chrome + auto workers)
-node run-tests.js --site=my-site
+node run-tests.js --site=my-site --pages=5 --functionality
 # or with short flags
-node run-tests.js -s my-site
+node run-tests.js -s my-site -p 5 --functionality
 
 # Target specific spec files (accepts multiple patterns and sites)
-node run-tests.js --site=my-site tests/a11y.audit.wcag.spec.js
-node run-tests.js -s daygroup-local -s daygroup-live -t responsive.layout.structure.spec.js
+node run-tests.js --site=my-site --pages=5 tests/a11y.audit.wcag.spec.js
+node run-tests.js -s daygroup-local -s daygroup-live -p 5 -t responsive.layout.structure.spec.js
 
 # Limit the number of pages (applies before suite selection)
 node run-tests.js --site=my-site --pages=5
 node run-tests.js -s my-site -p 5
 
 # Using npm script (pass args after --)
-npm run test:site -- --site=my-site
+npm run test -- --site=my-site --pages=5 --functionality
 
 # Smoke test example (nfs mediation)
 node run-tests.js --site=nfsmediation-local --functionality --pages=1 --project=Chrome
@@ -203,44 +205,47 @@ node run-tests.js --site=nfsmediation-local --functionality --pages=1 --project=
 ddev exec node run-tests.js --site=nfsmediation-local --functionality --pages=1 --project=Chrome
 
 # Refresh sitemap-backed page list before running tests
-node run-tests.js --site=my-site --discover
+npm run discover -- my-site
 
 # Pin worker count or expand browser coverage
-node run-tests.js --site=my-site --workers 4 --browsers Chrome,Firefox
-node run-tests.js -s my-site -w 4 -b Chrome,Firefox
+node run-tests.js --site=my-site --pages=5 --functionality --workers 4 --browsers Chrome,Firefox
+node run-tests.js -s my-site -p 5 --functionality -w 4 -b Chrome,Firefox
 
 # Update visual baselines for a site (visual regression only)
-npm run update-baselines -- --site=my-site
+npm run baselines:update -- my-site
 
 # Refresh test pages from sitemap (no tests run)
-npm run discover:site -- my-site
+npm run discover -- my-site
 
 ## Smoke Site Config
 - A minimal CI-friendly config is provided at `sites/nfsmediation-smoke.json` (points to `https://nfs.atelierdev.uk`, homepage only).
 - For CI, set the repository Actions variable `SMOKE_SITE=nfsmediation-live` or `nfsmediation-smoke`.
 
 # Run only visual regression tests (defaults to Chrome desktop)
-node run-tests.js --site=my-site --visual
+npm run test:visual -- --site=my-site --pages=5
+node run-tests.js --site=my-site --pages=5 --visual
 
 # Expand coverage (examples)
-node run-tests.js --site=my-site --visual --project=all
-node run-tests.js --site=my-site --visual --project=Chrome,Firefox
+node run-tests.js --site=my-site --pages=5 --visual --project=all
+node run-tests.js --site=my-site --pages=5 --visual --project=Chrome,Firefox
 
 # Run only responsive structure tests
-node run-tests.js --site=my-site --responsive
+npm run test:responsive -- --site=my-site --pages=5
+node run-tests.js --site=my-site --pages=5 --responsive
 
 # Run only functionality tests
-node run-tests.js --site=my-site --functionality
+npm run test:functionality -- --site=my-site --pages=5
+node run-tests.js --site=my-site --pages=5 --functionality
 
 # Test specific browser (defaults to Chrome when omitted)
-node run-tests.js --site=my-site --project="Chrome"
-node run-tests.js --site=my-site --project="Firefox"
-node run-tests.js --site=my-site --project="Safari"  # WebKit engine
-node run-tests.js --site=my-site --project=all         # Run every configured Playwright project
+node run-tests.js --site=my-site --pages=5 --functionality --project="Chrome"
+node run-tests.js --site=my-site --pages=5 --functionality --project="Firefox"
+node run-tests.js --site=my-site --pages=5 --functionality --project="Safari"  # WebKit engine
+node run-tests.js --site=my-site --pages=5 --functionality --project=all         # Run every configured Playwright project
 
 # Start local ddev automatically (if applicable)
 # Use --local to enable ddev preflight and infer DDEV_PROJECT_PATH under /home/warui/sites
-node run-tests.js --site=my-site-local --visual --local
+node run-tests.js --site=my-site-local --pages=5 --visual --local
 ```
 
 ## What Gets Tested
@@ -334,15 +339,15 @@ Each Allure summary now includes a “WCAG coverage” banner for these manual a
 
 ```bash
 # Wipe all Playwright artifacts (screenshots/traces/videos)
-npm run clean-test-results
+npm run clean:test-results
 
 # Prune HTML reports to the 10 newest runs
-npm run clean-reports
+npm run clean:reports
 ```
 
 **Note**: HTML reports live under `reports/run-*/report.html`. Playwright artifacts (videos/screenshots/traces) remain in `test-results/`.
 
-Run `npm run clean-manifests` to delete run manifest files older than 15 days (pass a custom day count as a second argument if needed).
+Run `npm run clean:manifests` to delete run manifest files older than 15 days (pass a custom day count as a second argument if needed).
 
 ### Run Manifest & Environment Contracts
 

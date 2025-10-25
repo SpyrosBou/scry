@@ -7,10 +7,10 @@ const TestRunner = require(path.join(__dirname, '..', 'utils', 'test-runner'));
 
 async function main() {
   const args = minimist(process.argv.slice(2));
-  const siteName = args.site || args._[0];
+  const siteName = args._[0] || args.site;
 
   if (!siteName) {
-    console.error('Usage: npm run discover:site -- <site-name> [--local]');
+    console.error('Usage: npm run discover -- <site-name> [--local]');
     process.exit(1);
   }
 

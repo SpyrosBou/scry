@@ -66,13 +66,18 @@ function showUsage() {
     'Smart Playwright runner',
     '',
     'Usage:',
+    '  node run-tests.js --site <site> --pages <n> [suite flags or --test <pattern>]',
     '  node run-tests.js [options] --site <site> [extra sites...] [test patterns...]',
     '',
-    'Core selections:',
-    '  Step 1 – Site(s):        --site, -s <name> (repeat or comma-separate)',
-    '  Step 2 – Tests (optional): --test, -t <pattern> (repeat as needed)',
-    '  Step 3 – Page scope:     --pages, -p <n> (caps pages across all suites)',
-    '  Step 4 – Projects:       --browsers, -b <list> (default Chrome, use "all" for every project)',
+    'Required selections:',
+    '  • Site(s):               --site, -s <name> (repeat or comma-separate)',
+    '  • Suite/tests:           Choose one or more of --visual/--responsive/--functionality/--accessibility',
+    '                           or pass --test, -t <pattern> (repeat as needed)',
+    '                           (suite flags and --test patterns are mutually exclusive)',
+    '  • Page cap:              --pages, -p <positive integer>',
+    '',
+    'Optional selections:',
+    '  • Projects:              --browsers, -b <list> (default Chrome, use "all" for every project)',
     '',
     'Advanced options:',
     '  --visual                Run only visual regression specs',
@@ -89,8 +94,9 @@ function showUsage() {
     '  --help                  Show this help message',
     '',
     'Tips:',
-    '  - Append test globs after the options (e.g. "node run-tests.js --site foo tests/*.spec.js").',
-    '  - Combine page cap and project selection to mirror the GUI flow you plan to build.',
+    '  - Append test globs after the options (e.g. "node run-tests.js --site foo --pages 5 tests/*.spec.js").',
+    '  - Combine page cap (--pages) and project selection to mirror the GUI flow you plan to build.',
+    '  - Always specify --pages with a positive integer to keep runs bounded.',
     '  - Use env vars like REPORT_BROWSER to override the default browser opener when viewing reports.',
     '',
   ];
@@ -105,7 +111,6 @@ function parseSites() {
   );
 
   const sites = [...explicitSites, ...inferredSites].filter(Boolean);
-  if (sites.length === 0) return ['example-site'];
   return Array.from(new Set(sites));
 }
 
@@ -217,6 +222,11 @@ async function main() {
   const sites = parseSites();
   const specs = parseSpecs();
 
+  if (sites.length === 0) {
+    console.error('❌ Missing required --site argument. Provide at least one site name (repeat or comma-separate).');
+    process.exit(1);
+  }
+
   if (argv['update-baselines']) {
     for (const site of sites) {
       await TestRunner.updateBaselines(site);
@@ -224,11 +234,43 @@ async function main() {
     return;
   }
 
-  const options = {
+  const rawPages = argv.pages;
+  if (rawPages === undefined || rawPages === null || String(rawPages).trim() === '') {
+    console.error('❌ Missing required --pages argument. Supply a positive integer to cap page selection (e.g. "--pages 5").');
+    process.exit(1);
+  }
+  const parsedPages = Number.parseInt(String(rawPages).trim(), 10);
+  if (!Number.isFinite(parsedPages) || parsedPages <= 0) {
+    console.error('❌ Invalid --pages value. Use a positive integer (e.g. "--pages 5").');
+    process.exit(1);
+  }
+  argv.pages = String(parsedPages);
+
+  const suiteSelections = {
     visual: coerceBoolean(argv.visual),
     responsive: coerceBoolean(argv.responsive),
     functionality: coerceBoolean(argv.functionality),
     accessibility: coerceBoolean(argv.accessibility),
+  };
+  const hasSuiteSelection = Object.values(suiteSelections).some(Boolean);
+  if (!hasSuiteSelection && specs.length === 0) {
+    console.error(
+      '❌ No suite or spec filters supplied. Use one or more of --visual/--responsive/--functionality/--accessibility or pass --test <pattern>.'
+    );
+    process.exit(1);
+  }
+  if (hasSuiteSelection && specs.length > 0) {
+    console.error(
+      '❌ Conflicting suite and spec filters supplied. Choose suite flags OR pass --test patterns, but not both.'
+    );
+    process.exit(1);
+  }
+
+  const options = {
+    visual: suiteSelections.visual,
+    responsive: suiteSelections.responsive,
+    functionality: suiteSelections.functionality,
+    accessibility: suiteSelections.accessibility,
     allGroups: false,
     debug: coerceBoolean(argv.debug),
     discover: coerceBoolean(argv.discover),
