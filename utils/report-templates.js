@@ -2775,11 +2775,19 @@ const renderSidebar = (panels, run, summaryMap) => {
         .map((panel) => {
           const statusMeta =
             panel.statusMeta || PANEL_STATUS_META[panel.status] || PANEL_STATUS_META.info;
+          const navItemClasses = ['nav-item'];
+          const navStatusClasses = ['nav-status'];
+          if (statusMeta.navClass) {
+            navItemClasses.push(statusMeta.navClass);
+            navStatusClasses.push(statusMeta.navClass);
+          }
           return `
-            <label class="nav-item ${escapeHtml(statusMeta.navClass || '')}" for="view-${panel.id}">
+            <label class="${escapeHtml(navItemClasses.join(' '))}" for="view-${panel.id}">
               <span class="nav-item__header">
                 <span class="nav-name">${escapeHtml(panel.label)}</span>
-                <span class="nav-status">${escapeHtml(statusMeta.label)}</span>
+                <span class="${escapeHtml(navStatusClasses.join(' '))}">${escapeHtml(
+            statusMeta.label
+          )}</span>
               </span>
             </label>
           `;
