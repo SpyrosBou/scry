@@ -1,39 +1,40 @@
 # Reporting Redesign Roadmap
 
-The mock HTML report is now approved and locked. All future work happens on the feature branch that carries the production reporter changes; keep this document updated alongside that branch.
+The mock HTML report remains our source of truth. This roadmap captures what is already live in `reporting-redesign`, what still blocks parity with the mock, and the sign-off steps before we merge to `main`.
 
-## Phase 0 · Prep
-- Take a fresh copy of `docs/mocks/full-run-report.html` and `docs/mocks/report-styles.scss` into the branch for quick comparison.
-- Snapshot the current reporter output (`reports/run-*/report.html`) so we can diff structure and CSS after each phase.
-- File tracking tickets for every spec panel so QA can sign off individually once they match the mock.
+## What’s already done
+- New shell (sidebar navigation, summary hero, suite cards) is in production templates.
+- WCAG, keyboard, structure, forms, iframe, reduced-motion, reflow, internal links, infrastructure, and interactive panels now render with schema-driven layouts that mirror the mock copy and component structure.
+- Reporter compiles `docs/mocks/report-styles.scss` at build time; all styling lives in Solarized theme tokens with light/dark support.
+- Navigation scripts (`reports:read`, `reports:regenerate`) allow us to reopen past runs during development.
+- Schema validator enforces required finding arrays (`gating`, `warnings`, `advisories`, `notes`) and is covered by unit tests.
 
-## Phase 1 · Schema + Data Audit
-- Inventory every spec payload produced by the test runner (accessibility/a11y, responsive, functionality variants, visual).
-- Ensure each payload exposes `gating`, `warnings`, `advisories`, `notes`, and artifact metadata (baseline/current/diff for visual).
-- Document any gaps in `utils/test-helpers.js` or spec fixtures and patch them before template work starts.
-- Add backstop unit coverage around `attachSchemaSummary` (and related helpers) for required fields and naming.
-- Keep `docs/report-schema-inventory.md` current so engineering/QA can cross-check payload expectations while migrating the reporter.
+## Outstanding work
 
-## Phase 2 · Template Migration (in progress)
-- ✅ Rebuilt the summary experience: the report now uses the sidebar + panel shell from the mock, complete with the summary hero, stat grid, and suite cards.
-- ✅ WCAG panel migrated to the schema-driven layout with gating/advisory rule tables, pills, and per-page cards.
-- ⏳ Port remaining panels (forms, keyboard, structure, functionality, responsive, visual) so each tab mirrors the approved wording, tables, and card stacks.
-- ⏳ Surface visual regression deltas, previews, and notes inside the new visual panel once the panel migration lands.
+### 1. Panel parity
+- Rebuild the Visual Regression panel to match the mock (hero summary, blocking/advisory tables, image preview deck, artifact links).
+- Rework responsive panels (responsive structure + WordPress features) so copy, status pills, and per-page accordions match the approved mock instead of the interim tables.
+- Audit functionality panels (interactive, availability, HTTP, performance) for any remaining mock deltas and tighten wording accordingly.
 
-## Phase 3 · Styling Integration
-- ✅ Reporter now compiles `docs/mocks/report-styles.scss`; legacy inline styles (`SUMMARY_STYLES`) are gone, so every panel inherits the mock tokens without spec-specific CSS.
-- Continue folding mock styling into `utils/report-templates.js` until all panels match the mock (Inter typography, pills, card shadows). Remaining work is tied to the outstanding suite panels above.
-- Specs should emit structured data only—no inline HTML styling—so the shared renderer controls layout, spacing, and color.
+### 2. Styling & theming
+- Finalise Solarized token values once all panels are migrated; ensure status colours, badges, and card shadows read correctly in both themes.
+- Keep `docs/mocks/report-styles.scss` as the single source of design tokens—no inline style escapes in templates.
+- Clean out legacy selector aliases once responsive/visual parity lands (several `.summary-*` fallbacks remain for the old markup).
 
-## Phase 4 · Interaction & Accessibility Pass
-- Re-check keyboard focus, tab order, and ARIA labelling for the new stacked layout and accordions.
-- Ensure visual diff previews are accessible (alt text, focusable controls for toggling/magnifying).
-- Confirm that “notes” cells read clearly with example production content, not placeholder authoring copy.
+### 3. Schema & data documentation
+- Produce `docs/report-schema-inventory.md` outlining every suite payload (run + page summaries, required fields, optional metadata, artifact keys).
+- Confirm visual payloads always expose artifact URLs and delta metrics; update fixtures/helpers where the data is missing.
 
-## Phase 5 · QA & Verification
-- Run `node run-tests.js --site=<example> --pages=5 --functionality` for representative sites; capture `reports/run-*/data/run.json` for payload verification.
-- Compare generated HTML against the mock using diff tooling and spot-check responsive breakpoints.
-- Take full-page screenshots of each suite tab (desktop + mobile widths) and attach them to the implementation PR.
-- Log any discrepancies in the tracking board; do not merge until the live report visually matches the mock.
+### 4. Interaction & accessibility
+- Validate accordion behaviour and keyboard focus across every panel, including the new theme toggle.
+- Add alt text and focusable controls for visual diff previews and any new responsive imagery.
+- Check ARIA labels/roles on navigation, toggle buttons, and status pills so screen readers surface the same severity cues.
 
-Track progress in the reporting board and close this roadmap when production reports render identically to `docs/mocks/full-run-report.html`.
+### 5. QA sign-off
+- Run representative sites (`--functionality`, `--responsive`, `--accessibility`, `--visual`) and archive `run.json` payloads alongside regenerated reports.
+- Diff each panel against `docs/mocks/full-run-report.html` (desktop and narrow breakpoints) and take annotated screenshots for the QA board.
+- Record discrepancies or known gaps before the merge PR; nothing ships until the live report is visually indistinguishable from the mock.
+
+## Ongoing hygiene
+- Snapshot a current report each time we land significant template/styling changes so regressions are obvious (`npm run reports:regenerate`).
+- Keep this roadmap and the schema inventory in sync with the feature branch; update statuses as panels cross the finish line.
