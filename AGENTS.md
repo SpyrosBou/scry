@@ -16,8 +16,8 @@ Whilst working on this repo you can assume we are concerned with the functionali
 - `--pages <n>` (required) caps the resolved manifest to the first _n_ pages (e.g. `node run-tests.js --site=createarts-live --pages 5 --functionality`); `A11Y_SAMPLE=<n>` remains available as an environment override for accessibility runs.
 - `--project=<name>` (or comma-separated list) lets you choose Playwright projects; omit for the Chrome desktop default.
 - `npm run reports:read [count]` opens the latest HTML report(s); set `REPORT_BROWSER`/`REPORT_BROWSER_ARGS` to force a specific viewer.
-- `npm run clean-reports` keeps the 10 newest `reports/run-*` directories (append `-- --all` or `-- -a` to purge everything) and `npm run clean-manifests` prunes cached manifest files.
-- `npm run clean-test-results` resets Playwright's `test-results/` folder.
+- `npm run clean:reports` keeps the 10 newest `reports/run-*` directories (append `-- --all` or `-- -a` to purge everything) and `npm run clean:manifests` prunes cached manifest files.
+- `npm run clean:test-results` resets Playwright's `test-results/` folder.
 - `npm run test:unit` runs the Node test suite in `tests/unit/`.
 - Suite shortcuts: `npm run test:visual -- --site=<name> --pages=<n>`, `npm run test:responsive -- --site=<name> --pages=<n>`, `npm run test:functionality -- --site=<name> --pages=<n>`, `npm run test:accessibility -- --site=<name> --pages=<n>`.
 - Suite flags and `--test` patterns are mutually exclusive—choose one style per invocation.

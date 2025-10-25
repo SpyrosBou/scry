@@ -7,9 +7,6 @@
     "test": "node run-tests.js",
     "install-browsers": "node scripts/install-browsers.js",
     "setup": "npm install && npm run install-browsers && npx playwright install",
-    "clean-test-results": "node scripts/cleanup.js clean-test-results",
-    "clean-reports": "node scripts/cleanup.js clean-reports",
-    "clean-manifests": "node scripts/cleanup.js clean-manifests",
     "baselines:update": "node scripts/update-baselines.js",
     "discover": "node scripts/discover-pages.js",
     "lint": "eslint run-tests.js utils/**/*.js scripts/**/*.js playwright.config.js",
@@ -21,7 +18,10 @@
     "test:visual": "node run-tests.js --visual",
     "test:responsive": "node run-tests.js --responsive",
     "test:functionality": "node run-tests.js --functionality",
-    "test:accessibility": "node run-tests.js --accessibility"
+    "test:accessibility": "node run-tests.js --accessibility",
+    "clean:reports": "node scripts/cleanup.js clean-reports",
+    "clean:manifests": "node scripts/cleanup.js clean-manifests",
+    "clean:test-results": "node scripts/cleanup.js clean-test-results"
   },
   "lint-staged": {},
   "keywords": [

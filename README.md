@@ -339,15 +339,15 @@ Each Allure summary now includes a “WCAG coverage” banner for these manual a
 
 ```bash
 # Wipe all Playwright artifacts (screenshots/traces/videos)
-npm run clean-test-results
+npm run clean:test-results
 
 # Prune HTML reports to the 10 newest runs
-npm run clean-reports
+npm run clean:reports
 ```
 
 **Note**: HTML reports live under `reports/run-*/report.html`. Playwright artifacts (videos/screenshots/traces) remain in `test-results/`.
 
-Run `npm run clean-manifests` to delete run manifest files older than 15 days (pass a custom day count as a second argument if needed).
+Run `npm run clean:manifests` to delete run manifest files older than 15 days (pass a custom day count as a second argument if needed).
 
 ### Run Manifest & Environment Contracts
 
