@@ -3455,11 +3455,22 @@ const renderIframeGroupHtml = (group) => {
 
 const renderStructurePageCard = (summary) => {
   if (!summary) return '';
-  const gating = summary.gatingIssues || [];
+  const gating = summary.gatingIssues || summary.gating || [];
   const advisories = summary.advisories || [];
   const headingSkips = summary.headingSkips || [];
   const headingOutline = summary.headingOutline || [];
-  const statusClass = gating.length ? 'error' : 'success';
+
+  let statusClass = 'status-ok';
+  let statusLabel = 'Pass';
+
+  if (gating.length > 0) {
+    statusClass = 'status-error';
+    statusLabel = `${formatCount(gating.length)} gating issue(s)`;
+  } else if (headingSkips.length > 0 || advisories.length > 0) {
+    statusClass = 'status-info';
+    statusLabel = 'Advisories';
+  }
+
   const gatingList = gating
     .map((item) => `<li class="check-fail">${escapeHtml(String(item))}</li>`)
     .join('');
@@ -3479,7 +3490,7 @@ const renderStructurePageCard = (summary) => {
       <div class="page-card__header">
         <h3>${escapeHtml(summary.page || 'unknown')}</h3>
         <span class="status-pill ${statusClass}">
-          ${gating.length ? `${gating.length} gating issue(s)` : 'Pass'}
+          ${statusLabel}
         </span>
       </div>
       <p class="details">H1 count: ${summary.h1Count ?? 'n/a'}</p>
@@ -3490,9 +3501,21 @@ const renderStructurePageCard = (summary) => {
         <li>Footer landmarks: ${summary.footerLandmarks ?? 0}</li>
       </ul>
       ${gating.length ? `<ul class="details">${gatingList}</ul>` : ''}
-      ${advisories.length ? `<details><summary>Advisories (${advisories.length})</summary><ul class="details">${advisoryList}</ul></details>` : ''}
-      ${headingSkips.length ? `<details><summary>Heading level skips</summary><ul class="details">${headingSkipList}</ul></details>` : ''}
-      ${headingOutline.length ? `<details><summary>Heading outline (${headingOutline.length} headings)</summary><ul class="details">${headingOutlineList}</ul></details>` : ''}
+      ${
+        advisories.length
+          ? `<details><summary>Advisories (${advisories.length})</summary><ul class="details">${advisoryList}</ul></details>`
+          : ''
+      }
+      ${
+        headingSkips.length
+          ? `<details><summary>Heading level skips</summary><ul class="details">${headingSkipList}</ul></details>`
+          : ''
+      }
+      ${
+        headingOutline.length
+          ? `<details><summary>Heading outline (${headingOutline.length} headings)</summary><ul class="details">${headingOutlineList}</ul></details>`
+          : ''
+      }
     </section>
   `;
 };
@@ -3648,56 +3671,223 @@ const renderStructureGroupHtml = (group) => {
   const buckets = collectSchemaProjects(group);
   if (buckets.length === 0) return '';
 
+  const formatImpactLabel = (impact) => {
+    if (!impact) return 'Info';
+    const label = String(impact);
+    return `${label.charAt(0).toUpperCase()}${label.slice(1)}`;
+  };
+
+  const renderIssuesTable = (issues, { title, emptyMessage }) => {
+    if (!title) return '';
+    if (!Array.isArray(issues) || issues.length === 0) {
+      return `
+        <section class="summary-report summary-a11y summary-a11y--structure-issues">
+          <h3>${escapeHtml(title)}</h3>
+          <p class="details">${escapeHtml(emptyMessage || 'No issues detected.')}</p>
+        </section>
+      `;
+    }
+
+    const rows = issues
+      .sort((a, b) => {
+        if (b.pageCount !== a.pageCount) return b.pageCount - a.pageCount;
+        return a.message.localeCompare(b.message);
+      })
+      .map((issue) => {
+        const impact = (issue.impact || 'info').toLowerCase();
+        const pagesList = Array.isArray(issue.pages)
+          ? issue.pages
+              .map((page) => `<code>${escapeHtml(page)}</code>`)
+              .join('<br />')
+          : '';
+        const pagesCell = pagesList
+          ? `<strong>${escapeHtml(formatCount(issue.pageCount))} page(s)</strong><br />${pagesList}`
+          : '—';
+        return `
+          <tr class="impact-${escapeHtml(impact)}">
+            <td>${escapeHtml(formatImpactLabel(impact))}</td>
+            <td>${escapeHtml(issue.message)}</td>
+            <td>${pagesCell}</td>
+            <td>${escapeHtml(formatCount(issue.pageCount))}</td>
+          </tr>
+        `;
+      })
+      .join('');
+
+    return `
+      <section class="summary-report summary-a11y summary-a11y--structure-issues">
+        <h3>${escapeHtml(title)}</h3>
+        <table class="schema-table">
+          <thead><tr><th>Impact</th><th>Issue</th><th>Pages</th><th>Occurrences</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </section>
+    `;
+  };
+
+  const collectIssues = (pages, fields, impact) => {
+    if (!Array.isArray(pages) || pages.length === 0) return [];
+    const map = new Map();
+    const fieldList = Array.isArray(fields) ? fields : [fields];
+
+    for (const page of pages) {
+      const pageId = page?.page || 'Unknown page';
+      for (const field of fieldList) {
+        const items = Array.isArray(page?.[field]) ? page[field] : [];
+        for (const rawItem of items) {
+          const message = String(rawItem || '').trim();
+          if (!message) continue;
+          if (!map.has(message)) {
+            map.set(message, { message, impact, pages: new Set() });
+          }
+          map.get(message).pages.add(pageId);
+        }
+      }
+    }
+
+    return Array.from(map.values()).map((entry) => {
+      const pagesList = Array.from(entry.pages);
+      return {
+        message: entry.message,
+        impact: entry.impact,
+        pages: pagesList,
+        pageCount: pagesList.length,
+      };
+    });
+  };
+
   const sections = buckets.map((bucket) => {
     const runPayload = firstRunPayload(bucket);
-    const pagesData = runPayload?.details?.pages || [];
-    const overview = runPayload?.overview || {};
-    const metrics = [
-      { label: 'Pages audited', value: overview.totalPagesAudited ?? pagesData.length },
-      {
-        label: 'Pages missing main landmark',
-        value:
-          overview.pagesMissingMain ?? pagesData.filter((page) => !page.hasMainLandmark).length,
-      },
-      {
-        label: 'Pages with heading skips',
-        value:
-          overview.pagesWithHeadingSkips ??
-          pagesData.filter((page) => (page.headingSkips || []).length > 0).length,
-      },
-      {
-        label: 'Pages with gating issues',
-        value:
-          overview.pagesWithGatingIssues ??
-          pagesData.filter((page) => (page.gating || []).length > 0).length,
-      },
-      {
-        label: 'Pages with advisories',
-        value:
-          overview.pagesWithAdvisories ??
-          pagesData.filter((page) => (page.advisories || []).length > 0).length,
-      },
-    ];
-    const overviewHtml = renderSummaryMetrics(metrics);
-    const wcagRefs = runPayload?.details?.wcagReferences || [];
-    const wcagBadges = wcagRefs
-      .map((ref) => `<span class="badge badge-wcag">${escapeHtml(`${ref.id} ${ref.name}`)}</span>`)
-      .join(' ');
+    let runSummaryBlock = '';
+    let metricsSection = '';
+    let gatingIssuesTable = '';
+    let advisoryIssuesTable = '';
 
-    const tableRows = pagesData
-      .map(
-        (page) => `
-          <tr class="${(page.gating || []).length ? 'impact-critical' : ''}">
-            <td><code>${escapeHtml(page.page || 'unknown')}</code></td>
-            <td>${page.h1Count ?? 0}</td>
-            <td>${page.hasMainLandmark ? 'Yes' : 'No'}</td>
-            <td>${(page.headingSkips || []).length}</td>
-            <td>${(page.gating || []).length}</td>
-            <td>${(page.advisories || []).length}</td>
-          </tr>
+    if (runPayload) {
+      const pagesData = Array.isArray(runPayload.details?.pages) ? runPayload.details.pages : [];
+      const overview = runPayload.overview || {};
+      const totalPagesAudited = overview.totalPagesAudited ?? pagesData.length;
+      const pagesMissingMain =
+        overview.pagesMissingMain ??
+        pagesData.filter((page) => !page.hasMainLandmark).length;
+      const pagesWithHeadingSkips =
+        overview.pagesWithHeadingSkips ??
+        pagesData.filter((page) => (page.headingSkips || []).length > 0).length;
+      const pagesWithGatingIssues =
+        overview.pagesWithGatingIssues ??
+        pagesData.filter((page) => (page.gating || page.gatingIssues || []).length > 0).length;
+      const pagesWithAdvisories =
+        overview.pagesWithAdvisories ??
+        pagesData.filter((page) => (page.advisories || []).length > 0).length;
+
+      const metrics = [
+        { label: 'Pages audited', value: totalPagesAudited },
+        { label: 'Pages missing main landmark', value: pagesMissingMain },
+        { label: 'Pages with heading skips', value: pagesWithHeadingSkips },
+        { label: 'Pages with gating issues', value: pagesWithGatingIssues },
+        { label: 'Pages with advisories', value: pagesWithAdvisories },
+      ];
+      const overviewHtml = renderSummaryMetrics(metrics);
+
+      const wcagRefs = runPayload.details?.wcagReferences || [];
+      const wcagBadges = wcagRefs
+        .map(
+          (ref) =>
+            `<span class="badge badge-wcag">${escapeHtml(`${ref.id} ${ref.name}`)}</span>`
+        )
+        .join(' ');
+
+      const metadata = runPayload.metadata || {};
+      const detailViewports = Array.isArray(runPayload.details?.viewports)
+        ? runPayload.details.viewports
+        : [];
+      const metadataViewports = Array.isArray(metadata.viewports) ? metadata.viewports : [];
+      const viewportList =
+        detailViewports.length > 0
+          ? detailViewports
+          : metadataViewports.length > 0
+            ? metadataViewports
+            : [];
+      const projectLabel = metadata.projectName || bucket.projectName || 'Selected project';
+      const viewportLabel = viewportList.length ? viewportList.join(', ') : projectLabel;
+
+      const summaryItems = [
+        {
+          label: 'Gating issues',
+          tone: 'status-error',
+          count: pagesWithGatingIssues,
+          suffix: 'page(s)',
+        },
+        {
+          label: 'Missing main landmarks',
+          tone: 'status-warning',
+          count: pagesMissingMain,
+          suffix: 'page(s)',
+        },
+        {
+          label: 'Heading skips',
+          tone: 'status-warning',
+          count: pagesWithHeadingSkips,
+          suffix: 'page(s)',
+        },
+        {
+          label: 'Advisories',
+          tone: 'status-info',
+          count: pagesWithAdvisories,
+          suffix: 'page(s)',
+        },
+      ];
+      const statusSummary = renderStatusSummaryList(summaryItems, { className: 'status-summary' });
+
+      const gatingIssues = collectIssues(pagesData, ['gatingIssues', 'gating'], 'critical').filter(
+        (issue) => issue.pageCount > 0
+      );
+      const headingSkipIssues = collectIssues(pagesData, 'headingSkips', 'moderate');
+      const warningIssues = collectIssues(pagesData, 'warnings', 'moderate');
+      const advisoryIssues = collectIssues(pagesData, 'advisories', 'minor');
+      const combinedAdvisories = [
+        ...headingSkipIssues,
+        ...warningIssues,
+        ...advisoryIssues,
+      ].filter((issue) => issue.pageCount > 0);
+
+      runSummaryBlock = `
+        <section class="summary-report summary-a11y summary-a11y--structure-summary">
+          <h3>Structural accessibility run summary</h3>
+          <p>Audited <strong>${escapeHtml(formatCount(totalPagesAudited))}</strong> page(s) across ${escapeHtml(
+            viewportLabel || 'this project'
+          )}.</p>
+          ${
+            statusSummary ||
+            '<p class="details">No structural issues detected across the audited pages.</p>'
+          }
+          ${
+            wcagBadges
+              ? `<p class="legend"><strong>WCAG coverage:</strong> ${wcagBadges}</p>`
+              : '<p class="legend"><strong>WCAG coverage:</strong> —</p>'
+          }
+        </section>
+      `;
+
+      metricsSection = overviewHtml
+        ? `
+          <section class="summary-report summary-a11y summary-a11y--structure-metrics">
+            <h3>Structure coverage at a glance</h3>
+            ${overviewHtml}
+          </section>
         `
-      )
-      .join('');
+        : '';
+
+      gatingIssuesTable = renderIssuesTable(gatingIssues, {
+        title: 'Gating structural issues',
+        emptyMessage: 'No gating issues detected.',
+      });
+
+      advisoryIssuesTable = renderIssuesTable(combinedAdvisories, {
+        title: 'Structural advisories and warnings',
+        emptyMessage: 'No advisories detected.',
+      });
+    }
 
     const perPageEntries = (bucket.pageEntries || []).map((entry) => {
       const payload = entry.payload || {};
@@ -3715,20 +3905,15 @@ const renderStructureGroupHtml = (group) => {
       formatSummaryLabel: (entrySummary) => entrySummary?.page || 'Unknown page',
     });
 
-    return `
-      <section class="summary-report summary-a11y summary-a11y--structure-summary">
-        <h2>Landmark & heading structure summary</h2>
-        <p class="details"><strong>WCAG coverage:</strong> ${wcagBadges || '—'}</p>
-        ${overviewHtml}
-        <table>
-          <thead>
-            <tr><th>Page</th><th>H1 count</th><th>Main landmark</th><th>Heading skips</th><th>Gating issues</th><th>Advisories</th></tr>
-          </thead>
-          <tbody>${tableRows}</tbody>
-        </table>
-      </section>
-      ${accordionHtml}
-    `;
+    return [
+      runSummaryBlock,
+      metricsSection,
+      gatingIssuesTable,
+      advisoryIssuesTable,
+      accordionHtml,
+    ]
+      .filter(Boolean)
+      .join('\n');
   });
 
   const headline = escapeHtml(group.title || 'Landmark & heading structure summary');
