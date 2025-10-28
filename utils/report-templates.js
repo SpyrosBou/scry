@@ -3490,9 +3490,25 @@ const renderReducedMotionGroupHtml = (group) => {
     const perPageEntries = (bucket.pageEntries || []).map((entry) => {
       const payload = entry.payload || {};
       const summary = payload.summary || {};
+      const gating = Array.isArray(summary.gating)
+        ? summary.gating
+        : Array.isArray(summary.gatingIssues)
+          ? summary.gatingIssues
+          : [];
+      const warnings = Array.isArray(summary.warnings) ? summary.warnings : [];
+      const headingSkips = Array.isArray(summary.headingSkips) ? summary.headingSkips : [];
+      const advisories = Array.isArray(summary.advisories) ? summary.advisories : [];
+      const summaryClass = gating.length
+        ? 'summary-page--fail'
+        : warnings.length || headingSkips.length
+          ? 'summary-page--warn'
+          : advisories.length
+            ? 'summary-page--advisory'
+            : 'summary-page--ok';
       return {
         ...summary,
         page: payload.page || summary.page,
+        _summaryClass: summaryClass,
       };
     });
 
@@ -3782,29 +3798,77 @@ const renderIframeGroupHtml = (group) => {
 
 const renderStructurePageCard = (summary) => {
   if (!summary) return '';
-  const gating = summary.gatingIssues || summary.gating || [];
-  const advisories = summary.advisories || [];
-  const headingSkips = summary.headingSkips || [];
-  const headingOutline = summary.headingOutline || [];
+  const gating = Array.isArray(summary.gatingIssues)
+    ? summary.gatingIssues
+    : Array.isArray(summary.gating)
+      ? summary.gating
+      : [];
+  const warnings = Array.isArray(summary.warnings) ? summary.warnings : [];
+  const advisories = Array.isArray(summary.advisories) ? summary.advisories : [];
+  const headingSkips = Array.isArray(summary.headingSkips) ? summary.headingSkips : [];
+  const headingOutline = Array.isArray(summary.headingOutline) ? summary.headingOutline : [];
 
-  let statusClass = 'status-ok';
-  let statusLabel = 'Pass';
+  const hasGating = gating.length > 0;
+  const hasWarnings = warnings.length > 0 || headingSkips.length > 0;
+  const hasAdvisories = advisories.length > 0;
 
-  if (gating.length > 0) {
-    statusClass = 'status-error';
-    statusLabel = `${formatCount(gating.length)} gating issue(s)`;
-  } else if (headingSkips.length > 0 || advisories.length > 0) {
-    statusClass = 'status-info';
-    statusLabel = 'Advisories';
-  }
+  const statusMeta = hasGating
+    ? { className: 'status-error', label: `${formatCount(gating.length)} gating issue(s)` }
+    : hasWarnings
+      ? { className: 'status-warning', label: 'Needs attention' }
+      : hasAdvisories
+        ? { className: 'status-info', label: 'Advisories present' }
+        : { className: 'status-ok', label: 'Pass' };
 
-  const gatingList = gating
-    .map((item) => `<li class="check-fail">${escapeHtml(String(item))}</li>`)
-    .join('');
-  const advisoryList = advisories.map((item) => `<li>${escapeHtml(String(item))}</li>`).join('');
-  const headingSkipList = headingSkips
-    .map((item) => `<li>${escapeHtml(String(item))}</li>`)
-    .join('');
+  const aggregateMessages = (messages, impact) => {
+    const map = new Map();
+    messages.forEach((rawMessage) => {
+      if (!rawMessage) return;
+      const message = String(rawMessage).replace(/\s+/g, ' ').trim();
+      if (!message) return;
+      if (!map.has(message)) {
+        map.set(message, { impact, id: message, nodesCount: 0 });
+      }
+      map.get(message).nodesCount += 1;
+    });
+    return Array.from(map.values());
+  };
+
+  const gatingEntries = aggregateMessages(gating, 'critical');
+  const warningEntries = aggregateMessages([...warnings, ...headingSkips], 'moderate');
+  const advisoryEntries = aggregateMessages(advisories, 'minor');
+
+  const renderEntriesTable = (entries, heading, headingClass) =>
+    entries.length
+      ? renderWcagPageIssueTable(
+          entries.map((entry) => ({
+            impact: entry.impact,
+            id: entry.id,
+            nodesCount: entry.nodesCount,
+          })),
+          heading,
+          headingClass ? { headingClass } : {}
+        )
+      : '';
+
+  const metaLines = [
+    `<p class="details"><strong>H1 count:</strong> ${escapeHtml(
+      formatCount(summary.h1Count ?? 'n/a')
+    )}</p>`,
+    `<p class="details"><strong>Main landmark:</strong> ${summary.hasMainLandmark ? 'Present' : 'Missing'}</p>`,
+    `<p class="details"><strong>Navigation landmarks:</strong> ${escapeHtml(
+      formatCount(summary.navigationLandmarks ?? 0)
+    )}</p>`,
+    `<p class="details"><strong>Header landmarks:</strong> ${escapeHtml(
+      formatCount(summary.headerLandmarks ?? 0)
+    )}</p>`,
+    `<p class="details"><strong>Footer landmarks:</strong> ${escapeHtml(
+      formatCount(summary.footerLandmarks ?? 0)
+    )}</p>`,
+  ]
+    .filter(Boolean)
+    .join('\n');
+
   const headingOutlineList = headingOutline
     .map(
       (entry) =>
@@ -3812,37 +3876,43 @@ const renderStructurePageCard = (summary) => {
     )
     .join('');
 
+  const headingOutlineHtml = headingOutlineList
+    ? `<details><summary>Heading outline (${headingOutline.length} headings)</summary><ul class="details">${headingOutlineList}</ul></details>`
+    : '';
+
+  const gatingSection = gatingEntries.length
+    ? renderEntriesTable(
+        gatingEntries,
+        `Gating structural issues (${formatCount(gatingEntries.length)})`
+      )
+    : '<p class="details">No gating issues detected.</p>';
+
+  const warningsSection = warningEntries.length
+    ? renderEntriesTable(
+        warningEntries,
+        `Structural warnings (${formatCount(warningEntries.length)})`
+      )
+    : '<p class="details">No structural warnings detected.</p>';
+
+  const advisoriesSection = renderEntriesTable(
+    advisoryEntries,
+    `Structural advisories (${formatCount(advisoryEntries.length)})`,
+    'summary-heading-best-practice'
+  );
+
   return `
-    <section class="summary-report summary-a11y page-card summary-a11y--page-card">
+    <section class="summary-report summary-a11y summary-a11y--page-card">
       <div class="page-card__header">
-        <h3>${escapeHtml(summary.page || 'unknown')}</h3>
-        <span class="status-pill ${statusClass}">
-          ${statusLabel}
-        </span>
+        <h3>${escapeHtml(summary.page || 'Unknown page')}</h3>
+        <span class="status-pill ${statusMeta.className}">${escapeHtml(statusMeta.label)}</span>
       </div>
-      <p class="details">H1 count: ${summary.h1Count ?? 'n/a'}</p>
-      <ul class="details">
-        <li>Main landmark: ${summary.hasMainLandmark ? 'present' : 'missing'}</li>
-        <li>Navigation landmarks: ${summary.navigationLandmarks ?? 0}</li>
-        <li>Header landmarks: ${summary.headerLandmarks ?? 0}</li>
-        <li>Footer landmarks: ${summary.footerLandmarks ?? 0}</li>
-      </ul>
-      ${gating.length ? `<ul class="details">${gatingList}</ul>` : ''}
-      ${
-        advisories.length
-          ? `<details><summary>Advisories (${advisories.length})</summary><ul class="details">${advisoryList}</ul></details>`
-          : ''
-      }
-      ${
-        headingSkips.length
-          ? `<details><summary>Heading level skips</summary><ul class="details">${headingSkipList}</ul></details>`
-          : ''
-      }
-      ${
-        headingOutline.length
-          ? `<details><summary>Heading outline (${headingOutline.length} headings)</summary><ul class="details">${headingOutlineList}</ul></details>`
-          : ''
-      }
+      <div class="page-card__meta">
+        ${metaLines}
+      </div>
+      ${gatingSection}
+      ${warningsSection}
+      ${advisoriesSection || '<p class="details">No structural advisories detected.</p>'}
+      ${headingOutlineHtml}
     </section>
   `;
 };
