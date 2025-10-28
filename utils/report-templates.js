@@ -254,12 +254,13 @@ const collectIssueMessages = (pages, fields, defaultImpact) => {
           message = String(rawItem || '').trim();
         }
 
-        if (!message) continue;
+        const normalizedMessage = message.replace(/\s+/g, ' ').trim();
+        if (!normalizedMessage) continue;
 
-        const key = JSON.stringify([message, impact || '', help || '', wcagBadge || '']);
+        const key = JSON.stringify([normalizedMessage, impact || '', help || '', wcagBadge || '']);
         if (!map.has(key)) {
           map.set(key, {
-            message,
+            message: normalizedMessage,
             impact,
             helpUrl: help,
             wcagBadge,
