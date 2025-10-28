@@ -3089,12 +3089,30 @@ const renderKeyboardPageCard = (summary, { projectLabel } = {}) => {
     ? `Present — ${escapeHtml(skipLink.text || skipLink.href || 'skip link')}`
     : 'Missing';
 
-  const statusMeta =
-    gating.length > 0
-      ? { className: 'status-error', label: `${formatCount(gating.length)} gating issue(s)` }
-      : warnings.length > 0 || advisories.length > 0
-        ? { className: 'status-warning', label: 'Needs attention' }
-        : { className: 'status-ok', label: 'Pass' };
+  const hasGating = gating.length > 0;
+  const hasWarnings = warnings.length > 0;
+  const hasAdvisories = advisories.length > 0;
+  const statusMeta = (() => {
+    if (hasGating) {
+      return {
+        className: 'status-error',
+        label: `${formatCount(gating.length)} gating issue(s)`,
+      };
+    }
+    if (hasWarnings) {
+      return {
+        className: 'status-warning',
+        label: 'Needs attention',
+      };
+    }
+    if (hasAdvisories) {
+      return {
+        className: 'status-info',
+        label: 'Advisories present',
+      };
+    }
+    return { className: 'status-ok', label: 'Pass' };
+  })();
 
   const metaLines = [
     `<p class="details"><strong>Viewport:</strong> ${escapeHtml(viewportName)}</p>`,
@@ -3109,14 +3127,17 @@ const renderKeyboardPageCard = (summary, { projectLabel } = {}) => {
         )}${coveragePercent != null ? ` (~${coveragePercent}% coverage)` : ''}</p>`
       : '',
     `<p class="details"><strong>Skip link:</strong> ${skipLabel}</p>`,
-    gating.length
+    hasGating
       ? `<p class="details"><strong>Gating issues:</strong> ${escapeHtml(
           formatCount(gating.length)
         )}</p>`
       : '',
-    warnings.length || advisories.length
-      ? `<p class="details"><strong>Warnings / advisories:</strong> ${escapeHtml(
-          formatCount(warnings.length + advisories.length)
+    hasWarnings
+      ? `<p class="details"><strong>Warnings:</strong> ${escapeHtml(formatCount(warnings.length))}</p>`
+      : '',
+    hasAdvisories
+      ? `<p class="details"><strong>Advisories:</strong> ${escapeHtml(
+          formatCount(advisories.length)
         )}</p>`
       : '',
   ]
@@ -3253,13 +3274,16 @@ const renderKeyboardGroupHtml = (group) => {
             : [];
         const warnings = Array.isArray(page.warnings) ? page.warnings : [];
         const advisories = Array.isArray(page.advisories) ? page.advisories : [];
-        let summaryClass = 'summary-page--ok';
-        if (gating.length > 0) {
-          summaryClass = 'summary-page--fail';
-        } else if (warnings.length > 0 || advisories.length > 0) {
-          summaryClass = 'summary-page--warn';
-        }
-
+        const hasGating = gating.length > 0;
+        const hasWarnings = warnings.length > 0;
+        const hasAdvisories = advisories.length > 0;
+        const summaryClass = hasGating
+          ? 'summary-page--fail'
+          : hasWarnings
+            ? 'summary-page--warn'
+            : hasAdvisories
+              ? 'summary-page--advisory'
+              : 'summary-page--ok';
         return {
           ...page,
           page: page.page || page.url || 'Unknown page',
