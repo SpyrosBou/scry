@@ -222,9 +222,10 @@ const renderUnifiedIssuesTable = (issues, { title, emptyMessage, variant, viewpo
   `;
 };
 
-const collectIssueMessages = (pages, fields, defaultImpact) => {
+const collectIssueMessages = (pages, fields, defaultImpact, options = {}) => {
   if (!Array.isArray(pages) || pages.length === 0) return [];
   const fieldList = Array.isArray(fields) ? fields : [fields];
+  const normalizeFn = typeof options.normalize === 'function' ? options.normalize : null;
 
   const map = new Map();
 
@@ -257,21 +258,41 @@ const collectIssueMessages = (pages, fields, defaultImpact) => {
         const normalizedMessage = message.replace(/\s+/g, ' ').trim();
         if (!normalizedMessage) continue;
 
-        const key = JSON.stringify([normalizedMessage, impact || '', help || '', wcagBadge || '']);
+        let messageKey = normalizedMessage;
+        let displayMessage = normalizedMessage;
+        let sampleTarget = null;
+        if (normalizeFn) {
+          const normalized = normalizeFn({
+            message: normalizedMessage,
+            raw: rawItem,
+            pageId,
+          });
+          if (normalized) {
+            if (normalized.key) messageKey = normalized.key;
+            if (normalized.label) displayMessage = normalized.label;
+            if (normalized.sample) sampleTarget = normalized.sample;
+          }
+        }
+
+        const key = JSON.stringify([messageKey, impact || '', help || '', wcagBadge || '']);
         if (!map.has(key)) {
           map.set(key, {
-            message: normalizedMessage,
+            message: displayMessage,
             impact,
             helpUrl: help,
             wcagBadge,
             pages: new Set(),
             instanceCount: 0,
+            samples: new Set(),
           });
         }
 
         const entry = map.get(key);
         entry.pages.add(pageId);
         entry.instanceCount += 1;
+        if (sampleTarget) {
+          entry.samples.add(sampleTarget);
+        }
       }
     }
   }
@@ -286,6 +307,7 @@ const collectIssueMessages = (pages, fields, defaultImpact) => {
       pages,
       pageCount: pages.length,
       instanceCount: entry.instanceCount,
+      samples: Array.from(entry.samples || []),
     };
   });
 };
@@ -3245,6 +3267,22 @@ const renderKeyboardGroupHtml = (group) => {
       const viewportsCount = viewportList.length || 1;
       const failThreshold = details.failThreshold || overview.failThreshold || metadata.failOn;
 
+      const normalizeKeyboardAdvisory = ({ message }) => {
+        if (!message) return null;
+        if (/^Unable to detect focus indicator change for/i.test(message)) {
+          const sample = message
+            .replace(/^Unable to detect focus indicator change for\s*/i, '')
+            .replace(/\.$/, '')
+            .replace(/^\((.+)\)$/, '$1');
+          return {
+            key: 'Unable to detect focus indicator change',
+            label: 'Unable to detect focus indicator change',
+            sample,
+          };
+        }
+        return { key: message, label: message };
+      };
+
       const runSummaryHtml = renderKeyboardRunSummary(overview, pagesData, wcagRefs, {
         viewportLabel,
         viewportsCount,
@@ -3259,9 +3297,9 @@ const renderKeyboardGroupHtml = (group) => {
         ['gating', 'gatingIssues'],
         'critical'
       ).filter((issue) => issue.pageCount > 0);
-      const advisoryIssues = collectIssueMessages(pagesData, 'advisories', 'minor').filter(
-        (issue) => issue.pageCount > 0
-      );
+      const advisoryIssues = collectIssueMessages(pagesData, 'advisories', 'minor', {
+        normalize: normalizeKeyboardAdvisory,
+      }).filter((issue) => issue.pageCount > 0);
 
       const executionSection = executionFailureIssues.length
         ? renderUnifiedIssuesTable(executionFailureIssues, {
