@@ -1748,97 +1748,156 @@ const renderInteractiveGroupHtml = (group) => {
 
   const sections = buckets.map((bucket) => {
     const runPayload = firstRunPayload(bucket);
-    const pages = bucket.pageEntries
-      .map((entry) => entry.payload || {})
-      .filter((payload) => payload.kind === KIND_PAGE_SUMMARY);
-    const projectLabel = runPayload?.metadata?.projectName || bucket.projectName || 'default';
-    const overviewHtml = runPayload?.overview ? renderSchemaMetrics(runPayload.overview) : '';
-    const resourceBudget = runPayload?.overview?.resourceErrorBudget;
+    if (!runPayload || !Array.isArray(runPayload.details?.pages)) return '';
 
-    const rows = pages
-      .map((payload) => {
-        const summary = payload.summary || {};
-        const statusLabel = summary.status == null ? 'n/a' : summary.status;
-        const hasIssues = (summary.consoleErrors || 0) > 0 || (summary.resourceErrors || 0) > 0;
-        const className = hasIssues ? 'status-error' : 'status-ok';
+    const overview = runPayload.overview || {};
+    const pagesData = runPayload.details.pages;
+    const metadata = runPayload.metadata || {};
+    const projectLabel = metadata.projectName || bucket.projectName || 'Chrome';
+    const viewportList = Array.isArray(metadata.viewports) ? metadata.viewports : [];
+    const viewportLabel = viewportList.length ? viewportList.join(', ') : projectLabel;
 
-        const consoleSample = summary.consoleSample || [];
-        const consoleItems = consoleSample.length
-          ? consoleSample
-              .slice(0, 5)
-              .map(
-                (item) => `<li class="check-fail">${escapeHtml(item.message || String(item))}</li>`
-              )
-              .join('')
-          : '<li class="check-pass">No console errors</li>';
-        const consoleList = `
-          <ul class="checks">${consoleItems}</ul>
-        `;
+    const totalPages = overview.totalPages ?? pagesData.length;
+    const pagesWithConsoleErrors = overview.pagesWithConsoleErrors ?? 0;
+    const pagesWithResourceErrors = overview.pagesWithResourceErrors ?? 0;
+    const totalConsoleErrors =
+      overview.totalConsoleErrors ??
+      pagesData.reduce((sum, page) => sum + (page.consoleErrors || 0), 0);
+    const totalResourceErrors =
+      overview.totalResourceErrors ??
+      pagesData.reduce((sum, page) => sum + (page.resourceErrors || 0), 0);
+    const resourceBudget = overview.resourceErrorBudget;
+    const budgetExceeded = overview.budgetExceeded;
 
-        const resourceSample = summary.resourceSample || [];
-        const resourceItems = resourceSample.length
-          ? resourceSample
-              .slice(0, 5)
-              .map((item) => {
-                const label =
-                  item.type === 'requestfailed'
-                    ? `${item.type} – ${item.failure || 'unknown'}`
-                    : `${item.type || 'resource'} ${item.status || ''} ${item.method || ''}`;
-                return `<li class="check-fail">${escapeHtml(label.trim())} — <code>${escapeHtml(item.url || '')}</code></li>`;
-              })
-              .join('')
-          : '<li class="check-pass">No failed requests</li>';
-        const resourceList = `
-          <ul class="checks">${resourceItems}</ul>
-        `;
+    const statusItems = [];
+    if (pagesWithConsoleErrors > 0) {
+      statusItems.push({
+        label: 'Console errors',
+        tone: 'status-error',
+        count: pagesWithConsoleErrors,
+        suffix: 'page(s)',
+      });
+    }
+    if (pagesWithResourceErrors > 0) {
+      statusItems.push({
+        label: 'Resource failures',
+        tone: 'status-error',
+        count: pagesWithResourceErrors,
+        suffix: 'page(s)',
+      });
+    }
 
-        const warningItems = (summary.warnings || []).map(
-          (msg) => `<li class="check-fail">${escapeHtml(msg)}</li>`
-        );
-        const infoItems = (summary.info || []).map(
-          (msg) => `<li class="check-pass">${escapeHtml(msg)}</li>`
-        );
-        const notesHtml =
-          warningItems.length || infoItems.length
-            ? `
-            <ul class="checks">${warningItems.concat(infoItems).join('')}</ul>
-          `
-            : '<span class="details">No additional notes</span>';
+    const statusSummary =
+      statusItems.length > 0
+        ? renderStatusSummaryList(statusItems, { className: 'status-summary' })
+        : '<p class="details">No console or resource errors detected across the audited pages.</p>';
 
-        return `
-          <tr class="${className}">
-            <td><code>${escapeHtml(payload.page || 'unknown')}</code></td>
-            <td>${escapeHtml(String(statusLabel))}</td>
-            <td>${consoleList}</td>
-            <td>${resourceList}</td>
-            <td>${notesHtml}</td>
-          </tr>
-        `;
-      })
-      .join('');
-
-    const tableHtml = rows
-      ? `
-          <table>
-            <thead><tr><th>Page</th><th>Status</th><th>Console</th><th>Resources</th><th>Notes</th></tr></thead>
-            <tbody>${rows}</tbody>
-          </table>
-        `
-      : '<p>No interactive pages were scanned.</p>';
-
-    const budgetNote =
+    const detailNotes = [
+      `<p class="details">Total console errors: ${escapeHtml(formatCount(totalConsoleErrors))}</p>`,
+      `<p class="details">Total resource errors: ${escapeHtml(
+        formatCount(totalResourceErrors)
+      )}</p>`,
       resourceBudget != null
-        ? `<p>Resource error budget: <strong>${resourceBudget}</strong></p>`
-        : '';
+        ? `<p class="details">Error budget: ${escapeHtml(
+            formatCount(resourceBudget)
+          )} (${budgetExceeded ? 'exceeded' : 'within budget'})</p>`
+        : '',
+    ]
+      .filter(Boolean)
+      .join('\n');
 
-    return `
-      <section class="summary-report summary-interactive">
-        <h3>${escapeHtml(projectLabel)} – JavaScript &amp; resource monitoring</h3>
-        ${overviewHtml}
-        ${budgetNote}
-        ${tableHtml}
+    const runSummaryHtml = `
+      <section class="summary-report summary-a11y summary-a11y--run-summary">
+        <h3>Console &amp; API run summary</h3>
+        <p>Audited <strong>${escapeHtml(
+          formatCount(totalPages)
+        )}</strong> page(s) per browser across ${escapeHtml(
+          formatCount(viewportList.length || 1)
+        )} viewport(s): ${escapeHtml(viewportLabel || 'Not recorded')}.</p>
+        ${statusSummary}
+        ${detailNotes}
       </section>
     `;
+
+    const normalizeConsoleIssue = ({ message }) => {
+      if (!message) return null;
+      if (message.startsWith('Console error')) {
+        return { key: message, label: message };
+      }
+      return { key: message, label: message };
+    };
+
+    const normalizeResourceIssue = ({ message }) => {
+      if (!message) return null;
+      if (message.startsWith('Resource')) {
+        return { key: message, label: message };
+      }
+      return { key: message, label: message };
+    };
+
+    const gatingIssues = collectIssueMessages(
+      pagesData,
+      ['gating', 'consoleErrors', 'resourceErrors'],
+      'critical',
+      {
+        normalize: normalizeConsoleIssue,
+      }
+    ).filter((issue) => issue.pageCount > 0);
+
+    const warningIssues = collectIssueMessages(pagesData, 'warnings', 'moderate', {
+      normalize: normalizeConsoleIssue,
+    }).filter((issue) => issue.pageCount > 0);
+
+    const advisoryIssues = collectIssueMessages(pagesData, 'advisories', 'minor', {
+      normalize: normalizeResourceIssue,
+    }).filter((issue) => issue.pageCount > 0);
+
+    const gatingSection = renderUnifiedIssuesTable(gatingIssues, {
+      title: 'Console & resource errors',
+      emptyMessage: 'No console or resource errors detected.',
+      variant: 'gating',
+      viewportLabel,
+    });
+
+    const advisorySection = renderUnifiedIssuesTable([...warningIssues, ...advisoryIssues], {
+      title: 'Console advisories',
+      emptyMessage: 'No advisories detected.',
+      variant: 'advisory',
+      viewportLabel,
+    });
+
+    const perPageEntries = pagesData.map((summary) => {
+      const consoleErrors = summary.consoleErrors ?? 0;
+      const resourceErrors = summary.resourceErrors ?? 0;
+      const hasGating =
+        consoleErrors > 0 ||
+        resourceErrors > 0 ||
+        (Array.isArray(summary.gating) && summary.gating.length > 0);
+      const hasWarnings = Array.isArray(summary.warnings) && summary.warnings.length > 0;
+      const hasAdvisories = Array.isArray(summary.advisories) && summary.advisories.length > 0;
+      const summaryClass = hasGating
+        ? 'summary-page--fail'
+        : hasWarnings
+          ? 'summary-page--warn'
+          : hasAdvisories
+            ? 'summary-page--advisory'
+            : 'summary-page--ok';
+      return {
+        ...summary,
+        page: summary.page,
+        _summaryClass: summaryClass,
+      };
+    });
+
+    const perPageHtml = renderPerPageAccordion(perPageEntries, {
+      heading: 'Per-page findings',
+      summaryClass: 'summary-page--interactive',
+      containerClass: 'summary-report summary-a11y summary-a11y--per-page',
+      renderCard: (entrySummary) => renderInteractivePageCard(entrySummary, { projectLabel }),
+      formatSummaryLabel: (entrySummary) => formatPageLabel(entrySummary?.page || 'Page'),
+    });
+
+    return [runSummaryHtml, gatingSection, advisorySection, perPageHtml].filter(Boolean).join('\n');
   });
 
   const headline = escapeHtml(group.title || 'Interactive smoke summary');
@@ -2872,7 +2931,7 @@ const buildSuitePanels = (schemaGroups, summaryMap) => {
             if (runEntries.length === 0) return false;
             return runEntries.some((entry) => (entry.payload?.metadata?.scope || '') !== 'run');
           })
-        : definition.summaryType === 'structure' || definition.summaryType === 'internal-links'
+        : ['structure', 'internal-links', 'interactive'].includes(definition.summaryType)
           ? groups.filter((group) => (group.runEntries || []).length > 0)
           : groups;
 
@@ -3212,6 +3271,87 @@ const renderInternalLinksPageCard = (summary, { projectLabel } = {}) => {
       ${warningSection}
       ${advisorySection || ''}
       ${brokenSamplesHtml}
+    </section>
+  `;
+};
+
+const renderInteractivePageCard = (summary, { projectLabel } = {}) => {
+  if (!summary) return '';
+
+  const gating = Array.isArray(summary.gating) ? summary.gating : [];
+  const warnings = Array.isArray(summary.warnings) ? summary.warnings : [];
+  const advisories = Array.isArray(summary.advisories) ? summary.advisories : [];
+  const consoleSample = Array.isArray(summary.consoleSample) ? summary.consoleSample : [];
+  const resourceSample = Array.isArray(summary.resourceSample) ? summary.resourceSample : [];
+  const info = Array.isArray(summary.info) ? summary.info : [];
+
+  const consoleErrors = summary.consoleErrors ?? 0;
+  const resourceErrors = summary.resourceErrors ?? 0;
+
+  const hasGating =
+    consoleErrors > 0 ||
+    resourceErrors > 0 ||
+    gating.length > 0 ||
+    consoleSample.length > 0 ||
+    resourceSample.length > 0;
+  const hasWarnings = warnings.length > 0;
+  const hasAdvisories = advisories.length > 0;
+
+  const statusMeta = hasGating
+    ? {
+        className: 'status-error',
+        label: `${formatCount(consoleErrors + resourceErrors)} error(s)`,
+      }
+    : hasWarnings
+      ? { className: 'status-warning', label: 'Needs attention' }
+      : hasAdvisories
+        ? { className: 'status-info', label: 'Advisories present' }
+        : { className: 'status-ok', label: 'Pass' };
+
+  const metaLines = [
+    `<p class="details"><strong>Viewport:</strong> ${escapeHtml(projectLabel || 'Not recorded')}</p>`,
+    `<p class="details"><strong>Console errors:</strong> ${escapeHtml(
+      formatCount(consoleErrors)
+    )}</p>`,
+    `<p class="details"><strong>Resource errors:</strong> ${escapeHtml(
+      formatCount(resourceErrors)
+    )}</p>`,
+  ].join('\n');
+
+  const notesHtml = info.length
+    ? `<details class="summary-note"><summary>Notes (${info.length})</summary><ul class="details">${info
+        .map((note) => `<li>${escapeHtml(String(note))}</li>`)
+        .join('')}</ul></details>`
+    : '';
+
+  const renderIssueList = (label, entries) =>
+    entries.length
+      ? `<details><summary>${escapeHtml(label)} (${entries.length})</summary><ul class="details">${entries
+          .map((entry) => `<li>${escapeHtml(String(entry.message || entry))}</li>`)
+          .join('')}</ul></details>`
+      : '';
+
+  const gatingList = renderIssueList('Gating issues', gating);
+  const consoleSamplesHtml = renderIssueList('Console sample', consoleSample);
+  const resourceSamplesHtml = renderIssueList('Resource sample', resourceSample);
+  const warningsHtml = renderIssueList('Warnings', warnings);
+  const advisoriesHtml = renderIssueList('Advisories', advisories);
+
+  return `
+    <section class="summary-report summary-a11y summary-a11y--page-card">
+      <div class="page-card__header">
+        <h3>${escapeHtml(summary.page || 'Unknown page')}</h3>
+        <span class="status-pill ${statusMeta.className}">${escapeHtml(statusMeta.label)}</span>
+      </div>
+      <div class="page-card__meta">
+        ${metaLines}
+      </div>
+      ${notesHtml}
+      ${gatingList}
+      ${warningsHtml}
+      ${advisoriesHtml}
+      ${consoleSamplesHtml}
+      ${resourceSamplesHtml}
     </section>
   `;
 };
