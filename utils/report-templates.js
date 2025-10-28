@@ -1615,95 +1615,122 @@ const renderInternalLinksGroupHtml = (group) => {
 
   const sections = buckets.map((bucket) => {
     const runPayload = firstRunPayload(bucket);
-    const detailPages = Array.isArray(runPayload?.details?.pages)
-      ? runPayload.details.pages.map((page) => ({
-          payload: {
-            page: page.page,
-            summary: page,
-          },
-        }))
-      : null;
-    const pages = (detailPages || bucket.pageEntries)
-      .map((entry) => entry.payload || {})
-      .filter((payload) => payload.kind === KIND_PAGE_SUMMARY || payload.summary);
-    const projectLabel = runPayload?.metadata?.projectName || bucket.projectName || 'default';
-    const overviewHtml = runPayload?.overview ? renderSchemaMetrics(runPayload.overview) : '';
+    if (!runPayload || !Array.isArray(runPayload.details?.pages)) return '';
 
-    const coverageRows = pages
-      .map((payload) => {
-        const summary = payload.summary || {};
-        const brokenCount = summary.brokenCount ?? 0;
-        const className = brokenCount > 0 ? 'status-error' : 'status-ok';
-        return `
-          <tr class="${className}">
-            <td><code>${escapeHtml(payload.page || 'unknown')}</code></td>
-            <td>${summary.totalLinks ?? '—'}</td>
-            <td>${summary.uniqueChecked ?? '—'}</td>
-            <td>${brokenCount}</td>
-          </tr>
-        `;
-      })
-      .join('');
+    const pagesData = runPayload.details.pages;
+    const overview = runPayload.overview || {};
+    const metadata = runPayload.metadata || {};
+    const projectLabel = metadata.projectName || bucket.projectName || 'Chrome';
 
-    const coverageTable = coverageRows
-      ? `
-          <table>
-            <thead><tr><th>Page</th><th>Links found</th><th>Checked</th><th>Broken</th></tr></thead>
-            <tbody>${coverageRows}</tbody>
-          </table>
-        `
-      : '<p>No pages were evaluated for internal links.</p>';
+    const totalPages = overview.totalPages ?? pagesData.length;
+    const brokenLinksDetected = overview.brokenLinksDetected ?? 0;
+    const pagesWithBrokenLinks = overview.pagesWithBrokenLinks ?? 0;
+    const totalLinksFound =
+      overview.totalLinksFound ?? pagesData.reduce((sum, page) => sum + (page.totalLinks || 0), 0);
+    const uniqueLinksChecked =
+      overview.uniqueLinksChecked ??
+      pagesData.reduce((sum, page) => sum + (page.uniqueChecked || 0), 0);
+    const maxChecksPerPage = overview.maxChecksPerPage ?? null;
 
-    const brokenRows = [];
-    pages.forEach((payload) => {
-      const summary = payload.summary || {};
-      (summary.brokenSample || []).forEach((issue) => {
-        brokenRows.push({
-          page: payload.page,
-          url: issue.url,
-          status: issue.status,
-          method: issue.methodTried,
-          error: issue.error,
-        });
+    const viewportList = Array.isArray(metadata.viewports) ? metadata.viewports : [];
+    const viewportLabel = viewportList.length ? viewportList.join(', ') : projectLabel;
+
+    const statusItems = [];
+    if (pagesWithBrokenLinks > 0) {
+      statusItems.push({
+        label: 'Broken links',
+        tone: 'status-error',
+        count: pagesWithBrokenLinks,
+        suffix: 'page(s)',
       });
+    }
+
+    const statusSummary =
+      statusItems.length > 0
+        ? renderStatusSummaryList(statusItems, { className: 'status-summary' })
+        : '<p class="details">No broken links detected across the audited pages.</p>';
+
+    const detailNotes = [
+      `<p class="details">Total links found: ${escapeHtml(formatCount(totalLinksFound))}</p>`,
+      `<p class="details">Unique links checked: ${escapeHtml(formatCount(uniqueLinksChecked))}</p>`,
+      `<p class="details">Broken links detected: ${escapeHtml(formatCount(brokenLinksDetected))}</p>`,
+      maxChecksPerPage != null
+        ? `<p class="details">Max checks per page: ${escapeHtml(formatCount(maxChecksPerPage))}</p>`
+        : '',
+    ]
+      .filter(Boolean)
+      .join('\n');
+
+    const runSummaryHtml = `
+      <section class="summary-report summary-a11y summary-a11y--run-summary">
+        <h3>Internal link run summary</h3>
+        <p>Audited <strong>${escapeHtml(
+          formatCount(totalPages)
+        )}</strong> page(s) per browser across ${escapeHtml(
+          formatCount(viewportList.length || 1)
+        )} viewport(s): ${escapeHtml(viewportLabel || 'Not recorded')}.</p>
+        ${statusSummary}
+        ${detailNotes}
+      </section>
+    `;
+
+    const gatingIssues = collectIssueMessages(
+      pagesData,
+      ['gating', 'gatingIssues'],
+      'critical'
+    ).filter((issue) => issue.pageCount > 0);
+    const warningIssues = collectIssueMessages(pagesData, 'warnings', 'moderate').filter(
+      (issue) => issue.pageCount > 0
+    );
+    const advisoryIssues = collectIssueMessages(pagesData, 'advisories', 'minor').filter(
+      (issue) => issue.pageCount > 0
+    );
+
+    const gatingSection = renderUnifiedIssuesTable(gatingIssues, {
+      title: 'Broken links',
+      emptyMessage: 'No broken links detected.',
+      variant: 'gating',
+      viewportLabel,
     });
 
-    const brokenSection = brokenRows.length
-      ? `
-          <section class="summary-report summary-links">
-            <h3>Broken links — ${escapeHtml(projectLabel)}</h3>
-            <table>
-              <thead><tr><th>Source page</th><th>URL</th><th>Status / Error</th><th>Method</th></tr></thead>
-              <tbody>${brokenRows
-                .map(
-                  (issue) => `
-                    <tr class="status-error">
-                      <td><code>${escapeHtml(issue.page || 'unknown')}</code></td>
-                      <td><code>${escapeHtml(issue.url || '')}</code></td>
-                      <td>${issue.status != null ? escapeHtml(String(issue.status)) : escapeHtml(issue.error || 'error')}</td>
-                      <td>${escapeHtml(issue.method || 'HEAD')}</td>
-                    </tr>
-                  `
-                )
-                .join('')}</tbody>
-            </table>
-          </section>
-        `
-      : `
-          <section class="summary-report summary-links">
-            <h3>Broken links — ${escapeHtml(projectLabel)}</h3>
-            <p>None detected 🎉</p>
-          </section>
-        `;
+    const advisorySection = renderUnifiedIssuesTable([...warningIssues, ...advisoryIssues], {
+      title: 'Link advisories',
+      emptyMessage: 'No advisories detected.',
+      variant: 'advisory',
+      viewportLabel,
+    });
 
-    return `
-      <section class="summary-report summary-links">
-        <h3>${escapeHtml(projectLabel)} – Internal link coverage</h3>
-        ${overviewHtml}
-        ${coverageTable}
-      </section>
-      ${brokenSection}
-    `;
+    const perPageEntries = pagesData.map((summary) => {
+      const brokenCount = summary.brokenCount ?? 0;
+      const hasGating =
+        brokenCount > 0 ||
+        (Array.isArray(summary.gating) && summary.gating.length > 0) ||
+        (Array.isArray(summary.brokenSample) && summary.brokenSample.length > 0);
+      const hasWarnings = Array.isArray(summary.warnings) && summary.warnings.length > 0;
+      const hasAdvisories = Array.isArray(summary.advisories) && summary.advisories.length > 0;
+      const summaryClass = hasGating
+        ? 'summary-page--fail'
+        : hasWarnings
+          ? 'summary-page--warn'
+          : hasAdvisories
+            ? 'summary-page--advisory'
+            : 'summary-page--ok';
+      return {
+        ...summary,
+        page: summary.page,
+        _summaryClass: summaryClass,
+      };
+    });
+
+    const perPageHtml = renderPerPageAccordion(perPageEntries, {
+      heading: 'Per-page findings',
+      summaryClass: 'summary-page--internal-links',
+      containerClass: 'summary-report summary-a11y summary-a11y--per-page',
+      renderCard: (entrySummary) => renderInternalLinksPageCard(entrySummary, { projectLabel }),
+      formatSummaryLabel: (entrySummary) => formatPageLabel(entrySummary?.page || 'Page'),
+    });
+
+    return [runSummaryHtml, gatingSection, advisorySection, perPageHtml].filter(Boolean).join('\n');
   });
 
   const headline = escapeHtml(group.title || 'Internal link audit summary');
@@ -2845,7 +2872,7 @@ const buildSuitePanels = (schemaGroups, summaryMap) => {
             if (runEntries.length === 0) return false;
             return runEntries.some((entry) => (entry.payload?.metadata?.scope || '') !== 'run');
           })
-        : definition.summaryType === 'structure'
+        : definition.summaryType === 'structure' || definition.summaryType === 'internal-links'
           ? groups.filter((group) => (group.runEntries || []).length > 0)
           : groups;
 
@@ -3069,6 +3096,122 @@ const renderFormsPageCard = (summary) => {
       ${gating.length ? `<ul class="details">${gatingList}</ul>` : ''}
       ${advisories.length ? `<details><summary>Advisories (${advisories.length})</summary><ul class="details">${advisoryList}</ul></details>` : ''}
       ${fieldRows}
+    </section>
+  `;
+};
+
+const renderInternalLinksPageCard = (summary, { projectLabel } = {}) => {
+  if (!summary) return '';
+
+  const gating = Array.isArray(summary.gating) ? summary.gating : [];
+  const warnings = Array.isArray(summary.warnings) ? summary.warnings : [];
+  const advisories = Array.isArray(summary.advisories) ? summary.advisories : [];
+  const brokenSample = Array.isArray(summary.brokenSample) ? summary.brokenSample : [];
+  const notes = Array.isArray(summary.notes) ? summary.notes.filter(Boolean) : [];
+
+  const hasGating = gating.length > 0 || brokenSample.length > 0;
+  const hasWarnings = warnings.length > 0;
+  const hasAdvisories = advisories.length > 0;
+  const statusMeta = hasGating
+    ? {
+        className: 'status-error',
+        label: `${formatCount(summary.brokenCount ?? gating.length)} broken link(s)`,
+      }
+    : hasWarnings
+      ? { className: 'status-warning', label: 'Needs attention' }
+      : hasAdvisories
+        ? { className: 'status-info', label: 'Advisories present' }
+        : { className: 'status-ok', label: 'Pass' };
+
+  const aggregateMessages = (items, impact) => {
+    const map = new Map();
+    items.forEach((raw) => {
+      if (!raw) return;
+      const message = String(raw).replace(/\s+/g, ' ').trim();
+      if (!message) return;
+      if (!map.has(message)) map.set(message, { message, impact, count: 0 });
+      map.get(message).count += 1;
+    });
+    return Array.from(map.values());
+  };
+
+  const gatingEntries = aggregateMessages(gating, 'critical');
+  const warningEntries = aggregateMessages(warnings, 'moderate');
+  const advisoryEntries = aggregateMessages(advisories, 'minor');
+
+  const renderEntriesTable = (entries, heading, options = {}) =>
+    entries.length
+      ? renderWcagPageIssueTable(
+          entries.map((entry) => ({
+            impact: entry.impact,
+            id: entry.message,
+            nodesCount: entry.count,
+          })),
+          heading,
+          options
+        )
+      : '';
+
+  const metaLines = [
+    `<p class="details"><strong>Viewport:</strong> ${escapeHtml(projectLabel || 'Not recorded')}</p>`,
+    `<p class="details"><strong>Links found:</strong> ${escapeHtml(
+      formatCount(summary.totalLinks ?? 'n/a')
+    )}</p>`,
+    `<p class="details"><strong>Unique checked:</strong> ${escapeHtml(
+      formatCount(summary.uniqueChecked ?? 'n/a')
+    )}</p>`,
+    `<p class="details"><strong>Broken links:</strong> ${escapeHtml(
+      formatCount(summary.brokenCount ?? 0)
+    )}</p>`,
+  ].join('\n');
+
+  const notesHtml = notes.length
+    ? `<details class="summary-note"><summary>Notes (${notes.length})</summary><ul class="details">${notes
+        .map((note) => `<li>${escapeHtml(String(note))}</li>`)
+        .join('')}</ul></details>`
+    : '';
+
+  const brokenSamplesHtml = brokenSample.length
+    ? `<details><summary>Broken link samples (${brokenSample.length})</summary><ul class="details">${brokenSample
+        .map((item) => {
+          const statusLabel =
+            item.status != null ? `Status ${item.status}` : escapeHtml(item.error || 'Error');
+          const method = item.methodTried ? `via ${item.methodTried}` : '';
+          return `<li><code>${escapeHtml(item.url || 'unknown URL')}</code> (${escapeHtml(
+            [statusLabel, method].filter(Boolean).join(' ').trim()
+          )})</li>`;
+        })
+        .join('')}</ul></details>`
+    : '';
+
+  const gatingSection =
+    renderEntriesTable(gatingEntries, `Broken links (${formatCount(gatingEntries.length)})`) ||
+    (hasGating ? '' : '<p class="details">No broken links detected.</p>');
+
+  const warningSection =
+    renderEntriesTable(warningEntries, `Link warnings (${formatCount(warningEntries.length)})`) ||
+    (hasWarnings ? '' : '<p class="details">No link warnings detected.</p>');
+
+  const advisorySection = renderEntriesTable(
+    advisoryEntries,
+    `Link advisories (${formatCount(advisoryEntries.length)})`,
+    { headingClass: 'summary-heading-best-practice' }
+  );
+
+  return `
+    <section class="summary-report summary-a11y summary-a11y--page-card">
+      <div class="page-card__header">
+        <h3>${escapeHtml(summary.page || 'Unknown page')}</h3>
+        <span class="status-pill ${statusMeta.className}">${escapeHtml(statusMeta.label)}</span>
+      </div>
+      <div class="page-card__meta">
+        ${metaLines}
+      </div>
+      ${notesHtml}
+      ${gatingSection}
+      ${warningSection}
+      ${advisorySection || ''}
+      ${brokenSamplesHtml}
     </section>
   `;
 };
