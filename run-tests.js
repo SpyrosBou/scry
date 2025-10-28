@@ -223,7 +223,9 @@ async function main() {
   const specs = parseSpecs();
 
   if (sites.length === 0) {
-    console.error('❌ Missing required --site argument. Provide at least one site name (repeat or comma-separate).');
+    console.error(
+      '❌ Missing required --site argument. Provide at least one site name (repeat or comma-separate).'
+    );
     process.exit(1);
   }
 

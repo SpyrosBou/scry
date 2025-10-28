@@ -148,6 +148,147 @@ const renderStatusSummaryList = (items, { className = 'status-summary' } = {}) =
   return `<ul class="${escapeHtml(className)}">${entries}</ul>`;
 };
 
+const formatIssueImpactLabel = (impact) => {
+  if (!impact) return 'Info';
+  const label = String(impact);
+  return `${label.charAt(0).toUpperCase()}${label.slice(1)}`;
+};
+
+const renderUnifiedIssuesTable = (issues, { title, emptyMessage, variant, viewportLabel } = {}) => {
+  if (!title) return '';
+
+  const baseClass = [
+    'summary-report summary-a11y summary-a11y--rule-table',
+    variant === 'gating' ? 'summary-a11y--rule-table-gating' : 'summary-a11y--rule-table-advisory',
+  ].join(' ');
+
+  if (!Array.isArray(issues) || issues.length === 0) {
+    return `
+      <section class="${baseClass}">
+        <h3>${escapeHtml(title)}</h3>
+        <p class="details">${escapeHtml(emptyMessage || 'No issues detected.')}</p>
+      </section>
+    `;
+  }
+
+  const rows = issues
+    .slice()
+    .sort((a, b) => {
+      const aCount = Number.isFinite(a.pageCount) ? a.pageCount : 0;
+      const bCount = Number.isFinite(b.pageCount) ? b.pageCount : 0;
+      if (bCount !== aCount) return bCount - aCount;
+      return (a.message || '').localeCompare(b.message || '');
+    })
+    .map((issue) => {
+      const impact = String(issue.impact || 'info').toLowerCase();
+      const pagesList =
+        Array.isArray(issue.pages) && issue.pages.length > 0
+          ? issue.pages.map((page) => `<code>${escapeHtml(page)}</code>`).join('<br />')
+          : '—';
+      const nodeCount =
+        issue.instanceCount != null
+          ? issue.instanceCount
+          : issue.pageCount != null
+            ? issue.pageCount
+            : 0;
+      const wcagHtml =
+        typeof issue.wcagHtml === 'string'
+          ? issue.wcagHtml
+          : issue.wcagBadge
+            ? `<span class="badge badge-wcag">${escapeHtml(issue.wcagBadge)}</span>`
+            : '—';
+
+      return `
+        <tr class="impact-${escapeHtml(impact)}">
+          <td>${escapeHtml(formatIssueImpactLabel(impact))}</td>
+          <td>${escapeHtml(issue.message || 'Issue')}</td>
+          <td>${viewportLabel ? escapeHtml(viewportLabel) : '—'}</td>
+          <td>${pagesList}</td>
+          <td>${escapeHtml(formatCount(nodeCount))}</td>
+          <td>${wcagHtml}</td>
+        </tr>
+      `;
+    })
+    .join('');
+
+  return `
+    <section class="${baseClass}">
+      <h3>${escapeHtml(title)}</h3>
+      <table class="schema-table">
+        <thead><tr><th>Impact</th><th>Issue</th><th>Viewport(s)</th><th>Pages</th><th>Nodes</th><th>WCAG level</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </section>
+  `;
+};
+
+const collectIssueMessages = (pages, fields, defaultImpact) => {
+  if (!Array.isArray(pages) || pages.length === 0) return [];
+  const fieldList = Array.isArray(fields) ? fields : [fields];
+
+  const map = new Map();
+
+  for (const page of pages) {
+    const pageId = page?.page || 'Unknown page';
+    for (const field of fieldList) {
+      const rawItems = Array.isArray(page?.[field]) ? page[field] : [];
+      for (const rawItem of rawItems) {
+        let message = '';
+        let impact = defaultImpact;
+        let help = null;
+        let wcagBadge = null;
+
+        if (rawItem && typeof rawItem === 'object') {
+          const candidate =
+            rawItem.message ||
+            rawItem.text ||
+            rawItem.issue ||
+            rawItem.description ||
+            rawItem.id ||
+            rawItem.rule;
+          message = String(candidate || '').trim();
+          if (rawItem.impact) impact = rawItem.impact;
+          if (rawItem.helpUrl) help = rawItem.helpUrl;
+          if (rawItem.wcag) wcagBadge = rawItem.wcag;
+        } else {
+          message = String(rawItem || '').trim();
+        }
+
+        if (!message) continue;
+
+        const key = JSON.stringify([message, impact || '', help || '', wcagBadge || '']);
+        if (!map.has(key)) {
+          map.set(key, {
+            message,
+            impact,
+            helpUrl: help,
+            wcagBadge,
+            pages: new Set(),
+            instanceCount: 0,
+          });
+        }
+
+        const entry = map.get(key);
+        entry.pages.add(pageId);
+        entry.instanceCount += 1;
+      }
+    }
+  }
+
+  return Array.from(map.values()).map((entry) => {
+    const pages = Array.from(entry.pages);
+    return {
+      message: entry.message,
+      impact: entry.impact,
+      helpUrl: entry.helpUrl,
+      wcagBadge: entry.wcagBadge,
+      pages,
+      pageCount: pages.length,
+      instanceCount: entry.instanceCount,
+    };
+  });
+};
+
 const formatWcagTagLabel = (tag) => {
   if (!tag) return null;
   const lower = String(tag).toLowerCase();
@@ -1156,20 +1297,48 @@ const renderWcagRunSummary = (overview, details, { viewportLabel, viewportsCount
   `;
 };
 
-const renderKeyboardRunSummary = (overview = {}, pages = [], references = []) => {
+const renderKeyboardRunSummary = (
+  overview = {},
+  pages = [],
+  references = [],
+  { viewportLabel, viewportsCount, failThreshold } = {}
+) => {
   const totalPages = overview.totalPagesAudited ?? pages.length;
   const gatingPages =
-    overview.pagesWithGatingIssues ?? pages.filter((page) => (page.gating || []).length > 0).length;
+    overview.pagesWithGatingIssues ??
+    pages.filter(
+      (page) => (Array.isArray(page.gating) ? page.gating : page.gatingIssues || []).length > 0
+    ).length;
+  const warningPages =
+    overview.pagesWithWarnings ??
+    pages.filter((page) => (Array.isArray(page.warnings) ? page.warnings.length : 0) > 0).length;
   const advisoryPages =
     overview.pagesWithAdvisories ??
-    pages.filter((page) => (page.advisories || []).length > 0).length;
+    pages.filter((page) => (Array.isArray(page.advisories) ? page.advisories.length : 0) > 0)
+      .length;
   const skipLinksDetected =
     overview.skipLinksDetected ?? pages.filter((page) => Boolean(page.skipLink)).length;
-  const pagesMissingSkip = Math.max(totalPages - skipLinksDetected, 0);
-  const totalFocusable = pages.reduce((sum, page) => sum + (page.focusableCount || 0), 0);
-  const totalVisited = pages.reduce((sum, page) => sum + (page.visitedCount || 0), 0);
+  const pagesMissingSkip = totalPages > 0 ? Math.max(totalPages - skipLinksDetected, 0) : 0;
+
+  const totalFocusable = pages.reduce(
+    (sum, page) => sum + (Number.isFinite(page.focusableCount) ? page.focusableCount : 0),
+    0
+  );
+  const totalVisited = pages.reduce(
+    (sum, page) => sum + (Number.isFinite(page.visitedCount) ? page.visitedCount : 0),
+    0
+  );
   const coveragePercent =
     totalFocusable > 0 ? Math.round((totalVisited / totalFocusable) * 100) : null;
+
+  const totalWarnings = pages.reduce(
+    (sum, page) => sum + (Array.isArray(page.warnings) ? page.warnings.length : 0),
+    0
+  );
+  const totalAdvisories = pages.reduce(
+    (sum, page) => sum + (Array.isArray(page.advisories) ? page.advisories.length : 0),
+    0
+  );
 
   const wcagBadges = Array.isArray(references)
     ? references
@@ -1181,66 +1350,87 @@ const renderKeyboardRunSummary = (overview = {}, pages = [], references = []) =>
 
   const statusItems = [];
   if (gatingPages > 0) {
-    statusItems.push(
-      `<li><span class="status-pill status-error">Gating issues</span><span>${formatNumber(
-        gatingPages
-      )} page(s)</span></li>`
-    );
-  } else {
-    statusItems.push(
-      '<li><span class="status-pill status-ok">No gating issues</span><span>All pages</span></li>'
-    );
+    statusItems.push({
+      label: 'Gating issues',
+      tone: 'status-error',
+      count: gatingPages,
+      suffix: 'page(s)',
+    });
+  }
+  if (warningPages > 0) {
+    statusItems.push({
+      label: 'Warnings',
+      tone: 'status-warning',
+      count: warningPages,
+      suffix: 'page(s)',
+    });
   }
   if (advisoryPages > 0) {
-    statusItems.push(
-      `<li><span class="status-pill status-info">Advisories</span><span>${formatNumber(
-        advisoryPages
-      )} page(s)</span></li>`
+    statusItems.push({
+      label: 'Advisories',
+      tone: 'status-info',
+      count: advisoryPages,
+      suffix: 'page(s)',
+    });
+  }
+
+  const statusSummary =
+    renderStatusSummaryList(statusItems, { className: 'status-summary' }) ||
+    '<p class="details">No keyboard issues detected across the audited pages.</p>';
+
+  const detailNotes = [];
+  if (totalFocusable > 0) {
+    detailNotes.push(
+      `<p class="details">Visited ${escapeHtml(
+        formatCount(totalVisited)
+      )} of ${escapeHtml(formatCount(totalFocusable))} focusable elements${
+        coveragePercent != null ? ` (~${coveragePercent}% coverage)` : ''
+      }.</p>`
     );
   }
   if (pagesMissingSkip > 0) {
-    statusItems.push(
-      `<li><span class="status-pill status-warning">Skip link missing</span><span>${formatNumber(
-        pagesMissingSkip
-      )} page(s)</span></li>`
+    detailNotes.push(
+      `<p class="details">Skip links missing on ${escapeHtml(
+        formatCount(pagesMissingSkip)
+      )} page(s).</p>`
     );
-  } else if (totalPages > 0) {
-    statusItems.push(
-      `<li><span class="status-pill status-ok">Skip links detected</span><span>${formatNumber(
-        skipLinksDetected
-      )} page(s)</span></li>`
+  } else if (skipLinksDetected > 0) {
+    detailNotes.push(
+      `<p class="details">Skip links detected on ${escapeHtml(
+        formatCount(skipLinksDetected)
+      )} page(s).</p>`
+    );
+  }
+  if (totalWarnings > 0) {
+    detailNotes.push(
+      `<p class="details">Warnings recorded ${escapeHtml(
+        formatCount(totalWarnings)
+      )} time(s) across ${escapeHtml(formatCount(warningPages))} page(s).</p>`
+    );
+  }
+  if (totalAdvisories > 0) {
+    detailNotes.push(
+      `<p class="details">Advisories recorded ${escapeHtml(
+        formatCount(totalAdvisories)
+      )} time(s) across ${escapeHtml(formatCount(advisoryPages))} page(s).</p>`
     );
   }
 
-  const statusSummary = statusItems.length
-    ? `<ul class="status-summary">${statusItems.join('')}</ul>`
+  const thresholdNote = failThreshold
+    ? `<p class="details">Gating threshold: ${escapeHtml(String(failThreshold))}</p>`
     : '';
 
-  const coverageNote =
-    totalFocusable > 0
-      ? `<p class="details">Visited ${formatNumber(totalVisited)} of ${formatNumber(
-          totalFocusable
-        )} focusable elements${
-          coveragePercent != null ? ` (~${coveragePercent}% coverage)` : ''
-        }.</p>`
-      : '';
-
-  const skipNote =
-    pagesMissingSkip > 0
-      ? `<p class="details">Skip links missing on ${formatNumber(pagesMissingSkip)} page(s).</p>`
-      : skipLinksDetected > 0
-        ? `<p class="details">Skip links detected on ${formatNumber(
-            skipLinksDetected
-          )} page(s).</p>`
-        : '';
-
   return `
-    <section class="summary-report summary-a11y summary-a11y--keyboard-summary">
+    <section class="summary-report summary-a11y summary-a11y--run-summary">
       <h3>Keyboard run summary</h3>
-      <p>Audited <strong>${formatNumber(totalPages)}</strong> page(s) with keyboard navigation.</p>
-      ${coverageNote}
+      <p>Audited <strong>${escapeHtml(
+        formatCount(totalPages)
+      )}</strong> page(s) per browser across ${escapeHtml(
+        formatCount(viewportsCount || 1)
+      )} viewport(s): ${escapeHtml(viewportLabel || 'Not recorded')}.</p>
       ${statusSummary}
-      ${skipNote}
+      ${thresholdNote}
+      ${detailNotes.join('\n')}
       ${wcagBadges ? `<p class="legend">${wcagBadges}</p>` : ''}
     </section>
   `;
@@ -2786,8 +2976,8 @@ const renderSidebar = (panels, run, summaryMap) => {
               <span class="nav-item__header">
                 <span class="nav-name">${escapeHtml(panel.label)}</span>
                 <span class="${escapeHtml(navStatusClasses.join(' '))}">${escapeHtml(
-            statusMeta.label
-          )}</span>
+                  statusMeta.label
+                )}</span>
               </span>
             </label>
           `;
@@ -2858,8 +3048,24 @@ const renderFormsPageCard = (summary) => {
   `;
 };
 
-const renderKeyboardPageCard = (summary) => {
+const makeKeyboardIssueEntry = (message, impact) => ({
+  impact: impact || 'info',
+  id: message,
+  rule: message,
+  nodes: [],
+  tags: [],
+});
+
+const renderKeyboardPageIssuesTable = (entries, heading, options = {}) => {
+  if (!Array.isArray(entries) || entries.length === 0) {
+    return options.emptyHtml || '';
+  }
+  return renderWcagPageIssueTable(entries, heading, options);
+};
+
+const renderKeyboardPageCard = (summary, { projectLabel } = {}) => {
   if (!summary) return '';
+
   const gating = Array.isArray(summary.gatingIssues)
     ? summary.gatingIssues
     : Array.isArray(summary.gating)
@@ -2868,16 +3074,55 @@ const renderKeyboardPageCard = (summary) => {
   const warnings = Array.isArray(summary.warnings) ? summary.warnings : [];
   const advisories = Array.isArray(summary.advisories) ? summary.advisories : [];
   const focusSequence = Array.isArray(summary.focusSequence) ? summary.focusSequence : [];
-  const statusClass = gating.length
-    ? 'status-error'
-    : warnings.length || advisories.length
-      ? 'status-warning'
-      : 'status-ok';
-  const gatingList = gating
-    .map((item) => `<li class="check-fail">${escapeHtml(String(item))}</li>`)
-    .join('');
-  const warningList = warnings.map((item) => `<li>${escapeHtml(String(item))}</li>`).join('');
-  const advisoryList = advisories.map((item) => `<li>${escapeHtml(String(item))}</li>`).join('');
+  const notes = Array.isArray(summary.notes) ? summary.notes.filter(Boolean) : [];
+
+  const viewportName = summary.projectName || summary.viewport || projectLabel || 'Not recorded';
+  const focusableCount = Number.isFinite(summary.focusableCount) ? summary.focusableCount : null;
+  const visitedCount = Number.isFinite(summary.visitedCount) ? summary.visitedCount : null;
+  const coveragePercent =
+    focusableCount && visitedCount != null && focusableCount > 0
+      ? Math.round((visitedCount / focusableCount) * 100)
+      : null;
+
+  const skipLink = summary.skipLink;
+  const skipLabel = skipLink
+    ? `Present — ${escapeHtml(skipLink.text || skipLink.href || 'skip link')}`
+    : 'Missing';
+
+  const statusMeta =
+    gating.length > 0
+      ? { className: 'status-error', label: `${formatCount(gating.length)} gating issue(s)` }
+      : warnings.length > 0 || advisories.length > 0
+        ? { className: 'status-warning', label: 'Needs attention' }
+        : { className: 'status-ok', label: 'Pass' };
+
+  const metaLines = [
+    `<p class="details"><strong>Viewport:</strong> ${escapeHtml(viewportName)}</p>`,
+    focusableCount != null
+      ? `<p class="details"><strong>Focusable elements:</strong> ${escapeHtml(
+          formatCount(focusableCount)
+        )}</p>`
+      : '',
+    visitedCount != null
+      ? `<p class="details"><strong>Visited via keyboard:</strong> ${escapeHtml(
+          formatCount(visitedCount)
+        )}${coveragePercent != null ? ` (~${coveragePercent}% coverage)` : ''}</p>`
+      : '',
+    `<p class="details"><strong>Skip link:</strong> ${skipLabel}</p>`,
+    gating.length
+      ? `<p class="details"><strong>Gating issues:</strong> ${escapeHtml(
+          formatCount(gating.length)
+        )}</p>`
+      : '',
+    warnings.length || advisories.length
+      ? `<p class="details"><strong>Warnings / advisories:</strong> ${escapeHtml(
+          formatCount(warnings.length + advisories.length)
+        )}</p>`
+      : '',
+  ]
+    .filter(Boolean)
+    .join('\n');
+
   const sequenceItems = focusSequence
     .slice(0, 25)
     .map((entry, index) => {
@@ -2893,40 +3138,48 @@ const renderKeyboardPageCard = (summary) => {
     })
     .join('');
 
-  const skipLink = summary.skipLink;
-  const skipStatus = skipLink
-    ? `present (${escapeHtml(skipLink.text || skipLink.href || 'skip link')})`
-    : 'not detected';
+  const gatingEntries = gating.map((message) => makeKeyboardIssueEntry(message, 'critical'));
+  const warningEntries = warnings.map((message) => makeKeyboardIssueEntry(message, 'moderate'));
+  const advisoryEntries = advisories.map((message) => makeKeyboardIssueEntry(message, 'minor'));
 
-  const warningsHtml = warningList
-    ? `<details><summary>Warnings (${warnings.length})</summary><ul class="details">${warningList}</ul></details>`
-    : '';
-  const advisoriesHtml = advisoryList
-    ? `<details><summary>Advisories (${advisories.length})</summary><ul class="details">${advisoryList}</ul></details>`
+  const gatingSection = renderKeyboardPageIssuesTable(
+    gatingEntries,
+    `Gating keyboard issues (${formatCount(gatingEntries.length)})`,
+    {
+      emptyHtml: '<p class="details">No gating issues detected.</p>',
+    }
+  );
+
+  const advisorySection = renderKeyboardPageIssuesTable(
+    [...warningEntries, ...advisoryEntries],
+    `Keyboard advisories and warnings (${formatCount(warningEntries.length + advisoryEntries.length)})`,
+    {
+      headingClass: 'summary-heading-best-practice',
+    }
+  );
+
+  const notesHtml = notes.length
+    ? `<details class="summary-note"><summary>Notes (${notes.length})</summary><ul class="details">${notes
+        .map((note) => `<li>${escapeHtml(String(note))}</li>`)
+        .join('')}</ul></details>`
     : '';
 
   const sequenceHtml = sequenceItems
     ? `<details><summary>Focus sequence (${focusSequence.length} stops)</summary><ul class="details">${sequenceItems}</ul></details>`
     : '';
 
-  const statusLabel = gating.length
-    ? `${gating.length} gating issue(s)`
-    : warnings.length || advisories.length
-      ? 'Needs attention'
-      : 'Pass';
-
   return `
-    <section class="summary-report summary-a11y page-card summary-a11y--page-card">
+    <section class="summary-report summary-a11y summary-a11y--page-card">
       <div class="page-card__header">
-        <h3>${escapeHtml(summary.page || 'unknown')}</h3>
-        <span class="status-pill ${statusClass}">${statusLabel}</span>
+        <h3>${escapeHtml(summary.page || 'Unknown page')}</h3>
+        <span class="status-pill ${statusMeta.className}">${escapeHtml(statusMeta.label)}</span>
       </div>
-      <p class="details">Focusable elements detected: ${summary.focusableCount ?? 'n/a'}</p>
-      <p class="details">Visited via keyboard: ${summary.visitedCount ?? 'n/a'}</p>
-      <p class="details">Skip link ${skipStatus}.</p>
-      ${gatingList ? `<ul class="details">${gatingList}</ul>` : ''}
-      ${warningsHtml}
-      ${advisoriesHtml}
+      <div class="page-card__meta">
+        ${metaLines}
+      </div>
+      ${notesHtml}
+      ${gatingSection}
+      ${advisorySection}
       ${sequenceHtml}
     </section>
   `;
@@ -2936,16 +3189,6 @@ const renderKeyboardGroupHtml = (group) => {
   const buckets = collectSchemaProjects(group);
   if (buckets.length === 0) return '';
 
-  const dataReady = buckets.every((bucket) => {
-    const runPayload = firstRunPayload(bucket);
-    return runPayload?.details && Array.isArray(runPayload.details.pages);
-  });
-
-  if (!dataReady) {
-    return '';
-  }
-  const multiProject = buckets.length > 1;
-
   const sections = buckets
     .map((bucket) => {
       const runPayload = firstRunPayload(bucket);
@@ -2954,94 +3197,92 @@ const renderKeyboardGroupHtml = (group) => {
       const details = runPayload.details || {};
       const overview = runPayload.overview || {};
       const metadata = runPayload.metadata || {};
-      const projectLabel = metadata.projectName || bucket.projectName || 'Keyboard audit';
       const pagesData = Array.isArray(details.pages) ? details.pages : [];
+      if (pagesData.length === 0) return '';
+
       const wcagRefs = Array.isArray(details.wcagReferences) ? details.wcagReferences : [];
+      const viewportList =
+        Array.isArray(details.viewports) && details.viewports.length
+          ? details.viewports
+          : Array.isArray(metadata.viewports) && metadata.viewports.length
+            ? metadata.viewports
+            : [];
+      const projectLabel = metadata.projectName || bucket.projectName || 'Keyboard audit';
+      const viewportLabel = viewportList.length ? viewportList.join(', ') : projectLabel;
+      const viewportsCount = viewportList.length || 1;
+      const failThreshold = details.failThreshold || overview.failThreshold || metadata.failOn;
 
-      const runSummaryHtml = renderKeyboardRunSummary(overview, pagesData, wcagRefs);
+      const runSummaryHtml = renderKeyboardRunSummary(overview, pagesData, wcagRefs, {
+        viewportLabel,
+        viewportsCount,
+        failThreshold,
+      });
 
-      const totalVisited = pagesData.reduce((sum, page) => sum + (page.visitedCount || 0), 0);
-      const totalFocusable = pagesData.reduce((sum, page) => sum + (page.focusableCount || 0), 0);
-      const skipLinksDetected =
-        overview.skipLinksDetected ?? pagesData.filter((page) => Boolean(page.skipLink)).length;
+      const gatingIssues = collectIssueMessages(
+        pagesData,
+        ['gating', 'gatingIssues'],
+        'critical'
+      ).filter((issue) => issue.pageCount > 0);
+      const warningIssues = collectIssueMessages(pagesData, 'warnings', 'moderate').filter(
+        (issue) => issue.pageCount > 0
+      );
+      const advisoryIssues = collectIssueMessages(pagesData, 'advisories', 'minor').filter(
+        (issue) => issue.pageCount > 0
+      );
+      const nonGatingIssues = [...warningIssues, ...advisoryIssues];
 
-      const metrics = renderSummaryMetrics([
-        { label: 'Tab stops visited', value: totalVisited },
-        { label: 'Focusable elements logged', value: totalFocusable },
-        { label: 'Skip links detected', value: skipLinksDetected },
-      ]);
+      const gatingSection = renderUnifiedIssuesTable(gatingIssues, {
+        title: 'Gating keyboard issues',
+        emptyMessage: 'No gating issues detected.',
+        variant: 'gating',
+        viewportLabel,
+      });
 
-      const tableRows = pagesData
-        .map((page) => {
-          const skipStatus = page.skipLink
-            ? `Present — ${escapeHtml(page.skipLink.text || page.skipLink.href || 'skip link')}`
-            : 'Missing';
-          return `
-            <tr class="${(page.gating || []).length ? 'impact-critical' : ''}">
-              <td><code>${escapeHtml(page.page || 'unknown')}</code></td>
-              <td>${page.focusableCount ?? 'n/a'}</td>
-              <td>${page.visitedCount ?? 'n/a'}</td>
-              <td>${skipStatus}</td>
-              <td>${(page.gating || []).length}</td>
-              <td>${(page.advisories || []).length}</td>
-            </tr>
-          `;
-        })
-        .join('');
+      const advisorySection = renderUnifiedIssuesTable(nonGatingIssues, {
+        title: 'Keyboard advisories and warnings',
+        emptyMessage: 'No advisories detected.',
+        variant: 'advisory',
+        viewportLabel,
+      });
 
-      const coverageTableHtml = pagesData.length
-        ? `
-          <section class="summary-report summary-a11y summary-a11y--project-summary">
-            <h3>Focus coverage by page</h3>
-            <table>
-              <thead>
-                <tr><th>Page</th><th>Focusable elements</th><th>Visited stops</th><th>Skip link</th><th>Gating issues</th><th>Advisories</th></tr>
-              </thead>
-              <tbody>${tableRows}</tbody>
-            </table>
-          </section>
-        `
-        : '';
+      const perPageEntries = pagesData.map((page) => {
+        const gating = Array.isArray(page.gating)
+          ? page.gating
+          : Array.isArray(page.gatingIssues)
+            ? page.gatingIssues
+            : [];
+        const warnings = Array.isArray(page.warnings) ? page.warnings : [];
+        const advisories = Array.isArray(page.advisories) ? page.advisories : [];
+        let summaryClass = 'summary-page--ok';
+        if (gating.length > 0) {
+          summaryClass = 'summary-page--fail';
+        } else if (warnings.length > 0 || advisories.length > 0) {
+          summaryClass = 'summary-page--warn';
+        }
 
-      const perPageEntries = (bucket.pageEntries || []).map((entry) => {
-        const payload = entry.payload || {};
-        const summary = payload.summary || {};
-        const gating = Array.isArray(summary.gating) ? summary.gating : [];
-        const warnings = Array.isArray(summary.warnings) ? summary.warnings : [];
-        const advisories = Array.isArray(summary.advisories) ? summary.advisories : [];
-        const tone = gating.length
-          ? 'summary-page--fail'
-          : warnings.length || advisories.length
-            ? 'summary-page--warn'
-            : 'summary-page--ok';
         return {
-          ...summary,
-          page: payload.page || summary.page,
-          _summaryClass: tone,
+          ...page,
+          page: page.page || page.url || 'Unknown page',
+          _summaryClass: summaryClass,
         };
       });
 
-      const accordionHtml = renderPerPageAccordion(perPageEntries, {
-        heading: 'Per-page keyboard findings',
+      const perPageHtml = renderPerPageAccordion(perPageEntries, {
+        heading: 'Per-page findings',
         summaryClass: 'summary-page--keyboard',
         containerClass: 'summary-report summary-a11y summary-a11y--per-page',
-        renderCard: (entrySummary) => renderKeyboardPageCard(entrySummary),
-        formatSummaryLabel: (entrySummary) => entrySummary?.page || 'Unknown page',
+        renderCard: (entrySummary) =>
+          renderKeyboardPageCard(entrySummary, { projectLabel: viewportLabel }),
+        formatSummaryLabel: (entrySummary) => formatPageLabel(entrySummary?.page || 'Page'),
       });
 
-      const contentParts = [
-        runSummaryHtml,
-        metrics
-          ? `<section class="summary-report summary-a11y summary-a11y--keyboard-metrics"><h3>Focus metrics</h3>${metrics}</section>`
-          : '',
-        coverageTableHtml,
-        accordionHtml,
-      ]
+      const contentParts = [runSummaryHtml, gatingSection, advisorySection, perPageHtml]
         .filter(Boolean)
         .join('\n');
-      if (!contentParts) return '';
 
-      if (multiProject) {
+      if (!contentParts.trim()) return '';
+
+      if (buckets.length > 1) {
         return `
           <section class="schema-group__project-block">
             <header class="schema-group__project"><h3>${escapeHtml(projectLabel)}</h3></header>
@@ -3671,95 +3912,9 @@ const renderStructureGroupHtml = (group) => {
   const buckets = collectSchemaProjects(group);
   if (buckets.length === 0) return '';
 
-  const formatImpactLabel = (impact) => {
-    if (!impact) return 'Info';
-    const label = String(impact);
-    return `${label.charAt(0).toUpperCase()}${label.slice(1)}`;
-  };
-
-  const renderIssuesTable = (issues, { title, emptyMessage }) => {
-    if (!title) return '';
-    if (!Array.isArray(issues) || issues.length === 0) {
-      return `
-        <section class="summary-report summary-a11y summary-a11y--structure-issues">
-          <h3>${escapeHtml(title)}</h3>
-          <p class="details">${escapeHtml(emptyMessage || 'No issues detected.')}</p>
-        </section>
-      `;
-    }
-
-    const rows = issues
-      .sort((a, b) => {
-        if (b.pageCount !== a.pageCount) return b.pageCount - a.pageCount;
-        return a.message.localeCompare(b.message);
-      })
-      .map((issue) => {
-        const impact = (issue.impact || 'info').toLowerCase();
-        const pagesList = Array.isArray(issue.pages)
-          ? issue.pages
-              .map((page) => `<code>${escapeHtml(page)}</code>`)
-              .join('<br />')
-          : '';
-        const pagesCell = pagesList
-          ? `<strong>${escapeHtml(formatCount(issue.pageCount))} page(s)</strong><br />${pagesList}`
-          : '—';
-        return `
-          <tr class="impact-${escapeHtml(impact)}">
-            <td>${escapeHtml(formatImpactLabel(impact))}</td>
-            <td>${escapeHtml(issue.message)}</td>
-            <td>${pagesCell}</td>
-            <td>${escapeHtml(formatCount(issue.pageCount))}</td>
-          </tr>
-        `;
-      })
-      .join('');
-
-    return `
-      <section class="summary-report summary-a11y summary-a11y--structure-issues">
-        <h3>${escapeHtml(title)}</h3>
-        <table class="schema-table">
-          <thead><tr><th>Impact</th><th>Issue</th><th>Pages</th><th>Occurrences</th></tr></thead>
-          <tbody>${rows}</tbody>
-        </table>
-      </section>
-    `;
-  };
-
-  const collectIssues = (pages, fields, impact) => {
-    if (!Array.isArray(pages) || pages.length === 0) return [];
-    const map = new Map();
-    const fieldList = Array.isArray(fields) ? fields : [fields];
-
-    for (const page of pages) {
-      const pageId = page?.page || 'Unknown page';
-      for (const field of fieldList) {
-        const items = Array.isArray(page?.[field]) ? page[field] : [];
-        for (const rawItem of items) {
-          const message = String(rawItem || '').trim();
-          if (!message) continue;
-          if (!map.has(message)) {
-            map.set(message, { message, impact, pages: new Set() });
-          }
-          map.get(message).pages.add(pageId);
-        }
-      }
-    }
-
-    return Array.from(map.values()).map((entry) => {
-      const pagesList = Array.from(entry.pages);
-      return {
-        message: entry.message,
-        impact: entry.impact,
-        pages: pagesList,
-        pageCount: pagesList.length,
-      };
-    });
-  };
-
   const sections = buckets.map((bucket) => {
     const runPayload = firstRunPayload(bucket);
     let runSummaryBlock = '';
-    let metricsSection = '';
     let gatingIssuesTable = '';
     let advisoryIssuesTable = '';
 
@@ -3768,8 +3923,7 @@ const renderStructureGroupHtml = (group) => {
       const overview = runPayload.overview || {};
       const totalPagesAudited = overview.totalPagesAudited ?? pagesData.length;
       const pagesMissingMain =
-        overview.pagesMissingMain ??
-        pagesData.filter((page) => !page.hasMainLandmark).length;
+        overview.pagesMissingMain ?? pagesData.filter((page) => !page.hasMainLandmark).length;
       const pagesWithHeadingSkips =
         overview.pagesWithHeadingSkips ??
         pagesData.filter((page) => (page.headingSkips || []).length > 0).length;
@@ -3780,20 +3934,10 @@ const renderStructureGroupHtml = (group) => {
         overview.pagesWithAdvisories ??
         pagesData.filter((page) => (page.advisories || []).length > 0).length;
 
-      const metrics = [
-        { label: 'Pages audited', value: totalPagesAudited },
-        { label: 'Pages missing main landmark', value: pagesMissingMain },
-        { label: 'Pages with heading skips', value: pagesWithHeadingSkips },
-        { label: 'Pages with gating issues', value: pagesWithGatingIssues },
-        { label: 'Pages with advisories', value: pagesWithAdvisories },
-      ];
-      const overviewHtml = renderSummaryMetrics(metrics);
-
       const wcagRefs = runPayload.details?.wcagReferences || [];
       const wcagBadges = wcagRefs
         .map(
-          (ref) =>
-            `<span class="badge badge-wcag">${escapeHtml(`${ref.id} ${ref.name}`)}</span>`
+          (ref) => `<span class="badge badge-wcag">${escapeHtml(`${ref.id} ${ref.name}`)}</span>`
         )
         .join(' ');
 
@@ -3839,28 +3983,48 @@ const renderStructureGroupHtml = (group) => {
       ];
       const statusSummary = renderStatusSummaryList(summaryItems, { className: 'status-summary' });
 
-      const gatingIssues = collectIssues(pagesData, ['gatingIssues', 'gating'], 'critical').filter(
+      const detailNotes = [];
+      if (pagesMissingMain > 0) {
+        detailNotes.push(
+          `<p class="details">Main landmark missing on ${escapeHtml(formatCount(pagesMissingMain))} page(s).</p>`
+        );
+      }
+      if (pagesWithHeadingSkips > 0) {
+        detailNotes.push(
+          `<p class="details">Heading level sequence issues on ${escapeHtml(formatCount(pagesWithHeadingSkips))} page(s).</p>`
+        );
+      }
+      if (pagesWithAdvisories > 0) {
+        detailNotes.push(
+          `<p class="details">Advisories recorded on ${escapeHtml(formatCount(pagesWithAdvisories))} page(s).</p>`
+        );
+      }
+
+      const gatingIssues = collectIssueMessages(
+        pagesData,
+        ['gatingIssues', 'gating'],
+        'critical'
+      ).filter((issue) => issue.pageCount > 0);
+      const headingSkipIssues = collectIssueMessages(pagesData, 'headingSkips', 'moderate');
+      const warningIssues = collectIssueMessages(pagesData, 'warnings', 'moderate');
+      const advisoryIssues = collectIssueMessages(pagesData, 'advisories', 'minor');
+      const combinedAdvisories = [...headingSkipIssues, ...warningIssues, ...advisoryIssues].filter(
         (issue) => issue.pageCount > 0
       );
-      const headingSkipIssues = collectIssues(pagesData, 'headingSkips', 'moderate');
-      const warningIssues = collectIssues(pagesData, 'warnings', 'moderate');
-      const advisoryIssues = collectIssues(pagesData, 'advisories', 'minor');
-      const combinedAdvisories = [
-        ...headingSkipIssues,
-        ...warningIssues,
-        ...advisoryIssues,
-      ].filter((issue) => issue.pageCount > 0);
 
       runSummaryBlock = `
-        <section class="summary-report summary-a11y summary-a11y--structure-summary">
+        <section class="summary-report summary-a11y summary-a11y--run-summary">
           <h3>Structural accessibility run summary</h3>
-          <p>Audited <strong>${escapeHtml(formatCount(totalPagesAudited))}</strong> page(s) across ${escapeHtml(
-            viewportLabel || 'this project'
-          )}.</p>
+          <p>Audited <strong>${escapeHtml(
+            formatCount(totalPagesAudited)
+          )}</strong> page(s) per browser across ${escapeHtml(
+            formatCount(viewportList.length || 1)
+          )} viewport(s): ${escapeHtml(viewportLabel || 'Not recorded')}.</p>
           ${
             statusSummary ||
             '<p class="details">No structural issues detected across the audited pages.</p>'
           }
+          ${detailNotes.join('\n')}
           ${
             wcagBadges
               ? `<p class="legend"><strong>WCAG coverage:</strong> ${wcagBadges}</p>`
@@ -3869,23 +4033,18 @@ const renderStructureGroupHtml = (group) => {
         </section>
       `;
 
-      metricsSection = overviewHtml
-        ? `
-          <section class="summary-report summary-a11y summary-a11y--structure-metrics">
-            <h3>Structure coverage at a glance</h3>
-            ${overviewHtml}
-          </section>
-        `
-        : '';
-
-      gatingIssuesTable = renderIssuesTable(gatingIssues, {
+      gatingIssuesTable = renderUnifiedIssuesTable(gatingIssues, {
         title: 'Gating structural issues',
         emptyMessage: 'No gating issues detected.',
+        variant: 'gating',
+        viewportLabel,
       });
 
-      advisoryIssuesTable = renderIssuesTable(combinedAdvisories, {
+      advisoryIssuesTable = renderUnifiedIssuesTable(combinedAdvisories, {
         title: 'Structural advisories and warnings',
         emptyMessage: 'No advisories detected.',
+        variant: 'advisory',
+        viewportLabel,
       });
     }
 
@@ -3905,13 +4064,7 @@ const renderStructureGroupHtml = (group) => {
       formatSummaryLabel: (entrySummary) => entrySummary?.page || 'Unknown page',
     });
 
-    return [
-      runSummaryBlock,
-      metricsSection,
-      gatingIssuesTable,
-      advisoryIssuesTable,
-      accordionHtml,
-    ]
+    return [runSummaryBlock, gatingIssuesTable, advisoryIssuesTable, accordionHtml]
       .filter(Boolean)
       .join('\n');
   });
