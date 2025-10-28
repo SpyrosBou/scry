@@ -2845,7 +2845,9 @@ const buildSuitePanels = (schemaGroups, summaryMap) => {
             if (runEntries.length === 0) return false;
             return runEntries.some((entry) => (entry.payload?.metadata?.scope || '') !== 'run');
           })
-        : groups;
+        : definition.summaryType === 'structure'
+          ? groups.filter((group) => (group.runEntries || []).length > 0)
+          : groups;
 
     if (filteredGroups.length === 0) continue;
 
@@ -4065,6 +4067,10 @@ const renderResponsiveWpGroupHtml = (group) => {
 };
 
 const renderStructureGroupHtml = (group) => {
+  const firstSummary = Array.isArray(group?.summaries) ? group.summaries[0] : null;
+  if (firstSummary?.metadata?.scope === 'page' || (group.runEntries || []).length === 0) {
+    return '';
+  }
   const buckets = collectSchemaProjects(group);
   if (buckets.length === 0) return '';
 
@@ -4242,12 +4248,39 @@ const renderStructureGroupHtml = (group) => {
       });
     }
 
-    const perPageEntries = (bucket.pageEntries || []).map((entry) => {
+    const perPageSource = Array.isArray(runPayload?.details?.pages)
+      ? runPayload.details.pages.map((page) => ({
+          page,
+          payload: {
+            page: page.page,
+            summary: page,
+          },
+        }))
+      : bucket.pageEntries;
+
+    const perPageEntries = (perPageSource || []).map((entry) => {
       const payload = entry.payload || {};
-      const summary = payload.summary || {};
+      const summary = payload.summary || entry.page || {};
+      const pageLabel = payload.page || summary.page;
+      const gating = Array.isArray(summary.gating)
+        ? summary.gating
+        : Array.isArray(summary.gatingIssues)
+          ? summary.gatingIssues
+          : [];
+      const warnings = Array.isArray(summary.warnings) ? summary.warnings : [];
+      const headingSkips = Array.isArray(summary.headingSkips) ? summary.headingSkips : [];
+      const advisories = Array.isArray(summary.advisories) ? summary.advisories : [];
+      const summaryClass = gating.length
+        ? 'summary-page--fail'
+        : warnings.length || headingSkips.length
+          ? 'summary-page--warn'
+          : advisories.length
+            ? 'summary-page--advisory'
+            : 'summary-page--ok';
       return {
         ...summary,
-        page: payload.page || summary.page,
+        page: pageLabel,
+        _summaryClass: summaryClass,
       };
     });
 
