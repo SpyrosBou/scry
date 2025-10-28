@@ -4086,14 +4086,52 @@ const renderStructureGroupHtml = (group) => {
         );
       }
 
-      const gatingIssues = collectIssueMessages(
-        pagesData,
-        ['gatingIssues', 'gating'],
-        'critical'
-      ).filter((issue) => issue.pageCount > 0);
-      const headingSkipIssues = collectIssueMessages(pagesData, 'headingSkips', 'moderate');
-      const warningIssues = collectIssueMessages(pagesData, 'warnings', 'moderate');
-      const advisoryIssues = collectIssueMessages(pagesData, 'advisories', 'minor');
+      const normalizeStructureAdvisory = ({ message }) => {
+        if (!message) return null;
+        if (/^Missing main landmark/i.test(message)) {
+          return { key: 'Missing main landmark', label: 'Missing main landmark' };
+        }
+        if (/^No H1 heading found/i.test(message)) {
+          return { key: 'Missing H1 heading', label: 'Missing H1 heading' };
+        }
+        if (/heading level/i.test(message)) {
+          return { key: 'Heading level sequence issue', label: 'Heading level sequence issue' };
+        }
+        return { key: message, label: message };
+      };
+
+      const normalizeStructureWarning = ({ message }) => {
+        if (!message) return null;
+        if (/^Landmark missing:/i.test(message)) {
+          const label = message.replace(/^Landmark missing:\s*/i, '').trim();
+          return { key: `Landmark missing: ${label}`, label: `Landmark missing: ${label}` };
+        }
+        return { key: message, label: message };
+      };
+
+      const normalizeStructureGating = ({ message }) => {
+        if (!message) return null;
+        if (/^No H1 heading found/i.test(message)) {
+          return { key: 'Missing H1 heading', label: 'Missing H1 heading' };
+        }
+        if (/^Main landmark missing/i.test(message)) {
+          return { key: 'Missing main landmark', label: 'Missing main landmark' };
+        }
+        return { key: message, label: message };
+      };
+
+      const gatingIssues = collectIssueMessages(pagesData, ['gatingIssues', 'gating'], 'critical', {
+        normalize: normalizeStructureGating,
+      }).filter((issue) => issue.pageCount > 0);
+      const headingSkipIssues = collectIssueMessages(pagesData, 'headingSkips', 'moderate', {
+        normalize: normalizeStructureAdvisory,
+      });
+      const warningIssues = collectIssueMessages(pagesData, 'warnings', 'moderate', {
+        normalize: normalizeStructureWarning,
+      });
+      const advisoryIssues = collectIssueMessages(pagesData, 'advisories', 'minor', {
+        normalize: normalizeStructureAdvisory,
+      });
       const combinedAdvisories = [...headingSkipIssues, ...warningIssues, ...advisoryIssues].filter(
         (issue) => issue.pageCount > 0
       );
