@@ -235,11 +235,12 @@ async function main() {
   }
 
   const rawPages = argv.pages;
+  let parsedPages;
   if (rawPages === undefined || rawPages === null || String(rawPages).trim() === '') {
-    console.error('❌ Missing required --pages argument. Supply a positive integer to cap page selection (e.g. "--pages 5").');
-    process.exit(1);
+    parsedPages = 5;
+  } else {
+    parsedPages = Number.parseInt(String(rawPages).trim(), 10);
   }
-  const parsedPages = Number.parseInt(String(rawPages).trim(), 10);
   if (!Number.isFinite(parsedPages) || parsedPages <= 0) {
     console.error('❌ Invalid --pages value. Use a positive integer (e.g. "--pages 5").');
     process.exit(1);
