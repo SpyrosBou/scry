@@ -1309,7 +1309,7 @@ const renderKeyboardRunSummary = (
     pages.filter(
       (page) => (Array.isArray(page.gating) ? page.gating : page.gatingIssues || []).length > 0
     ).length;
-  const warningPages =
+  const executionFailurePages =
     overview.pagesWithWarnings ??
     pages.filter((page) => (Array.isArray(page.warnings) ? page.warnings.length : 0) > 0).length;
   const advisoryPages =
@@ -1331,7 +1331,7 @@ const renderKeyboardRunSummary = (
   const coveragePercent =
     totalFocusable > 0 ? Math.round((totalVisited / totalFocusable) * 100) : null;
 
-  const totalWarnings = pages.reduce(
+  const totalExecutionFailures = pages.reduce(
     (sum, page) => sum + (Array.isArray(page.warnings) ? page.warnings.length : 0),
     0
   );
@@ -1357,11 +1357,11 @@ const renderKeyboardRunSummary = (
       suffix: 'page(s)',
     });
   }
-  if (warningPages > 0) {
+  if (executionFailurePages > 0) {
     statusItems.push({
-      label: 'Warnings',
-      tone: 'status-warning',
-      count: warningPages,
+      label: 'Execution failures',
+      tone: 'status-error',
+      count: executionFailurePages,
       suffix: 'page(s)',
     });
   }
@@ -1401,11 +1401,11 @@ const renderKeyboardRunSummary = (
       )} page(s).</p>`
     );
   }
-  if (totalWarnings > 0) {
+  if (totalExecutionFailures > 0) {
     detailNotes.push(
-      `<p class="details">Warnings recorded ${escapeHtml(
-        formatCount(totalWarnings)
-      )} time(s) across ${escapeHtml(formatCount(warningPages))} page(s).</p>`
+      `<p class="details">Execution failures recorded ${escapeHtml(
+        formatCount(totalExecutionFailures)
+      )} time(s) across ${escapeHtml(formatCount(executionFailurePages))} page(s).</p>`
     );
   }
   if (totalAdvisories > 0) {
@@ -3071,7 +3071,7 @@ const renderKeyboardPageCard = (summary, { projectLabel } = {}) => {
     : Array.isArray(summary.gating)
       ? summary.gating
       : [];
-  const warnings = Array.isArray(summary.warnings) ? summary.warnings : [];
+  const executionFailures = Array.isArray(summary.warnings) ? summary.warnings : [];
   const advisories = Array.isArray(summary.advisories) ? summary.advisories : [];
   const focusSequence = Array.isArray(summary.focusSequence) ? summary.focusSequence : [];
   const notes = Array.isArray(summary.notes) ? summary.notes.filter(Boolean) : [];
@@ -3090,7 +3090,7 @@ const renderKeyboardPageCard = (summary, { projectLabel } = {}) => {
     : 'Missing';
 
   const hasGating = gating.length > 0;
-  const hasWarnings = warnings.length > 0;
+  const hasExecutionFailures = executionFailures.length > 0;
   const hasAdvisories = advisories.length > 0;
   const statusMeta = (() => {
     if (hasGating) {
@@ -3099,10 +3099,10 @@ const renderKeyboardPageCard = (summary, { projectLabel } = {}) => {
         label: `${formatCount(gating.length)} gating issue(s)`,
       };
     }
-    if (hasWarnings) {
+    if (hasExecutionFailures) {
       return {
-        className: 'status-warning',
-        label: 'Needs attention',
+        className: 'status-error',
+        label: 'Execution failures',
       };
     }
     if (hasAdvisories) {
@@ -3132,8 +3132,10 @@ const renderKeyboardPageCard = (summary, { projectLabel } = {}) => {
           formatCount(gating.length)
         )}</p>`
       : '',
-    hasWarnings
-      ? `<p class="details"><strong>Warnings:</strong> ${escapeHtml(formatCount(warnings.length))}</p>`
+    hasExecutionFailures
+      ? `<p class="details"><strong>Execution failures:</strong> ${escapeHtml(
+          formatCount(executionFailures.length)
+        )}</p>`
       : '',
     hasAdvisories
       ? `<p class="details"><strong>Advisories:</strong> ${escapeHtml(
@@ -3159,9 +3161,19 @@ const renderKeyboardPageCard = (summary, { projectLabel } = {}) => {
     })
     .join('');
 
+  const executionEntries = executionFailures.map((message) =>
+    makeKeyboardIssueEntry(message, 'critical')
+  );
   const gatingEntries = gating.map((message) => makeKeyboardIssueEntry(message, 'critical'));
-  const warningEntries = warnings.map((message) => makeKeyboardIssueEntry(message, 'moderate'));
   const advisoryEntries = advisories.map((message) => makeKeyboardIssueEntry(message, 'minor'));
+
+  const executionSection = renderKeyboardPageIssuesTable(
+    executionEntries,
+    `Execution failures (${formatCount(executionEntries.length)})`,
+    {
+      emptyHtml: '',
+    }
+  );
 
   const gatingSection = renderKeyboardPageIssuesTable(
     gatingEntries,
@@ -3172,11 +3184,9 @@ const renderKeyboardPageCard = (summary, { projectLabel } = {}) => {
   );
 
   const advisorySection = renderKeyboardPageIssuesTable(
-    [...warningEntries, ...advisoryEntries],
-    `Keyboard advisories and warnings (${formatCount(warningEntries.length + advisoryEntries.length)})`,
-    {
-      headingClass: 'summary-heading-best-practice',
-    }
+    advisoryEntries,
+    `Advisories (${formatCount(advisoryEntries.length)})`,
+    { headingClass: 'summary-heading-best-practice' }
   );
 
   const notesHtml = notes.length
@@ -3199,6 +3209,7 @@ const renderKeyboardPageCard = (summary, { projectLabel } = {}) => {
         ${metaLines}
       </div>
       ${notesHtml}
+      ${executionSection}
       ${gatingSection}
       ${advisorySection}
       ${sequenceHtml}
@@ -3239,19 +3250,26 @@ const renderKeyboardGroupHtml = (group) => {
         failThreshold,
       });
 
+      const executionFailureIssues = collectIssueMessages(pagesData, 'warnings', 'critical').filter(
+        (issue) => issue.pageCount > 0
+      );
       const gatingIssues = collectIssueMessages(
         pagesData,
         ['gating', 'gatingIssues'],
         'critical'
       ).filter((issue) => issue.pageCount > 0);
-      const warningIssues = collectIssueMessages(pagesData, 'warnings', 'moderate').filter(
-        (issue) => issue.pageCount > 0
-      );
       const advisoryIssues = collectIssueMessages(pagesData, 'advisories', 'minor').filter(
         (issue) => issue.pageCount > 0
       );
-      const nonGatingIssues = [...warningIssues, ...advisoryIssues];
 
+      const executionSection = executionFailureIssues.length
+        ? renderUnifiedIssuesTable(executionFailureIssues, {
+            title: 'Execution failures',
+            emptyMessage: 'Execution failures recorded during this run.',
+            variant: 'gating',
+            viewportLabel,
+          })
+        : '';
       const gatingSection = renderUnifiedIssuesTable(gatingIssues, {
         title: 'Gating keyboard issues',
         emptyMessage: 'No gating issues detected.',
@@ -3259,8 +3277,8 @@ const renderKeyboardGroupHtml = (group) => {
         viewportLabel,
       });
 
-      const advisorySection = renderUnifiedIssuesTable(nonGatingIssues, {
-        title: 'Keyboard advisories and warnings',
+      const advisorySection = renderUnifiedIssuesTable(advisoryIssues, {
+        title: 'Advisories',
         emptyMessage: 'No advisories detected.',
         variant: 'advisory',
         viewportLabel,
@@ -3272,15 +3290,14 @@ const renderKeyboardGroupHtml = (group) => {
           : Array.isArray(page.gatingIssues)
             ? page.gatingIssues
             : [];
-        const warnings = Array.isArray(page.warnings) ? page.warnings : [];
+        const executionIssues = Array.isArray(page.warnings) ? page.warnings : [];
         const advisories = Array.isArray(page.advisories) ? page.advisories : [];
         const hasGating = gating.length > 0;
-        const hasWarnings = warnings.length > 0;
+        const hasExecution = executionIssues.length > 0;
         const hasAdvisories = advisories.length > 0;
-        const summaryClass = hasGating
-          ? 'summary-page--fail'
-          : hasWarnings
-            ? 'summary-page--warn'
+        const summaryClass =
+          hasGating || hasExecution
+            ? 'summary-page--fail'
             : hasAdvisories
               ? 'summary-page--advisory'
               : 'summary-page--ok';
@@ -3300,7 +3317,13 @@ const renderKeyboardGroupHtml = (group) => {
         formatSummaryLabel: (entrySummary) => formatPageLabel(entrySummary?.page || 'Page'),
       });
 
-      const contentParts = [runSummaryHtml, gatingSection, advisorySection, perPageHtml]
+      const contentParts = [
+        runSummaryHtml,
+        executionSection,
+        gatingSection,
+        advisorySection,
+        perPageHtml,
+      ]
         .filter(Boolean)
         .join('\n');
 
