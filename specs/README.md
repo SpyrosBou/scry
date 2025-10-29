@@ -81,6 +81,7 @@ node -e "const Gen=require('./specs/utils/spec-to-test-generator'); const g=new 
 node -e "const fs=require('fs'); const Gen=require('./specs/utils/spec-to-test-generator'); const g=new Gen(); const code=g.generateFunctionalityTest(); fs.writeFileSync('tests/functionality.generated.spec.js', code); console.log('Wrote tests/functionality.generated.spec.js');"
 
 # Run with the existing runner (includes all top-level *.spec.js files)
+# Swap 5 for another number or use --pages all to remove the cap.
 node run-tests.js --site=<your-site> --pages=5 --functionality
 
 # Or run Playwright directly (SITE_NAME is required by generated tests)

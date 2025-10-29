@@ -66,7 +66,7 @@ function showUsage() {
     'Smart Playwright runner',
     '',
     'Usage:',
-    '  node run-tests.js --site <site> --pages <n> [suite flags or --test <pattern>]',
+    '  node run-tests.js --site <site> --pages <n|all> [suite flags or --test <pattern>]',
     '  node run-tests.js [options] --site <site> [extra sites...] [test patterns...]',
     '',
     'Required selections:',
@@ -74,7 +74,7 @@ function showUsage() {
     '  • Suite/tests:           Choose one or more of --visual/--responsive/--functionality/--accessibility',
     '                           or pass --test, -t <pattern> (repeat as needed)',
     '                           (suite flags and --test patterns are mutually exclusive)',
-    '  • Page cap:              --pages, -p <positive integer>',
+    '  • Page cap:              --pages, -p <positive integer> or "all"',
     '',
     'Optional selections:',
     '  • Projects:              --browsers, -b <list> (default Chrome, use "all" for every project)',
@@ -96,7 +96,7 @@ function showUsage() {
     'Tips:',
     '  - Append test globs after the options (e.g. "node run-tests.js --site foo --pages 5 tests/*.spec.js").',
     '  - Combine page cap (--pages) and project selection to mirror the GUI flow you plan to build.',
-    '  - Always specify --pages with a positive integer to keep runs bounded.',
+    '  - Use "--pages all" when you want to exercise every available page for the site.',
     '  - Use env vars like REPORT_BROWSER to override the default browser opener when viewing reports.',
     '',
   ];
@@ -237,17 +237,26 @@ async function main() {
   }
 
   const rawPages = argv.pages;
-  let parsedPages;
+  let pagesToken;
   if (rawPages === undefined || rawPages === null || String(rawPages).trim() === '') {
-    parsedPages = 5;
+    pagesToken = '5';
   } else {
-    parsedPages = Number.parseInt(String(rawPages).trim(), 10);
+    const normalisedPages = String(rawPages).trim().toLowerCase();
+    const unlimitedTokens = ['all', 'infinite', 'infinity'];
+    if (unlimitedTokens.includes(normalisedPages)) {
+      pagesToken = 'all';
+    } else {
+      const parsedPages = Number.parseInt(normalisedPages, 10);
+      if (!Number.isFinite(parsedPages) || parsedPages <= 0) {
+        console.error(
+          '❌ Invalid --pages value. Use a positive integer or "all" (e.g. "--pages 5" or "--pages all").'
+        );
+        process.exit(1);
+      }
+      pagesToken = String(parsedPages);
+    }
   }
-  if (!Number.isFinite(parsedPages) || parsedPages <= 0) {
-    console.error('❌ Invalid --pages value. Use a positive integer (e.g. "--pages 5").');
-    process.exit(1);
-  }
-  argv.pages = String(parsedPages);
+  argv.pages = pagesToken;
 
   const suiteSelections = {
     visual: coerceBoolean(argv.visual),

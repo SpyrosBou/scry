@@ -393,11 +393,19 @@ class TestRunner {
 
       appliedPageLimit = null;
       if (options.limit != null) {
-        const limitNumber = Number.parseInt(options.limit, 10);
-        if (Number.isFinite(limitNumber) && limitNumber > 0) {
-          siteConfig.testPages = siteConfig.testPages.slice(0, limitNumber);
-          appliedPageLimit = limitNumber;
-          console.log(`ℹ️  Page cap applied: first ${limitNumber} page(s) will be tested.`);
+        const rawLimit = String(options.limit).trim().toLowerCase();
+        const unlimitedTokens = new Set(['all', 'infinite', 'infinity']);
+        if (rawLimit !== '' && !unlimitedTokens.has(rawLimit)) {
+          const limitNumber = Number.parseInt(rawLimit, 10);
+          if (Number.isFinite(limitNumber) && limitNumber > 0) {
+            siteConfig.testPages = siteConfig.testPages.slice(0, limitNumber);
+            appliedPageLimit = limitNumber;
+            console.log(`ℹ️  Page cap applied: first ${limitNumber} page(s) will be tested.`);
+          } else {
+            console.log('⚠️  Ignoring invalid page cap; all pages will be tested.');
+          }
+        } else {
+          console.log('ℹ️  Page cap disabled; all available pages will be tested.');
         }
       }
 

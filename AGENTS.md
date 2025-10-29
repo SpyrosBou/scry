@@ -12,14 +12,14 @@ Whilst working on this repo you can assume we are concerned with the functionali
 ## Build, Test, and Development Commands
 
 - `npm run setup` installs all dependencies and Playwright browsers; use `npm run install-browsers` if you only need to refresh the browser binaries.
-- `node run-tests.js --site=<name> --functionality` executes the default Chrome desktop run (append `--pages=<n>` to override the 5-page default). Layer `--responsive`, `--functionality`, `--accessibility`, or `--visual` to target suite families, or pass one or more spec paths/Globs via `--test` / trailing arguments (for example `node run-tests.js --site=createarts-live --pages 5 tests/a11y.audit.wcag.spec.js`).
-- `--pages <n>` (optional, default 5) caps the resolved manifest to the first _n_ pages (e.g. `node run-tests.js --site=createarts-live --pages 8 --functionality`); `A11Y_SAMPLE=<n>` remains available as an environment override for accessibility runs.
+- `node run-tests.js --site=<name> --functionality` executes the default Chrome desktop run (append `--pages=<n|all>` to override the 5-page default). Layer `--responsive`, `--functionality`, `--accessibility`, or `--visual` to target suite families, or pass one or more spec paths/Globs via `--test` / trailing arguments (for example `node run-tests.js --site=createarts-live --pages all tests/a11y.audit.wcag.spec.js`).
+- `--pages <n|all>` (optional, default 5) caps the resolved manifest to the first _n_ pages or removes the cap entirely (e.g. `node run-tests.js --site=createarts-live --pages all --functionality`); `A11Y_SAMPLE=<n>` remains available as an environment override for accessibility runs.
 - `--project=<name>` (or comma-separated list) lets you choose Playwright projects; omit for the Chrome desktop default.
 - `npm run reports:read [count]` opens the latest HTML report(s); set `REPORT_BROWSER`/`REPORT_BROWSER_ARGS` to force a specific viewer.
 - `npm run clean:reports` keeps the 10 newest `reports/run-*` directories (append `-- --all` or `-- -a` to purge everything) and `npm run clean:manifests` prunes cached manifest files.
 - `npm run clean:test-results` resets Playwright's `test-results/` folder.
 - `npm run test:unit` runs the Node test suite in `tests/unit/`.
-- Suite shortcuts: `npm run test:visual -- --site=<name> [--pages=<n>]`, `npm run test:responsive -- --site=<name> [--pages=<n>]`, `npm run test:functionality -- --site=<name> [--pages=<n>]`, `npm run test:accessibility -- --site=<name> [--pages=<n>]`.
+- Suite shortcuts: `npm run test:visual -- --site=<name> [--pages=<n|all>]`, `npm run test:responsive -- --site=<name> [--pages=<n|all>]`, `npm run test:functionality -- --site=<name> [--pages=<n|all>]`, `npm run test:accessibility -- --site=<name> [--pages=<n|all>]`.
 - Suite flags and `--test` patterns are mutually exclusive—choose one style per invocation.
 - `npm run discover -- <site>` hits sitemap discovery and updates the matching config; review the diff before committing.
 - `npm run baselines:update -- <site>` refreshes visual regression snapshots for any configured site.
@@ -35,7 +35,7 @@ Whilst working on this repo you can assume we are concerned with the functionali
 
 - Tests rely on `@playwright/test` with custom fixtures in `utils/test-fixtures.js` and Axe accessibility helpers.
 - Use `node run-tests.js --list-sites` to discover configs; `--functionality`, `--visual`, `--responsive`, and `--accessibility` let you target specific suites.
-- The runner honours an optional `--pages <n>` override to cap page selection from the manifest (defaults to 5 when omitted).
+- The runner honours an optional `--pages <n|all>` override to cap page selection from the manifest (defaults to 5 when omitted).
 - Update visual baselines with `npx playwright test tests/visual.regression.snapshots.spec.js --update-snapshots` when UI changes are intentional.
 - Accessibility sampling honors `A11Y_SAMPLE` env vars and `a11yResponsiveSampleSize` config entries.
 - Accessibility specs now attach schema-backed run and page summaries via `attachSchemaSummary` with helpers in `utils/reporting-utils.js` / `utils/report-schema.js`; extend those utilities instead of hand-rolled HTML so run-level cards stay consistent.
@@ -43,7 +43,7 @@ Whilst working on this repo you can assume we are concerned with the functionali
 ## Commit & Pull Request Guidelines
 
 - Follow Conventional Commits (`feat:`, `fix:`, `chore:`, etc.), e.g., `fix: harden wcag report filtering`.
-- Stage related changes only; run pertinent suites (`node run-tests.js --site=<name> --functionality` with `--pages=<n>` if you need a different cap) and mention report paths or artifacts in the PR description.
+- Stage related changes only; run pertinent suites (`node run-tests.js --site=<name> --functionality` with `--pages=<n|all>` if you need a different cap) and mention report paths or artifacts in the PR description.
 - PRs should describe scope, reproduction steps, linked issues, and highlight any failing tests or required follow-ups.
 
 ## Security & Configuration Tips

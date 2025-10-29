@@ -27,20 +27,20 @@ Automated Playwright-powered testing harness for auditing WordPress websites acr
    ```
 
 ### Quick Smoke Test
-Verify the harness with a small responsive run (replace the site name with one from `sites/`). The runner defaults to 5 pages, so overriding is optional:
+Verify the harness with a small responsive run (replace the site name with one from `sites/`). The runner defaults to 5 pages; use a higher number or `--pages all` when you need full coverage:
 ```bash
 node run-tests.js --site example-site --pages 5 --responsive
 ```
 
 ## Running Test Suites
-- **General form:** `node run-tests.js --site <name> [--pages <n>] [suite flags]`
+- **General form:** `node run-tests.js --site <name> [--pages <n|all>] [suite flags]`
 - **Suite flags:** `--functionality`, `--responsive`, `--accessibility`, `--visual` (choose one style: flags or `--test` globs).
 - **Multiple sites:** repeat `--site` or append additional site names after the options.
-- **Custom specs:** `node run-tests.js --site <name> --pages <n> --test tests/a11y.audit.wcag.spec.js`
+- **Custom specs:** `node run-tests.js --site <name> --pages <n|all> --test tests/a11y.audit.wcag.spec.js`
 - **Projects:** select Playwright projects with `--browsers=chrome,firefox` or `--browsers=all`.
 - **Discovery:** append `--discover` to refresh sitemap-backed manifests before execution.
 - **Debugging:** use `--debug` for Playwright trace mode or `--output <path>` to persist manifest JSON.
-- **Page cap:** omit `--pages` to use the default of 5, or pass a positive integer to override.
+- **Page cap:** omit `--pages` to use the default of 5, pass a positive integer to override, or use `--pages all` to test every available page.
 
 Helpful environment variables:
 - `REPORT_BROWSER` and `REPORT_BROWSER_ARGS` force a specific viewer when opening reports.
@@ -88,10 +88,10 @@ Helpful environment variables:
 ## Linting and Tests
 - Lint JavaScript with `npm run lint` (or `npm run lint:fix` to auto-format where possible).
 - Execute Node unit tests with `npm run test:unit`.
-- Use suite shortcuts such as `npm run test:visual -- --site=<name> [--pages=<n>]` to mirror reporter commands.
+- Use suite shortcuts such as `npm run test:visual -- --site=<name> [--pages=<n|all>]` to mirror reporter commands.
 
 ## Troubleshooting
-- If `--pages` is omitted, the runner defaults to 5 pages; supply a positive integer to widen or narrow the run.
+- If `--pages` is omitted, the runner defaults to 5 pages; supply a positive integer to widen or narrow the run, or `--pages all` to remove the cap.
 - If reports fail to open, check `REPORT_BROWSER` settings or inspect the generated `reports/run-*/data/run.json`.
 - For stubborn Playwright issues, clear cached browsers with `npx playwright install --force`.
 - Use `npm run clean:reports -- --all` when old artifacts clutter comparisons.
