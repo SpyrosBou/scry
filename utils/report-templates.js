@@ -312,6 +312,60 @@ const collectIssueMessages = (pages, fields, defaultImpact, options = {}) => {
   });
 };
 
+const stripAnsiSequences = (value) => String(value ?? '').replace(/\u001b\[[0-9;]*m/g, '');
+
+const simplifyUrlForDisplay = (value) => {
+  if (!value) return '';
+  try {
+    const url = new URL(value);
+    return `${url.origin}${url.pathname}`.replace(/\/+$/, '/');
+  } catch (_error) {
+    return value;
+  }
+};
+
+const normalizeInteractiveMessage = (input) => {
+  const resolveRawInput = (value) => {
+    if (!value || typeof value !== 'object') return '';
+    if (typeof value.raw === 'string') return value.raw;
+    if (value.raw && typeof value.raw.message === 'string') return value.raw.message;
+    return value.message || value.error || value.failure || '';
+  };
+
+  const raw =
+    typeof input === 'string'
+      ? input
+      : input && typeof input === 'object'
+        ? resolveRawInput(input)
+        : '';
+  if (!raw) return null;
+
+  let text = stripAnsiSequences(raw).trim();
+  if (!text) return null;
+  const newlineIndex = text.indexOf('\n');
+  if (newlineIndex >= 0) {
+    text = text.slice(0, newlineIndex).trim();
+  }
+  text = text.replace(/\s+/g, ' ');
+  text = text.replace(/#\d+/g, '#n');
+  text = text.replace(/Timeout [0-9.]+ms exceeded/gi, 'Timeout exceeded');
+  text = text.replace(/requestfailed/gi, 'request failed');
+  text = text.replace(/request failed failed/gi, 'request failed');
+
+  const urlMatch = text.match(/https?:\/\/\S+/i);
+  if (urlMatch) {
+    let candidate = urlMatch[0];
+    while (candidate && /[),.;!?]$/.test(candidate)) {
+      candidate = candidate.slice(0, -1);
+    }
+    const simplified = simplifyUrlForDisplay(candidate);
+    text = text.replace(urlMatch[0], simplified);
+  }
+
+  if (!text) return null;
+  return { key: text, label: text };
+};
+
 const formatWcagTagLabel = (tag) => {
   if (!tag) return null;
   const lower = String(tag).toLowerCase();
@@ -1819,37 +1873,16 @@ const renderInteractiveGroupHtml = (group) => {
       </section>
     `;
 
-    const normalizeConsoleIssue = ({ message }) => {
-      if (!message) return null;
-      if (message.startsWith('Console error')) {
-        return { key: message, label: message };
-      }
-      return { key: message, label: message };
-    };
-
-    const normalizeResourceIssue = ({ message }) => {
-      if (!message) return null;
-      if (message.startsWith('Resource')) {
-        return { key: message, label: message };
-      }
-      return { key: message, label: message };
-    };
-
-    const gatingIssues = collectIssueMessages(
-      pagesData,
-      ['gating', 'consoleErrors', 'resourceErrors'],
-      'critical',
-      {
-        normalize: normalizeConsoleIssue,
-      }
-    ).filter((issue) => issue.pageCount > 0);
+    const gatingIssues = collectIssueMessages(pagesData, 'gating', 'critical', {
+      normalize: normalizeInteractiveMessage,
+    }).filter((issue) => issue.pageCount > 0);
 
     const warningIssues = collectIssueMessages(pagesData, 'warnings', 'moderate', {
-      normalize: normalizeConsoleIssue,
+      normalize: normalizeInteractiveMessage,
     }).filter((issue) => issue.pageCount > 0);
 
     const advisoryIssues = collectIssueMessages(pagesData, 'advisories', 'minor', {
-      normalize: normalizeResourceIssue,
+      normalize: normalizeInteractiveMessage,
     }).filter((issue) => issue.pageCount > 0);
 
     const gatingSection = renderUnifiedIssuesTable(gatingIssues, {
@@ -3308,15 +3341,72 @@ const renderInteractivePageCard = (summary, { projectLabel } = {}) => {
         ? { className: 'status-info', label: 'Advisories present' }
         : { className: 'status-ok', label: 'Pass' };
 
-  const metaLines = [
-    `<p class="details"><strong>Viewport:</strong> ${escapeHtml(projectLabel || 'Not recorded')}</p>`,
-    `<p class="details"><strong>Console errors:</strong> ${escapeHtml(
-      formatCount(consoleErrors)
-    )}</p>`,
-    `<p class="details"><strong>Resource errors:</strong> ${escapeHtml(
-      formatCount(resourceErrors)
-    )}</p>`,
-  ].join('\n');
+  const aggregateMessages = (items, impact, normalizer) => {
+    const map = new Map();
+    items.forEach((raw) => {
+      if (!raw) return;
+      const normalized = normalizer ? normalizer(raw) : { key: String(raw), label: String(raw) };
+      if (!normalized) return;
+      const key = normalized.key || normalized.label;
+      if (!key) return;
+      const label = normalized.label || normalized.key || '';
+      if (!map.has(key)) map.set(key, { impact, message: label, count: 0 });
+      map.get(key).count += 1;
+    });
+    return Array.from(map.values());
+  };
+
+  const gatingEntries = aggregateMessages(gating, 'critical', normalizeInteractiveMessage);
+  const warningEntries = aggregateMessages(warnings, 'moderate', normalizeInteractiveMessage);
+  const advisoryEntries = aggregateMessages(advisories, 'minor', normalizeInteractiveMessage);
+  const consoleEntries = aggregateMessages(consoleSample, 'moderate', normalizeInteractiveMessage);
+  const resourceEntries = aggregateMessages(resourceSample, 'critical', (sample) => {
+    const parts = [];
+    if (sample?.status != null) parts.push(`Status ${sample.status}`);
+    else if (sample?.error) parts.push(sample.error);
+    else if (sample?.failure) parts.push(sample.failure);
+    const method = sample?.methodTried || sample?.method;
+    if (method) parts.push(`via ${method}`);
+    const urlLabel = sample?.url ? simplifyUrlForDisplay(sample.url) : 'Unknown URL';
+    const label = `${parts.length ? parts.join(' ') : 'Request failure'} – ${urlLabel}`;
+    return { key: label, label };
+  });
+
+  const buildSummaryMeta = () =>
+    [
+      `<p class="details"><strong>Viewport:</strong> ${escapeHtml(projectLabel || 'Not recorded')}</p>`,
+      `<p class="details"><strong>Console errors:</strong> ${escapeHtml(
+        formatCount(consoleErrors)
+      )}</p>`,
+      `<p class="details"><strong>Resource errors:</strong> ${escapeHtml(
+        formatCount(resourceErrors)
+      )}</p>`,
+    ].join('\n');
+
+  const renderEntriesTable = (entries, heading, options = {}) =>
+    entries.length
+      ? renderWcagPageIssueTable(
+          entries.map((entry) => ({
+            impact: entry.impact,
+            id: entry.message,
+            nodesCount: entry.count,
+          })),
+          heading,
+          options
+        )
+      : '';
+
+  const renderList = (label, entries) =>
+    entries.length
+      ? `<details><summary>${escapeHtml(label)} (${formatCount(entries.length)})</summary><ul class="details">${entries
+          .map(
+            (entry) =>
+              `<li>${escapeHtml(entry.message)}${
+                entry.count > 1 ? ` (${formatCount(entry.count)})` : ''
+              }</li>`
+          )
+          .join('')}</ul></details>`
+      : '';
 
   const notesHtml = info.length
     ? `<details class="summary-note"><summary>Notes (${info.length})</summary><ul class="details">${info
@@ -3324,18 +3414,22 @@ const renderInteractivePageCard = (summary, { projectLabel } = {}) => {
         .join('')}</ul></details>`
     : '';
 
-  const renderIssueList = (label, entries) =>
-    entries.length
-      ? `<details><summary>${escapeHtml(label)} (${entries.length})</summary><ul class="details">${entries
-          .map((entry) => `<li>${escapeHtml(String(entry.message || entry))}</li>`)
-          .join('')}</ul></details>`
-      : '';
+  const gatingSection =
+    renderEntriesTable(gatingEntries, `Console & resource errors (${formatCount(gatingEntries.length)})`) ||
+    (hasGating ? '' : '<p class="details">No console or resource errors detected.</p>');
 
-  const gatingList = renderIssueList('Gating issues', gating);
-  const consoleSamplesHtml = renderIssueList('Console sample', consoleSample);
-  const resourceSamplesHtml = renderIssueList('Resource sample', resourceSample);
-  const warningsHtml = renderIssueList('Warnings', warnings);
-  const advisoriesHtml = renderIssueList('Advisories', advisories);
+  const warningsSection =
+    renderEntriesTable(warningEntries, `Console warnings (${formatCount(warningEntries.length)})`) ||
+    (hasWarnings ? '' : '<p class="details">No console warnings detected.</p>');
+
+  const advisoriesSection = renderEntriesTable(
+    advisoryEntries,
+    `Console advisories (${formatCount(advisoryEntries.length)})`,
+    { headingClass: 'summary-heading-best-practice' }
+  );
+
+  const consoleSamplesHtml = renderList('Console sample', consoleEntries);
+  const resourceSamplesHtml = renderList('Resource sample', resourceEntries);
 
   return `
     <section class="summary-report summary-a11y summary-a11y--page-card">
@@ -3344,12 +3438,12 @@ const renderInteractivePageCard = (summary, { projectLabel } = {}) => {
         <span class="status-pill ${statusMeta.className}">${escapeHtml(statusMeta.label)}</span>
       </div>
       <div class="page-card__meta">
-        ${metaLines}
+        ${buildSummaryMeta()}
       </div>
       ${notesHtml}
-      ${gatingList}
-      ${warningsHtml}
-      ${advisoriesHtml}
+      ${gatingSection}
+      ${warningsSection}
+      ${advisoriesSection || ''}
       ${consoleSamplesHtml}
       ${resourceSamplesHtml}
     </section>
