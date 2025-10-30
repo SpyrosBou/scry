@@ -1853,6 +1853,20 @@ details.summary-accordion[open] summary {
   color: #065f46;
 }
 
+:is(#view-summary:checked ~ .report-shell .sidebar label[for=view-summary].status-info,
+#view-accessibility-wcag:checked ~ .report-shell .sidebar label[for=view-accessibility-wcag].status-info,
+#view-accessibility-forms:checked ~ .report-shell .sidebar label[for=view-accessibility-forms].status-info,
+#view-accessibility-keyboard:checked ~ .report-shell .sidebar label[for=view-accessibility-keyboard].status-info,
+#view-accessibility-landmarks:checked ~ .report-shell .sidebar label[for=view-accessibility-landmarks].status-info,
+#view-functionality-links:checked ~ .report-shell .sidebar label[for=view-functionality-links].status-info,
+#view-functionality-interactive:checked ~ .report-shell .sidebar label[for=view-functionality-interactive].status-info,
+#view-functionality-infrastructure:checked ~ .report-shell .sidebar label[for=view-functionality-infrastructure].status-info,
+#view-responsive-layout:checked ~ .report-shell .sidebar label[for=view-responsive-layout].status-info,
+#view-visual-regression:checked ~ .report-shell .sidebar label[for=view-visual-regression].status-info) {
+  background: var(--nav-card-info-hover-bg);
+  color: var(--nav-status-info-text);
+}
+
 @media (max-width: 1080px) {
   .report-shell {
     grid-template-columns: 1fr;
