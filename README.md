@@ -38,7 +38,7 @@ node run-tests.js --site example-site --pages 5 --responsive
 - **Multiple sites:** repeat `--site` or append additional site names after the options.
 - **Custom specs:** `node run-tests.js --site <name> --pages <n|all> --test tests/a11y.audit.wcag.spec.js`
 - **Projects:** select Playwright projects with `--browsers=chrome,firefox` or `--browsers=all`.
-- **Discovery:** append `--discover` to refresh sitemap-backed manifests before execution.
+- **Discovery:** append `--discover` to refresh sitemap-backed manifests before execution. Pass a full base URL to `npm run discover -- <url>` to scaffold a new `sites/*.json` interactively when one does not exist yet (use `--yes --base-url=<url> [--name "<Display Name>"]` for non-interactive environments).
 - **Debugging:** use `--debug` for Playwright trace mode or `--output <path>` to persist manifest JSON.
 - **Page cap:** omit `--pages` to use the default of 5, pass a positive integer to override, or use `--pages all` to test every available page.
 
