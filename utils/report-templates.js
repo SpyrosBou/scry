@@ -1040,15 +1040,9 @@ const resolveViewportsTested = (records = []) => {
   return Array.from(viewports);
 };
 
-const renderSummaryStatCards = (run, summaryMap, suiteCards, schemaRecords) => {
+const renderSummaryStatCards = (run, summaryMap, suiteCards, schemaRecords, suitePanels = []) => {
   const pagesTested = resolvePagesTested(summaryMap);
   const projects = Array.isArray(run?.projects) ? run.projects.filter(Boolean) : [];
-  const totalTests =
-    typeof run?.totalTests === 'number' && Number.isFinite(run.totalTests)
-      ? run.totalTests
-      : typeof run?.totalTestsPlanned === 'number' && Number.isFinite(run.totalTestsPlanned)
-        ? run.totalTestsPlanned
-        : null;
   const viewportsTested = resolveViewportsTested(schemaRecords);
   const siteLabel = run?.site?.baseUrl || run?.site?.name || null;
 
@@ -1064,9 +1058,9 @@ const renderSummaryStatCards = (run, summaryMap, suiteCards, schemaRecords) => {
       meta: pagesTested != null ? 'per test' : 'Not captured',
     },
     {
-      label: 'TESTS ON EACH PAGE',
-      count: totalTests != null ? formatNumber(totalTests) : '—',
-      meta: totalTests != null ? 'Listed in sidebar' : 'Not captured',
+      label: 'SPEC PANELS',
+      count: suitePanels.length ? formatNumber(suitePanels.length) : '—',
+      meta: suitePanels.length ? 'Visible in sidebar' : 'None rendered',
     },
     {
       label: 'BROWSERS INCLUDED',
@@ -1102,12 +1096,18 @@ const renderSummaryStatCards = (run, summaryMap, suiteCards, schemaRecords) => {
     : '';
 };
 
-const renderSummaryOverview = (run, schemaRecords) => {
+const renderSummaryOverview = (run, schemaRecords, suitePanels = []) => {
   const summaryMap = collectRunSummariesByType(schemaRecords);
   if (summaryMap.size === 0 && !run) return '';
 
   const suiteCards = buildSuiteCards(summaryMap);
-  const statCards = renderSummaryStatCards(run, summaryMap, suiteCards, schemaRecords);
+  const statCards = renderSummaryStatCards(
+    run,
+    summaryMap,
+    suiteCards,
+    schemaRecords,
+    Array.isArray(suitePanels) ? suitePanels : []
+  );
   const suitesHtml = renderSuiteCardsSection(suiteCards);
 
   return [statCards, suitesHtml].filter(Boolean).join('\n');
@@ -5181,6 +5181,8 @@ const groupTests = (tests) => {
   const groups = [];
   const map = new Map();
   const usedIds = new Set();
+  const skippedTests = [];
+  const unexecutedTests = [];
 
   const ensureUniqueId = (base) => {
     let candidate = base || 'group';
@@ -5193,7 +5195,17 @@ const groupTests = (tests) => {
     return candidate;
   };
 
-  tests.forEach((test) => {
+  (tests || []).forEach((test) => {
+    const status = test?.status || 'unknown';
+    if (status === 'skipped') {
+      skippedTests.push(test);
+      return;
+    }
+    if (status === 'timedOut' || status === 'interrupted') {
+      unexecutedTests.push(test);
+      return;
+    }
+
     const filePath = test.location?.file || 'Unknown file';
     const fileName = filePath.split(/[/\\]/).pop();
     const project = test.projectName || 'Default project';
@@ -5212,6 +5224,20 @@ const groupTests = (tests) => {
     }
     map.get(key).tests.push(test);
   });
+
+  const augmentGroup = (idBase, title, list) => {
+    if (!Array.isArray(list) || list.length === 0) return;
+    groups.push({
+      id: ensureUniqueId(idBase),
+      title,
+      project: title,
+      file: null,
+      tests: list,
+    });
+  };
+
+  augmentGroup('unexecuted-tests', 'Tests that failed to execute', unexecutedTests);
+  augmentGroup('skipped-tests', 'Skipped tests', skippedTests);
 
   return groups;
 };
@@ -5670,7 +5696,7 @@ function renderReportHtml(run) {
     </button>
   `;
 
-  const summaryOverviewHtml = renderSummaryOverview(run, run.schemaSummaries || []);
+  const summaryOverviewHtml = renderSummaryOverview(run, run.schemaSummaries || [], suitePanels);
   const runSummariesHtml = renderRunSummaries(filteredRunSummaries);
 
   const testsHtml = groupedTests
