@@ -17,11 +17,11 @@ const {
 } = require('../utils/a11y-shared');
 
 const KEYBOARD_WCAG_REFERENCES = [
-  { id: '2.1.1', name: 'Keyboard' },
-  { id: '2.1.2', name: 'No Keyboard Trap' },
-  { id: '2.4.1', name: 'Bypass Blocks' },
-  { id: '2.4.3', name: 'Focus Order' },
-  { id: '2.4.7', name: 'Focus Visible' },
+  { id: '2.1.1', name: 'Keyboard', level: 'A' },
+  { id: '2.1.2', name: 'No Keyboard Trap', level: 'A' },
+  { id: '2.4.1', name: 'Bypass Blocks', level: 'A' },
+  { id: '2.4.3', name: 'Focus Order', level: 'A' },
+  { id: '2.4.7', name: 'Focus Visible', level: 'AA' },
 ];
 
 const DEFAULT_MAX_TAB_ITERATIONS = 20;
@@ -241,6 +241,43 @@ const slugify = (value) =>
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '') || 'page';
 
+const findKeyboardReference = (id) =>
+  KEYBOARD_WCAG_REFERENCES.find((reference) => reference.id === id) || null;
+
+const formatKeyboardBadgeLabel = (reference) => {
+  if (!reference || !reference.id) return null;
+  const level = reference.level ? reference.level.toUpperCase() : '';
+  return `WCAG ${reference.id}${level ? ` ${level}` : ''}`.trim();
+};
+
+const createKeyboardAdvisory = (message, wcagId, extras = {}) => {
+  const { tags: extraTags, impact = 'minor', ...rest } = extras;
+  const reference = findKeyboardReference(wcagId) || { id: wcagId };
+  const badge = formatKeyboardBadgeLabel(reference);
+  const tags = Array.isArray(extraTags) ? extraTags.filter(Boolean) : [];
+  if (badge) tags.unshift(badge);
+  if (reference.id && reference.name) {
+    tags.push(`${reference.id} ${reference.name}`);
+  }
+  const uniqueTags = Array.from(new Set(tags));
+  return {
+    message,
+    impact,
+    wcag: badge || null,
+    tags: uniqueTags,
+    ...rest,
+  };
+};
+
+const describeFocusTarget = (snapshot) => {
+  const tag = snapshot?.tag || 'element';
+  const idPart = snapshot?.id ? `#${snapshot.id}` : '';
+  const descriptor = `${tag}${idPart}`.trim() || tag;
+  const label = (snapshot?.label || '').trim() || 'unnamed element';
+  const sample = label ? `${descriptor} — ${label}` : descriptor;
+  return { descriptor, label, sample };
+};
+
 test.describe('Accessibility: Keyboard navigation', () => {
   let siteConfig;
   let errorContext;
@@ -310,7 +347,11 @@ test.describe('Accessibility: Keyboard navigation', () => {
 
         report.skipLink = await page.evaluate(skipLinkMetadataScript);
         if (!report.skipLink) {
-          report.advisories.push('Skip navigation link not detected near top of document.');
+          report.advisories.push(
+            createKeyboardAdvisory('Skip navigation link not detected near top of document.', '2.4.1', {
+              summary: 'Skip navigation link not detected near top of document.',
+            })
+          );
         }
 
         await page.evaluate(() => {
@@ -351,8 +392,16 @@ test.describe('Accessibility: Keyboard navigation', () => {
             );
           }
           if (!hasIndicator) {
+            const focusTarget = describeFocusTarget(snapshot);
             report.advisories.push(
-              `Unable to detect focus indicator change for ${snapshot.tag} ${snapshot.id ? `#${snapshot.id}` : ''} (${snapshot.label || 'unnamed element'}).`
+              createKeyboardAdvisory(
+                `Unable to detect focus indicator change for ${focusTarget.descriptor} (${focusTarget.label}).`,
+                '2.4.7',
+                {
+                  summary: 'Unable to detect focus indicator change',
+                  sample: focusTarget.sample,
+                }
+              )
             );
           }
 

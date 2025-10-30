@@ -196,7 +196,9 @@ const renderUnifiedIssuesTable = (issues, { title, emptyMessage, variant, viewpo
           ? issue.wcagHtml
           : issue.wcagBadge
             ? `<span class="badge badge-wcag">${escapeHtml(issue.wcagBadge)}</span>`
-            : '—';
+            : Array.isArray(issue.wcagTags) && issue.wcagTags.length > 0
+              ? renderWcagTagBadges(issue.wcagTags)
+              : '—';
 
       return `
         <tr class="impact-${escapeHtml(impact)}">
@@ -238,6 +240,7 @@ const collectIssueMessages = (pages, fields, defaultImpact, options = {}) => {
         let impact = defaultImpact;
         let help = null;
         let wcagBadge = null;
+        let wcagTags = null;
 
         if (rawItem && typeof rawItem === 'object') {
           const candidate =
@@ -250,7 +253,24 @@ const collectIssueMessages = (pages, fields, defaultImpact, options = {}) => {
           message = String(candidate || '').trim();
           if (rawItem.impact) impact = rawItem.impact;
           if (rawItem.helpUrl) help = rawItem.helpUrl;
-          if (rawItem.wcag) wcagBadge = rawItem.wcag;
+          if (rawItem.wcag) {
+            if (typeof rawItem.wcag === 'string') {
+              wcagBadge = rawItem.wcag;
+            } else if (typeof rawItem.wcag === 'object') {
+              const badgeCandidate =
+                rawItem.wcag.badge || rawItem.wcag.label || rawItem.wcag.text || null;
+              if (badgeCandidate) wcagBadge = String(badgeCandidate);
+              if (Array.isArray(rawItem.wcag.tags)) {
+                wcagTags = rawItem.wcag.tags.filter(Boolean);
+              }
+            }
+          }
+          if (!wcagTags) {
+            const candidateTags = rawItem.tags || rawItem.wcagTags;
+            if (Array.isArray(candidateTags)) {
+              wcagTags = candidateTags.filter(Boolean);
+            }
+          }
         } else {
           message = String(rawItem || '').trim();
         }
@@ -280,7 +300,8 @@ const collectIssueMessages = (pages, fields, defaultImpact, options = {}) => {
             message: displayMessage,
             impact,
             helpUrl: help,
-            wcagBadge,
+            wcagBadge: wcagBadge || null,
+            wcagTags: new Set(Array.isArray(wcagTags) ? wcagTags : []),
             pages: new Set(),
             instanceCount: 0,
             samples: new Set(),
@@ -290,6 +311,30 @@ const collectIssueMessages = (pages, fields, defaultImpact, options = {}) => {
         const entry = map.get(key);
         entry.pages.add(pageId);
         entry.instanceCount += 1;
+        if (rawItem && typeof rawItem === 'object' && Array.isArray(rawItem.samples)) {
+          for (const rawSample of rawItem.samples) {
+            if (rawSample != null) {
+              const sampleValue = String(rawSample).trim();
+              if (sampleValue) {
+                entry.samples.add(sampleValue);
+              }
+            }
+          }
+        }
+        if (rawItem && typeof rawItem === 'object' && rawItem.sample != null) {
+          const sampleValue = String(rawItem.sample).trim();
+          if (sampleValue) {
+            entry.samples.add(sampleValue);
+          }
+        }
+        if (wcagBadge && !entry.wcagBadge) {
+          entry.wcagBadge = wcagBadge;
+        }
+        if (Array.isArray(wcagTags)) {
+          for (const tag of wcagTags) {
+            if (tag) entry.wcagTags.add(tag);
+          }
+        }
         if (sampleTarget) {
           entry.samples.add(sampleTarget);
         }
@@ -304,6 +349,7 @@ const collectIssueMessages = (pages, fields, defaultImpact, options = {}) => {
       impact: entry.impact,
       helpUrl: entry.helpUrl,
       wcagBadge: entry.wcagBadge,
+      wcagTags: Array.from(entry.wcagTags || []),
       pages,
       pageCount: pages.length,
       instanceCount: entry.instanceCount,
@@ -312,7 +358,10 @@ const collectIssueMessages = (pages, fields, defaultImpact, options = {}) => {
   });
 };
 
-const stripAnsiSequences = (value) => String(value ?? '').replace(/\u001b\[[0-9;]*m/g, '');
+/* eslint-disable-next-line no-control-regex */
+const ANSI_ESCAPE_REGEX = /\u001B\[[0-9;]*m/g;
+
+const stripAnsiSequences = (value) => String(value ?? '').replace(ANSI_ESCAPE_REGEX, '');
 
 const simplifyUrlForDisplay = (value) => {
   if (!value) return '';
@@ -3415,12 +3464,16 @@ const renderInteractivePageCard = (summary, { projectLabel } = {}) => {
     : '';
 
   const gatingSection =
-    renderEntriesTable(gatingEntries, `Console & resource errors (${formatCount(gatingEntries.length)})`) ||
-    (hasGating ? '' : '<p class="details">No console or resource errors detected.</p>');
+    renderEntriesTable(
+      gatingEntries,
+      `Console & resource errors (${formatCount(gatingEntries.length)})`
+    ) || (hasGating ? '' : '<p class="details">No console or resource errors detected.</p>');
 
   const warningsSection =
-    renderEntriesTable(warningEntries, `Console warnings (${formatCount(warningEntries.length)})`) ||
-    (hasWarnings ? '' : '<p class="details">No console warnings detected.</p>');
+    renderEntriesTable(
+      warningEntries,
+      `Console warnings (${formatCount(warningEntries.length)})`
+    ) || (hasWarnings ? '' : '<p class="details">No console warnings detected.</p>');
 
   const advisoriesSection = renderEntriesTable(
     advisoryEntries,
@@ -3450,19 +3503,177 @@ const renderInteractivePageCard = (summary, { projectLabel } = {}) => {
   `;
 };
 
-const makeKeyboardIssueEntry = (message, impact) => ({
-  impact: impact || 'info',
-  id: message,
-  rule: message,
-  nodes: [],
-  tags: [],
-});
+const makeKeyboardIssueEntry = (issue, impact) => {
+  if (issue && typeof issue === 'object') {
+    const rawMessage = issue.message || issue.rule || issue.id || '';
+    const message = String(rawMessage).trim() || 'Issue';
+    const identifier = String(issue.summary || issue.id || message).trim() || message;
+    const tags = Array.isArray(issue.tags) ? issue.tags.filter(Boolean) : [];
+    if (!tags.length && issue.wcag) {
+      tags.push(issue.wcag);
+    }
+
+    const nodes = Array.isArray(issue.nodes) ? [...issue.nodes] : [];
+    const sampleTargets = new Set();
+    const addSample = (value) => {
+      if (value == null) return;
+      const label = String(value).trim();
+      if (!label) return;
+      sampleTargets.add(label);
+    };
+    if (Array.isArray(issue.samples)) {
+      issue.samples.forEach(addSample);
+    }
+    if (issue.sample) {
+      addSample(issue.sample);
+    }
+    sampleTargets.forEach((label) => {
+      nodes.push({ target: [label] });
+    });
+
+    return {
+      impact: issue.impact || impact || 'info',
+      id: identifier,
+      rule: message,
+      nodes,
+      tags,
+      helpUrl: issue.helpUrl || issue.help || null,
+    };
+  }
+
+  const text = String(issue || '').trim() || 'Issue';
+  return {
+    impact: impact || 'info',
+    id: text,
+    rule: text,
+    nodes: [],
+    tags: [],
+  };
+};
 
 const renderKeyboardPageIssuesTable = (entries, heading, options = {}) => {
   if (!Array.isArray(entries) || entries.length === 0) {
     return options.emptyHtml || '';
   }
   return renderWcagPageIssueTable(entries, heading, options);
+};
+
+const normaliseStructureIssueItem = (issue, defaultImpact) => {
+  if (!issue) return null;
+
+  if (typeof issue === 'string') {
+    const message = issue.trim();
+    if (!message) return null;
+    return {
+      impact: defaultImpact || 'info',
+      summary: message,
+      message,
+      tags: [],
+      helpUrl: null,
+      samples: [],
+      nodes: [],
+    };
+  }
+
+  if (typeof issue !== 'object') return null;
+
+  const message = String(issue.message || issue.rule || issue.id || '').trim();
+  const summary = String(issue.summary || message || '').trim();
+  const impact = issue.impact || defaultImpact || 'info';
+
+  const tagsSource = Array.isArray(issue.tags) ? issue.tags.filter(Boolean) : [];
+  const tagSet = new Set(tagsSource);
+  if (issue.wcag) {
+    tagSet.add(issue.wcag);
+  }
+
+  const helpUrl = issue.helpUrl || issue.help || null;
+
+  const samples = [];
+  if (Array.isArray(issue.samples)) {
+    issue.samples.forEach((sample) => {
+      const label = String(sample || '').trim();
+      if (label) samples.push(label);
+    });
+  }
+  if (issue.sample != null) {
+    const label = String(issue.sample || '').trim();
+    if (label) samples.push(label);
+  }
+
+  const nodes = Array.isArray(issue.nodes) ? issue.nodes.filter(Boolean) : [];
+
+  if (!message && !summary) return null;
+
+  return {
+    impact,
+    summary: summary || message || 'Issue',
+    message: message || summary || 'Issue',
+    tags: Array.from(tagSet),
+    helpUrl,
+    samples,
+    nodes,
+  };
+};
+
+const aggregateStructureIssues = (issues, defaultImpact) => {
+  if (!Array.isArray(issues) || issues.length === 0) return [];
+
+  const map = new Map();
+
+  for (const rawIssue of issues) {
+    const normalized = normaliseStructureIssueItem(rawIssue, defaultImpact);
+    if (!normalized) continue;
+
+    const key = JSON.stringify([
+      normalized.summary,
+      normalized.tags.join('|'),
+      normalized.helpUrl || '',
+    ]);
+
+    if (!map.has(key)) {
+      map.set(key, {
+        impact: normalized.impact,
+        summary: normalized.summary,
+        message: normalized.message,
+        tags: normalized.tags,
+        helpUrl: normalized.helpUrl,
+        samples: new Set(),
+        nodes: [],
+      });
+    }
+
+    const bucket = map.get(key);
+    bucket.impact = normalized.impact || bucket.impact;
+    bucket.message = normalized.message || bucket.message;
+    if (normalized.tags.length > 0) {
+      bucket.tags = normalized.tags;
+    }
+    if (normalized.helpUrl) {
+      bucket.helpUrl = normalized.helpUrl;
+    }
+    normalized.samples.forEach((sample) => {
+      if (sample) bucket.samples.add(sample);
+    });
+    normalized.nodes.forEach((node) => {
+      if (node) bucket.nodes.push(node);
+    });
+  }
+
+  return Array.from(map.values()).map((entry) => {
+    const nodes = [...entry.nodes];
+    entry.samples.forEach((sample) => {
+      nodes.push({ target: [sample] });
+    });
+    return {
+      impact: entry.impact || defaultImpact || 'info',
+      id: entry.summary || entry.message,
+      rule: entry.message || entry.summary || 'Issue',
+      tags: entry.tags,
+      helpUrl: entry.helpUrl || null,
+      nodes,
+    };
+  });
 };
 
 const renderKeyboardPageCard = (summary, { projectLabel } = {}) => {
@@ -3646,20 +3857,50 @@ const renderKeyboardGroupHtml = (group) => {
       const viewportsCount = viewportList.length || 1;
       const failThreshold = details.failThreshold || overview.failThreshold || metadata.failOn;
 
-      const normalizeKeyboardAdvisory = ({ message }) => {
-        if (!message) return null;
-        if (/^Unable to detect focus indicator change for/i.test(message)) {
-          const sample = message
-            .replace(/^Unable to detect focus indicator change for\s*/i, '')
-            .replace(/\.$/, '')
-            .replace(/^\((.+)\)$/, '$1');
+      const normalizeKeyboardAdvisory = ({ message, raw }) => {
+        const source =
+          (raw &&
+            typeof raw === 'object' &&
+            typeof raw.message === 'string' &&
+            raw.message.trim()) ||
+          (typeof message === 'string' ? message.trim() : '');
+        if (!source) return null;
+
+        if (/^unable to detect focus indicator change/i.test(source)) {
+          const summary =
+            (raw &&
+              typeof raw === 'object' &&
+              typeof raw.summary === 'string' &&
+              raw.summary.trim()) ||
+            'Unable to detect focus indicator change';
+          const sampleCandidate =
+            (raw && typeof raw === 'object' && raw.sample) ||
+            source
+              .replace(/^Unable to detect focus indicator change for\s*/i, '')
+              .replace(/\.$/, '');
+          const sample =
+            typeof sampleCandidate === 'string' ? sampleCandidate.trim() : sampleCandidate;
           return {
-            key: 'Unable to detect focus indicator change',
-            label: 'Unable to detect focus indicator change',
+            key: summary,
+            label: summary,
             sample,
           };
         }
-        return { key: message, label: message };
+
+        if (/^skip navigation link not detected/i.test(source)) {
+          const summary =
+            (raw &&
+              typeof raw === 'object' &&
+              typeof raw.summary === 'string' &&
+              raw.summary.trim()) ||
+            'Skip navigation link not detected near top of document.';
+          return {
+            key: summary,
+            label: summary,
+          };
+        }
+
+        return { key: source, label: source };
       };
 
       const runSummaryHtml = renderKeyboardRunSummary(overview, pagesData, wcagRefs, {
@@ -4199,36 +4440,9 @@ const renderStructurePageCard = (summary) => {
         ? { className: 'status-info', label: 'Advisories present' }
         : { className: 'status-ok', label: 'Pass' };
 
-  const aggregateMessages = (messages, impact) => {
-    const map = new Map();
-    messages.forEach((rawMessage) => {
-      if (!rawMessage) return;
-      const message = String(rawMessage).replace(/\s+/g, ' ').trim();
-      if (!message) return;
-      if (!map.has(message)) {
-        map.set(message, { impact, id: message, nodesCount: 0 });
-      }
-      map.get(message).nodesCount += 1;
-    });
-    return Array.from(map.values());
-  };
-
-  const gatingEntries = aggregateMessages(gating, 'critical');
-  const warningEntries = aggregateMessages([...warnings, ...headingSkips], 'moderate');
-  const advisoryEntries = aggregateMessages(advisories, 'minor');
-
-  const renderEntriesTable = (entries, heading, headingClass) =>
-    entries.length
-      ? renderWcagPageIssueTable(
-          entries.map((entry) => ({
-            impact: entry.impact,
-            id: entry.id,
-            nodesCount: entry.nodesCount,
-          })),
-          heading,
-          headingClass ? { headingClass } : {}
-        )
-      : '';
+  const gatingEntries = aggregateStructureIssues(gating, 'critical');
+  const warningEntries = aggregateStructureIssues([...warnings, ...headingSkips], 'moderate');
+  const advisoryEntries = aggregateStructureIssues(advisories, 'minor');
 
   const metaLines = [
     `<p class="details"><strong>H1 count:</strong> ${escapeHtml(
@@ -4260,24 +4474,26 @@ const renderStructurePageCard = (summary) => {
     : '';
 
   const gatingSection = gatingEntries.length
-    ? renderEntriesTable(
+    ? renderWcagPageIssueTable(
         gatingEntries,
         `Gating structural issues (${formatCount(gatingEntries.length)})`
       )
     : '<p class="details">No gating issues detected.</p>';
 
   const warningsSection = warningEntries.length
-    ? renderEntriesTable(
+    ? renderWcagPageIssueTable(
         warningEntries,
         `Structural warnings (${formatCount(warningEntries.length)})`
       )
     : '<p class="details">No structural warnings detected.</p>';
 
-  const advisoriesSection = renderEntriesTable(
-    advisoryEntries,
-    `Structural advisories (${formatCount(advisoryEntries.length)})`,
-    'summary-heading-best-practice'
-  );
+  const advisoriesSection = advisoryEntries.length
+    ? renderWcagPageIssueTable(
+        advisoryEntries,
+        `Structural advisories (${formatCount(advisoryEntries.length)})`,
+        { headingClass: 'summary-heading-best-practice' }
+      )
+    : '<p class="details">No structural advisories detected.</p>';
 
   return `
     <section class="summary-report summary-a11y summary-a11y--page-card">
@@ -4290,7 +4506,7 @@ const renderStructurePageCard = (summary) => {
       </div>
       ${gatingSection}
       ${warningsSection}
-      ${advisoriesSection || '<p class="details">No structural advisories detected.</p>'}
+      ${advisoriesSection}
       ${headingOutlineHtml}
     </section>
   `;
@@ -4539,38 +4755,70 @@ const renderStructureGroupHtml = (group) => {
         );
       }
 
-      const normalizeStructureAdvisory = ({ message }) => {
-        if (!message) return null;
-        if (/^Missing main landmark/i.test(message)) {
-          return { key: 'Missing main landmark', label: 'Missing main landmark' };
+      const pickStructureSample = (raw) => {
+        if (!raw || typeof raw !== 'object') return null;
+        if (raw.sample != null) {
+          const label = String(raw.sample).trim();
+          if (label) return label;
         }
-        if (/^No H1 heading found/i.test(message)) {
-          return { key: 'Missing H1 heading', label: 'Missing H1 heading' };
+        if (Array.isArray(raw.samples)) {
+          for (const value of raw.samples) {
+            const label = String(value || '').trim();
+            if (label) return label;
+          }
         }
-        if (/heading level/i.test(message)) {
-          return { key: 'Heading level sequence issue', label: 'Heading level sequence issue' };
-        }
-        return { key: message, label: message };
+        return null;
       };
 
-      const normalizeStructureWarning = ({ message }) => {
-        if (!message) return null;
-        if (/^Landmark missing:/i.test(message)) {
-          const label = message.replace(/^Landmark missing:\s*/i, '').trim();
-          return { key: `Landmark missing: ${label}`, label: `Landmark missing: ${label}` };
+      const normalizeStructureAdvisory = ({ message, raw }) => {
+        const summary =
+          (raw &&
+            typeof raw === 'object' &&
+            typeof raw.summary === 'string' &&
+            raw.summary.trim()) ||
+          (typeof message === 'string' ? message.trim() : '');
+        const sample = pickStructureSample(raw);
+        if (summary) {
+          return { key: summary, label: summary, sample };
         }
-        return { key: message, label: message };
+        const trimmedMessage = typeof message === 'string' ? message.trim() : '';
+        const fallback = trimmedMessage || 'Structural advisory';
+        return { key: fallback, label: fallback, sample };
       };
 
-      const normalizeStructureGating = ({ message }) => {
-        if (!message) return null;
-        if (/^No H1 heading found/i.test(message)) {
-          return { key: 'Missing H1 heading', label: 'Missing H1 heading' };
+      const normalizeStructureWarning = ({ message, raw }) => {
+        const summary =
+          (raw &&
+            typeof raw === 'object' &&
+            typeof raw.summary === 'string' &&
+            raw.summary.trim()) ||
+          (typeof message === 'string' ? message.trim() : '');
+        const sample = pickStructureSample(raw);
+        if (summary) {
+          return { key: summary, label: summary, sample };
         }
-        if (/^Main landmark missing/i.test(message)) {
-          return { key: 'Missing main landmark', label: 'Missing main landmark' };
+        const trimmedMessage = typeof message === 'string' ? message.trim() : '';
+        return {
+          key: trimmedMessage || 'Structural warning',
+          label: trimmedMessage || 'Structural warning',
+          sample,
+        };
+      };
+
+      const normalizeStructureGating = ({ message, raw }) => {
+        const summary =
+          (raw &&
+            typeof raw === 'object' &&
+            typeof raw.summary === 'string' &&
+            raw.summary.trim()) ||
+          (typeof message === 'string' ? message.trim() : '');
+        const sample = pickStructureSample(raw);
+        if (summary) {
+          return { key: summary, label: summary, sample };
         }
-        return { key: message, label: message };
+        const trimmedMessage = typeof message === 'string' ? message.trim() : '';
+        const fallback = trimmedMessage || 'Structural gating issue';
+        return { key: fallback, label: fallback, sample };
       };
 
       const gatingIssues = collectIssueMessages(pagesData, ['gatingIssues', 'gating'], 'critical', {
