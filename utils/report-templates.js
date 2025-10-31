@@ -2202,10 +2202,8 @@ const renderInternalLinksGroupHtml = (group) => {
     return [runSummaryHtml, issueSections, perPageHtml].filter(Boolean).join('\n');
   });
 
-  const headline = escapeHtml(group.title || 'Internal link audit summary');
   return `
     <article class="schema-group">
-      <header><h2>${headline}</h2></header>
       ${sections.join('\n')}
     </article>
   `;
@@ -2344,10 +2342,8 @@ const renderInteractiveGroupHtml = (group) => {
     return [runSummaryHtml, issueSections, perPageHtml].filter(Boolean).join('\n');
   });
 
-  const headline = escapeHtml(group.title || 'Interactive smoke summary');
   return `
     <article class="schema-group">
-      <header><h2>${headline}</h2></header>
       ${sections.join('\n')}
     </article>
   `;
@@ -2476,10 +2472,8 @@ const renderAvailabilityGroupHtml = (group) => {
     return [runSummaryHtml, issueSections, perPageHtml].filter(Boolean).join('\n');
   });
 
-  const headline = escapeHtml(group.title || 'Availability & uptime summary');
   return `
     <article class="schema-group">
-      <header><h2>${headline}</h2></header>
       ${sections.join('\n')}
     </article>
   `;
@@ -2647,10 +2641,8 @@ const renderHttpGroupHtml = (group) => {
     return [runSummaryHtml, issueSections, perPageHtml].filter(Boolean).join('\n');
   });
 
-  const headline = escapeHtml(group.title || 'HTTP response validation summary');
   return `
     <article class="schema-group">
-      <header><h2>${headline}</h2></header>
       ${sections.join('\n')}
     </article>
   `;
@@ -2796,10 +2788,8 @@ const renderPerformanceGroupHtml = (group) => {
     return [runSummaryHtml, issueSections, perPageHtml].filter(Boolean).join('\n');
   });
 
-  const headline = escapeHtml(group.title || 'Performance monitoring summary');
   return `
     <article class="schema-group">
-      <header><h2>${headline}</h2></header>
       ${sections.join('\n')}
     </article>
   `;
@@ -2978,10 +2968,8 @@ const renderVisualGroupHtml = (group) => {
 
   if (sections.length === 0) return '';
 
-  const headline = escapeHtml(group.title || 'Visual regression summary');
   return `
     <article class="schema-group">
-      <header><h2>${headline}</h2></header>
       ${sections.join('\n')}
     </article>
   `;
@@ -5231,10 +5219,8 @@ const renderKeyboardGroupHtml = (group) => {
 
   if (!sections.trim()) return '';
 
-  const headline = escapeHtml(group.title || 'Keyboard navigation summary');
   return `
     <section class="schema-group">
-      <header><h2>${headline}</h2></header>
       ${sections}
     </section>
   `;
@@ -5496,10 +5482,8 @@ const renderReducedMotionGroupHtml = (group) => {
     })
     .filter(Boolean);
 
-  const headline = escapeHtml(group.title || 'Reduced motion preference summary');
   return `
     <article class="schema-group">
-      <header><h2>${headline}</h2></header>
       ${sections.join('\n')}
     </article>
   `;
@@ -5729,10 +5713,8 @@ const renderReflowGroupHtml = (group) => {
     return [runSummaryHtml, issueSections, perPageHtml].filter(Boolean).join('\n');
   });
 
-  const headline = escapeHtml(group.title || '320px reflow summary');
   return `
     <article class="schema-group">
-      <header><h2>${headline}</h2></header>
       ${sections.join('\n')}
     </article>
   `;
@@ -5958,10 +5940,8 @@ const renderIframeGroupHtml = (group) => {
     })
     .filter(Boolean);
 
-  const headline = escapeHtml(group.title || 'Iframe accessibility summary');
   return `
     <article class="schema-group">
-      <header><h2>${headline}</h2></header>
       ${sections.join('\n')}
     </article>
   `;
@@ -6249,10 +6229,8 @@ const renderResponsiveStructureGroupHtml = (group) => {
 
   if (sections.length === 0) return '';
 
-  const headline = escapeHtml(group.title || 'Responsive structure summary');
   return `
     <article class="schema-group">
-      <header><h2>${headline}</h2></header>
       ${sections.join('\n')}
     </article>
   `;
@@ -6525,10 +6503,8 @@ const renderResponsiveWpGroupHtml = (group) => {
 
   if (sections.length === 0) return '';
 
-  const headline = escapeHtml(group.title || 'WordPress responsive features summary');
   return `
     <article class="schema-group">
-      <header><h2>${headline}</h2></header>
       ${sections.join('\n')}
     </article>
   `;
@@ -6910,10 +6886,8 @@ const renderStructureGroupHtml = (group) => {
       .join('\n');
   });
 
-  const headline = escapeHtml(group.title || 'Landmark & heading structure summary');
   return `
     <article class="schema-group">
-      <header><h2>${headline}</h2></header>
       ${sections.join('\n')}
     </article>
   `;
@@ -7060,10 +7034,8 @@ const renderFormsGroupHtml = (group) => {
     return [runSummaryHtml, issueSections, accordionHtml].filter(Boolean).join('\n');
   });
 
-  const headline = escapeHtml(group.title || 'Forms accessibility summary');
   return `
     <article class="schema-group">
-      <header><h2>${headline}</h2></header>
       ${sections.join('\n')}
     </article>
   `;
