@@ -3,6 +3,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const minimist = require('minimist');
+
 let openModule;
 async function openInBrowser(url) {
   if (!openModule) {
@@ -27,17 +28,6 @@ const args = minimist(process.argv.slice(2), {
 const PORT = Number(args.port) || 4173;
 const REPORTS_DIR = path.join(process.cwd(), 'reports');
 const LATEST_RUN_FILE = path.join(REPORTS_DIR, 'latest-run.json');
-const WATCH_TARGETS = [
-  path.join(__dirname, '..', 'utils', 'report-templates.js'),
-  path.join(__dirname, '..', 'docs', 'mocks', 'report-styles.scss'),
-  LATEST_RUN_FILE,
-];
-
-const clients = new Set();
-let reloadTimer = null;
-let keepAliveTimer = null;
-let currentRunInfo = null;
-let runWatchers = [];
 
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -60,6 +50,9 @@ const MIME_TYPES = {
   '.otf': 'font/otf',
 };
 
+const fixedRunInfo = resolveFixedRun(args.run);
+let announcedRunId = fixedRunInfo ? fixedRunInfo.id : null;
+
 function safeJsonParse(filePath) {
   try {
     const raw = fs.readFileSync(filePath, 'utf8');
@@ -69,58 +62,57 @@ function safeJsonParse(filePath) {
   }
 }
 
-function resolveLatestRun() {
-  if (args.run) {
-    return buildRunInfo(args.run);
-  }
+function buildRunInfo(runId) {
+  if (!runId) return null;
+  const normalized = String(runId).trim();
+  if (!normalized) return null;
 
+  const runDir = path.join(REPORTS_DIR, normalized);
+  const dataPath = path.join(runDir, 'data', 'run.json');
+  if (!fs.existsSync(runDir) || !fs.existsSync(dataPath)) return null;
+  return {
+    id: normalized,
+    dir: runDir,
+    dataPath,
+  };
+}
+
+function resolveFixedRun(runArgument) {
+  if (!runArgument) return null;
+  const info = buildRunInfo(runArgument);
+  if (!info) {
+    console.error(`[report-dev] Unable to find run "${runArgument}".`);
+    process.exit(1);
+  }
+  return info;
+}
+
+function discoverLatestRun() {
   const latestRecord = safeJsonParse(LATEST_RUN_FILE);
   if (latestRecord && latestRecord.runFolder) {
     const info = buildRunInfo(latestRecord.runFolder);
     if (info) return info;
   }
 
-  // Fallback: pick the newest run-* directory lexicographically
-  const candidates =
-    fs
+  try {
+    const entries = fs
       .readdirSync(REPORTS_DIR, { withFileTypes: true })
       .filter((entry) => entry.isDirectory() && /^run-\d{8}-\d{6}$/.test(entry.name))
       .map((entry) => entry.name)
-      .sort() || [];
+      .sort();
 
-  if (candidates.length === 0) {
+    if (entries.length === 0) {
+      return null;
+    }
+
+    return buildRunInfo(entries[entries.length - 1]);
+  } catch (_error) {
     return null;
   }
-
-  return buildRunInfo(candidates[candidates.length - 1]);
 }
 
-function buildRunInfo(runId) {
-  const runDir = path.join(REPORTS_DIR, runId);
-  const dataPath = path.join(runDir, 'data', 'run.json');
-  if (!fs.existsSync(runDir) || !fs.existsSync(dataPath)) return null;
-  return {
-    id: runId,
-    dir: runDir,
-    dataPath,
-  };
-}
-
-function injectLiveReload(html) {
-  const snippet = `
-<script>
-(function () {
-  const source = new EventSource('/__livereload');
-  source.addEventListener('reload', function () {
-    console.debug('[report-dev] reload event received');
-    window.location.reload();
-  });
-})();
-</script>`;
-  if (html.includes('</body>')) {
-    return html.replace('</body>', `${snippet}\n</body>`);
-  }
-  return `${html}\n${snippet}`;
+function resolveRunInfo() {
+  return fixedRunInfo || discoverLatestRun();
 }
 
 function renderReportHtmlFromData(runInfo) {
@@ -131,159 +123,110 @@ function renderReportHtmlFromData(runInfo) {
   if (!runData) {
     throw new Error(`Unable to load run data from ${runInfo.dataPath}`);
   }
-  const html = renderReportHtml(runData);
-  return injectLiveReload(html);
+  return renderReportHtml(runData);
 }
 
-function serveStaticFile(res, filePath) {
-  const ext = path.extname(filePath).toLowerCase();
-  const type = MIME_TYPES[ext] || 'application/octet-stream';
-  fs.readFile(filePath, (err, buffer) => {
-    if (err) {
-      res.writeHead(err.code === 'ENOENT' ? 404 : 500, { 'Content-Type': 'text/plain' });
-      res.end(err.code === 'ENOENT' ? 'Not Found' : 'Server Error');
+function respondWithError(res, status, message) {
+  res.writeHead(status, { 'Content-Type': 'text/plain; charset=utf-8' });
+  res.end(message);
+}
+
+function serveStaticAsset(res, runInfo, urlPath) {
+  const sanitized = urlPath.replace(/^\/+/, '');
+  if (!sanitized) {
+    respondWithError(res, 404, 'Not Found');
+    return;
+  }
+
+  const filePath = path.normalize(path.join(runInfo.dir, sanitized));
+  if (!filePath.startsWith(runInfo.dir)) {
+    respondWithError(res, 403, 'Forbidden');
+    return;
+  }
+
+  fs.stat(filePath, (statError, stats) => {
+    if (statError || !stats.isFile()) {
+      respondWithError(res, 404, 'Not Found');
       return;
     }
-    res.writeHead(200, { 'Content-Type': type });
-    res.end(buffer);
-  });
-}
 
-function broadcastReload(reason = 'file change') {
-  if (reloadTimer) return;
-  reloadTimer = setTimeout(() => {
-    reloadTimer = null;
-    console.log(`[report-dev] Reload triggered (${reason}).`);
-    const payload = JSON.stringify({ reason, ts: Date.now() });
-    for (const res of clients) {
-      try {
-        res.write(`event: reload\ndata: ${payload}\n\n`);
-      } catch (_error) {
-        // Connection might already be closed.
+    const ext = path.extname(filePath).toLowerCase();
+    const type = MIME_TYPES[ext] || 'application/octet-stream';
+    fs.readFile(filePath, (readError, buffer) => {
+      if (readError) {
+        respondWithError(res, readError.code === 'ENOENT' ? 404 : 500, 'Server Error');
+        return;
       }
-    }
-  }, 60);
-}
-
-function startKeepAlive() {
-  if (keepAliveTimer) return;
-  keepAliveTimer = setInterval(() => {
-    for (const res of clients) {
-      try {
-        res.write('event: heartbeat\ndata: ping\n\n');
-      } catch (_error) {
-        // ignore
-      }
-    }
-  }, 15000);
-}
-
-function clearRunWatchers() {
-  runWatchers.forEach((watcher) => watcher.close());
-  runWatchers = [];
-}
-
-function watchRunFiles(runInfo) {
-  clearRunWatchers();
-  if (!runInfo) return;
-  const targets = [runInfo.dataPath, path.join(runInfo.dir, 'report.html')];
-
-  targets.forEach((target) => {
-    try {
-      const watcher = fs.watch(target, { persistent: true }, () => {
-        broadcastReload(path.basename(target));
-      });
-      runWatchers.push(watcher);
-    } catch (_error) {
-      console.warn(`[report-dev] Unable to watch ${target}: ${_error.message}`);
-    }
-  });
-}
-
-function configureWatchers() {
-  WATCH_TARGETS.forEach((target) => {
-    try {
-      fs.watch(target, { persistent: true }, () => {
-        // If latest-run.json changed, refresh run info.
-        if (target === LATEST_RUN_FILE) {
-          const latest = resolveLatestRun();
-          if (latest && (!currentRunInfo || latest.id !== currentRunInfo.id)) {
-            currentRunInfo = latest;
-            watchRunFiles(currentRunInfo);
-          }
-        }
-        broadcastReload(path.basename(target));
-      });
-    } catch (_error) {
-      console.warn(`[report-dev] Unable to watch ${target}: ${_error.message}`);
-    }
+      res.writeHead(200, { 'Content-Type': type });
+      res.end(buffer);
+    });
   });
 }
 
 const server = http.createServer((req, res) => {
-  if (!currentRunInfo) {
-    currentRunInfo = resolveLatestRun();
-    if (currentRunInfo) {
-      watchRunFiles(currentRunInfo);
-    }
+  const runInfo = resolveRunInfo();
+  if (!runInfo) {
+    respondWithError(
+      res,
+      500,
+      'No reports found under ./reports/. Run a test to generate a report first.'
+    );
+    return;
   }
 
-  if (!currentRunInfo) {
-    res.writeHead(500, { 'Content-Type': 'text/plain' });
-    res.end('No reports found under ./reports/. Run a test to generate a report first.');
-    return;
+  if (!fixedRunInfo && runInfo.id !== announcedRunId) {
+    announcedRunId = runInfo.id;
+    console.log(`[report-dev] Now serving run: ${runInfo.id}`);
   }
 
   const url = new URL(req.url, `http://${req.headers.host}`);
-  if (url.pathname === '/__livereload') {
-    res.writeHead(200, {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      Connection: 'keep-alive',
-      'X-Accel-Buffering': 'no',
-    });
-    res.write('\n');
-    clients.add(res);
-    req.on('close', () => {
-      clients.delete(res);
-    });
-    startKeepAlive();
-    return;
-  }
-
-  if (url.pathname === '/' || url.pathname === '/index.html') {
+  if (url.pathname === '/' || url.pathname === '/index.html' || url.pathname === '/report.html') {
     try {
-      const html = renderReportHtmlFromData(currentRunInfo);
+      const html = renderReportHtmlFromData(runInfo);
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       res.end(html);
-    } catch (_error) {
-      res.writeHead(500, { 'Content-Type': 'text/plain' });
-      res.end(`Failed to render report: ${_error.message}`);
+    } catch (error) {
+      respondWithError(res, 500, `Failed to render report: ${error.message}`);
     }
     return;
   }
 
-  // Serve static assets relative to the current run directory
-  const assetPath = path.normalize(path.join(currentRunInfo.dir, url.pathname.replace(/^\/+/, '')));
+  serveStaticAsset(res, runInfo, url.pathname);
+});
 
-  if (!assetPath.startsWith(currentRunInfo.dir)) {
-    res.writeHead(403, { 'Content-Type': 'text/plain' });
-    res.end('Forbidden');
-    return;
-  }
+let shuttingDown = false;
+function shutdown(code = 0) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log('\n[report-dev] Shutting down preview server...');
+  server.close(() => {
+    process.exit(code);
+  });
 
-  serveStaticFile(res, assetPath);
+  const forcedExit = setTimeout(() => {
+    process.exit(code);
+  }, 1500);
+  forcedExit.unref();
+}
+
+['SIGINT', 'SIGTERM'].forEach((signal) => {
+  process.on(signal, () => shutdown(0));
+});
+
+server.on('error', (error) => {
+  console.error(`[report-dev] Server error: ${error.message}`);
 });
 
 server.listen(PORT, () => {
-  currentRunInfo = resolveLatestRun();
-  watchRunFiles(currentRunInfo);
-  configureWatchers();
-  console.log('[report-dev] Live report server ready.');
-  if (currentRunInfo) {
-    console.log(`[report-dev] Serving run: ${currentRunInfo.id}`);
+  const runInfo = resolveRunInfo();
+  console.log('[report-dev] Report preview ready.');
+  if (runInfo) {
+    announcedRunId = runInfo.id;
+    console.log(`[report-dev] Serving run: ${runInfo.id}`);
   } else {
-    console.log('[report-dev] No report detected yet. Waiting for a run to complete...');
+    console.log(
+      '[report-dev] No report detected yet. Generate a run and refresh when it finishes.'
+    );
   }
   console.log(`[report-dev] Visit http://127.0.0.1:${PORT}/`);
   if (args.open) {
