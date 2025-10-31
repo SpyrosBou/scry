@@ -187,6 +187,12 @@ const renderUnifiedIssuesTable = (issues, { title, emptyMessage, variant, viewpo
     if (Array.isArray(issue?.wcagTags) && issue.wcagTags.length > 0) return true;
     return false;
   });
+  const hasHelpData = issues.some((issue) => {
+    if (typeof issue?.helpHtml === 'string' && issue.helpHtml.trim()) return true;
+    if (issue?.helpUrl != null && String(issue.helpUrl).trim()) return true;
+    if (issue?.help != null && String(issue.help).trim()) return true;
+    return false;
+  });
 
   const rows = issues
     .slice()
@@ -219,6 +225,19 @@ const renderUnifiedIssuesTable = (issues, { title, emptyMessage, variant, viewpo
         }
         return '<span class="details">—</span>';
       })();
+      const helpHtml = (() => {
+        if (!hasHelpData) return '';
+        if (typeof issue.helpHtml === 'string' && issue.helpHtml.trim()) return issue.helpHtml;
+        const rawUrl =
+          issue.helpUrl != null ? String(issue.helpUrl).trim() : String(issue.help || '').trim();
+        if (rawUrl) {
+          const label = issue.helpLabel ? String(issue.helpLabel).trim() : 'rule docs';
+          return `<a href="${escapeHtml(rawUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(
+            label || 'rule docs'
+          )}</a>`;
+        }
+        return '<span class="details">—</span>';
+      })();
 
       const cells = [
         `<td>${escapeHtml(formatIssueImpactLabel(impact))}</td>`,
@@ -231,6 +250,9 @@ const renderUnifiedIssuesTable = (issues, { title, emptyMessage, variant, viewpo
       if (hasWcagData) {
         cells.push(`<td>${wcagHtml}</td>`);
       }
+      if (hasHelpData) {
+        cells.push(`<td>${helpHtml}</td>`);
+      }
 
       return `<tr class="impact-${escapeHtml(impact)}">${cells.join('')}</tr>`;
     })
@@ -239,6 +261,9 @@ const renderUnifiedIssuesTable = (issues, { title, emptyMessage, variant, viewpo
   const headers = ['Impact', 'Issue', 'Viewport(s)', 'Pages', 'Nodes'];
   if (hasWcagData) {
     headers.push('WCAG level');
+  }
+  if (hasHelpData) {
+    headers.push('Help');
   }
 
   return `
@@ -296,6 +321,8 @@ const collectIssueMessages = (pages, fields, defaultImpact, options = {}) => {
         let message = '';
         let impact = defaultImpact;
         let help = null;
+        let helpHtml = null;
+        let helpLabel = null;
         let wcagBadge = null;
         let wcagTags = null;
 
@@ -310,6 +337,8 @@ const collectIssueMessages = (pages, fields, defaultImpact, options = {}) => {
           message = String(candidate || '').trim();
           if (rawItem.impact) impact = rawItem.impact;
           if (rawItem.helpUrl) help = rawItem.helpUrl;
+          if (rawItem.helpHtml) helpHtml = rawItem.helpHtml;
+          if (rawItem.helpLabel) helpLabel = rawItem.helpLabel;
           if (rawItem.wcag) {
             if (typeof rawItem.wcag === 'string') {
               wcagBadge = rawItem.wcag;
@@ -326,6 +355,13 @@ const collectIssueMessages = (pages, fields, defaultImpact, options = {}) => {
             const candidateTags = rawItem.tags || rawItem.wcagTags;
             if (Array.isArray(candidateTags)) {
               wcagTags = candidateTags.filter(Boolean);
+            }
+          }
+          if (!help && !helpHtml && Array.isArray(wcagTags) && wcagTags.length > 0) {
+            const derived = deriveWcagHelpLink(wcagTags);
+            if (derived) {
+              help = derived.helpUrl;
+              helpLabel = derived.helpLabel;
             }
           }
         } else {
@@ -348,15 +384,25 @@ const collectIssueMessages = (pages, fields, defaultImpact, options = {}) => {
             if (normalized.key) messageKey = normalized.key;
             if (normalized.label) displayMessage = normalized.label;
             if (normalized.sample) sampleTarget = normalized.sample;
+            if (normalized.helpUrl) help = normalized.helpUrl;
+            if (normalized.helpHtml) helpHtml = normalized.helpHtml;
+            if (normalized.helpLabel) helpLabel = normalized.helpLabel;
           }
         }
 
-        const key = JSON.stringify([messageKey, impact || '', help || '', wcagBadge || '']);
+        const key = JSON.stringify([
+          messageKey,
+          impact || '',
+          help || helpHtml || '',
+          wcagBadge || '',
+        ]);
         if (!map.has(key)) {
           map.set(key, {
             message: displayMessage,
             impact,
             helpUrl: help,
+            helpHtml,
+            helpLabel,
             wcagBadge: wcagBadge || null,
             wcagTags: new Set(Array.isArray(wcagTags) ? wcagTags : []),
             pages: new Set(),
@@ -387,6 +433,15 @@ const collectIssueMessages = (pages, fields, defaultImpact, options = {}) => {
         if (wcagBadge && !entry.wcagBadge) {
           entry.wcagBadge = wcagBadge;
         }
+        if (!entry.helpUrl && help) {
+          entry.helpUrl = help;
+        }
+        if (!entry.helpHtml && helpHtml) {
+          entry.helpHtml = helpHtml;
+        }
+        if (!entry.helpLabel && helpLabel) {
+          entry.helpLabel = helpLabel;
+        }
         if (Array.isArray(wcagTags)) {
           for (const tag of wcagTags) {
             if (tag) entry.wcagTags.add(tag);
@@ -405,6 +460,8 @@ const collectIssueMessages = (pages, fields, defaultImpact, options = {}) => {
       message: entry.message,
       impact: entry.impact,
       helpUrl: entry.helpUrl,
+      helpHtml: entry.helpHtml,
+      helpLabel: entry.helpLabel,
       wcagBadge: entry.wcagBadge,
       wcagTags: Array.from(entry.wcagTags || []),
       pages,
@@ -522,6 +579,8 @@ const aggregatePageIssueEntries = (items, { defaultImpact = 'info', normalise } 
     nodesCount: entry.nodesCount,
     tags: Array.from(entry.tags),
     helpUrl: entry.helpUrl,
+    helpHtml: entry.helpHtml || null,
+    helpLabel: entry.helpLabel || null,
   }));
 };
 
@@ -540,7 +599,31 @@ const simplifyUrlForDisplay = (value) => {
   }
 };
 
+const deriveWcagHelpLink = (tags) => {
+  if (!Array.isArray(tags)) return null;
+  for (const rawTag of tags) {
+    if (!rawTag || typeof rawTag !== 'string') continue;
+    const tag = rawTag.trim();
+    const match = tag.match(/^(?:WCAG\s+)?([0-9]+\.[0-9]+\.[0-9]+)\s+(.+)/i);
+    if (!match) continue;
+    const section = match[1];
+    const title = match[2]
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+    if (!title) continue;
+    return {
+      helpUrl: `https://www.w3.org/WAI/WCAG21/Understanding/${title}/`,
+      helpLabel: `Understanding ${section}`,
+    };
+  }
+  return null;
+};
+
 const normalizeInteractiveMessage = (input) => {
+  const helpUrl = input && typeof input === 'object' ? input.helpUrl || null : null;
+  const helpHtml = input && typeof input === 'object' ? input.helpHtml || null : null;
+  const helpLabel = input && typeof input === 'object' ? input.helpLabel || null : null;
   const resolveRawInput = (value) => {
     if (!value || typeof value !== 'object') return '';
     if (typeof value.raw === 'string') return value.raw;
@@ -579,7 +662,7 @@ const normalizeInteractiveMessage = (input) => {
   }
 
   if (!text) return null;
-  return { key: text, label: text };
+  return { key: text, label: text, helpUrl, helpHtml, helpLabel };
 };
 
 const formatWcagTagLabel = (tag) => {
@@ -4050,13 +4133,28 @@ const renderInteractivePageCard = (summary, { projectLabel } = {}) => {
     const map = new Map();
     items.forEach((raw) => {
       if (!raw) return;
-      const normalized = normalizer ? normalizer(raw) : { key: String(raw), label: String(raw) };
+      const normalized = normalizer
+        ? normalizer(raw)
+        : { key: String(raw), label: String(raw), helpUrl: null, helpHtml: null, helpLabel: null };
       if (!normalized) return;
       const key = normalized.key || normalized.label;
       if (!key) return;
       const label = normalized.label || normalized.key || '';
-      if (!map.has(key)) map.set(key, { impact, message: label, count: 0 });
-      map.get(key).count += 1;
+      if (!map.has(key)) {
+        map.set(key, {
+          impact,
+          message: label,
+          count: 0,
+          helpUrl: normalized.helpUrl || null,
+          helpHtml: normalized.helpHtml || null,
+          helpLabel: normalized.helpLabel || null,
+        });
+      }
+      const entry = map.get(key);
+      entry.count += 1;
+      if (!entry.helpUrl && normalized.helpUrl) entry.helpUrl = normalized.helpUrl;
+      if (!entry.helpHtml && normalized.helpHtml) entry.helpHtml = normalized.helpHtml;
+      if (!entry.helpLabel && normalized.helpLabel) entry.helpLabel = normalized.helpLabel;
     });
     return Array.from(map.values());
   };
@@ -4858,6 +4956,9 @@ const renderKeyboardGroupHtml = (group) => {
       const failThreshold = details.failThreshold || overview.failThreshold || metadata.failOn;
 
       const normalizeKeyboardAdvisory = ({ message, raw }) => {
+        const helpUrl = raw && typeof raw === 'object' ? raw.helpUrl || null : null;
+        const helpHtml = raw && typeof raw === 'object' ? raw.helpHtml || null : null;
+        const helpLabel = raw && typeof raw === 'object' ? raw.helpLabel || null : null;
         const source =
           (raw &&
             typeof raw === 'object' &&
@@ -4884,6 +4985,9 @@ const renderKeyboardGroupHtml = (group) => {
             key: summary,
             label: summary,
             sample,
+            helpUrl,
+            helpHtml,
+            helpLabel,
           };
         }
 
@@ -4897,10 +5001,13 @@ const renderKeyboardGroupHtml = (group) => {
           return {
             key: summary,
             label: summary,
+            helpUrl,
+            helpHtml,
+            helpLabel,
           };
         }
 
-        return { key: source, label: source };
+        return { key: source, label: source, helpUrl, helpHtml, helpLabel };
       };
 
       const runSummaryHtml = renderKeyboardRunSummary(overview, pagesData, wcagRefs, {
@@ -6510,6 +6617,9 @@ const renderStructureGroupHtml = (group) => {
       };
 
       const normalizeStructureAdvisory = ({ message, raw }) => {
+        const helpUrl = raw && typeof raw === 'object' ? raw.helpUrl || null : null;
+        const helpHtml = raw && typeof raw === 'object' ? raw.helpHtml || null : null;
+        const helpLabel = raw && typeof raw === 'object' ? raw.helpLabel || null : null;
         const summary =
           (raw &&
             typeof raw === 'object' &&
@@ -6518,14 +6628,17 @@ const renderStructureGroupHtml = (group) => {
           (typeof message === 'string' ? message.trim() : '');
         const sample = pickStructureSample(raw);
         if (summary) {
-          return { key: summary, label: summary, sample };
+          return { key: summary, label: summary, sample, helpUrl, helpHtml, helpLabel };
         }
         const trimmedMessage = typeof message === 'string' ? message.trim() : '';
         const fallback = trimmedMessage || 'Structural advisory';
-        return { key: fallback, label: fallback, sample };
+        return { key: fallback, label: fallback, sample, helpUrl, helpHtml, helpLabel };
       };
 
       const normalizeStructureWarning = ({ message, raw }) => {
+        const helpUrl = raw && typeof raw === 'object' ? raw.helpUrl || null : null;
+        const helpHtml = raw && typeof raw === 'object' ? raw.helpHtml || null : null;
+        const helpLabel = raw && typeof raw === 'object' ? raw.helpLabel || null : null;
         const summary =
           (raw &&
             typeof raw === 'object' &&
@@ -6534,17 +6647,23 @@ const renderStructureGroupHtml = (group) => {
           (typeof message === 'string' ? message.trim() : '');
         const sample = pickStructureSample(raw);
         if (summary) {
-          return { key: summary, label: summary, sample };
+          return { key: summary, label: summary, sample, helpUrl, helpHtml, helpLabel };
         }
         const trimmedMessage = typeof message === 'string' ? message.trim() : '';
         return {
           key: trimmedMessage || 'Structural warning',
           label: trimmedMessage || 'Structural warning',
           sample,
+          helpUrl,
+          helpHtml,
+          helpLabel,
         };
       };
 
       const normalizeStructureGating = ({ message, raw }) => {
+        const helpUrl = raw && typeof raw === 'object' ? raw.helpUrl || null : null;
+        const helpHtml = raw && typeof raw === 'object' ? raw.helpHtml || null : null;
+        const helpLabel = raw && typeof raw === 'object' ? raw.helpLabel || null : null;
         const summary =
           (raw &&
             typeof raw === 'object' &&
@@ -6553,11 +6672,11 @@ const renderStructureGroupHtml = (group) => {
           (typeof message === 'string' ? message.trim() : '');
         const sample = pickStructureSample(raw);
         if (summary) {
-          return { key: summary, label: summary, sample };
+          return { key: summary, label: summary, sample, helpUrl, helpHtml, helpLabel };
         }
         const trimmedMessage = typeof message === 'string' ? message.trim() : '';
         const fallback = trimmedMessage || 'Structural gating issue';
-        return { key: fallback, label: fallback, sample };
+        return { key: fallback, label: fallback, sample, helpUrl, helpHtml, helpLabel };
       };
 
       const gatingIssues = collectIssueMessages(pagesData, ['gatingIssues', 'gating'], 'critical', {
