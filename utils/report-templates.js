@@ -181,6 +181,13 @@ const renderUnifiedIssuesTable = (issues, { title, emptyMessage, variant, viewpo
     `;
   }
 
+  const hasWcagData = issues.some((issue) => {
+    if (typeof issue?.wcagHtml === 'string' && issue.wcagHtml.trim()) return true;
+    if (issue?.wcagBadge != null && String(issue.wcagBadge).trim()) return true;
+    if (Array.isArray(issue?.wcagTags) && issue.wcagTags.length > 0) return true;
+    return false;
+  });
+
   const rows = issues
     .slice()
     .sort((a, b) => {
@@ -201,33 +208,44 @@ const renderUnifiedIssuesTable = (issues, { title, emptyMessage, variant, viewpo
           : issue.pageCount != null
             ? issue.pageCount
             : 0;
-      const wcagHtml =
-        typeof issue.wcagHtml === 'string'
-          ? issue.wcagHtml
-          : issue.wcagBadge
-            ? `<span class="badge badge-wcag">${escapeHtml(issue.wcagBadge)}</span>`
-            : Array.isArray(issue.wcagTags) && issue.wcagTags.length > 0
-              ? renderWcagTagBadges(issue.wcagTags)
-              : '—';
+      const wcagHtml = (() => {
+        if (!hasWcagData) return '';
+        if (typeof issue.wcagHtml === 'string' && issue.wcagHtml.trim()) return issue.wcagHtml;
+        if (issue.wcagBadge) {
+          return `<span class="badge badge-wcag">${escapeHtml(issue.wcagBadge)}</span>`;
+        }
+        if (Array.isArray(issue.wcagTags) && issue.wcagTags.length > 0) {
+          return renderWcagTagBadges(issue.wcagTags);
+        }
+        return '<span class="details">—</span>';
+      })();
 
-      return `
-        <tr class="impact-${escapeHtml(impact)}">
-          <td>${escapeHtml(formatIssueImpactLabel(impact))}</td>
-          <td>${escapeHtml(issue.message || 'Issue')}</td>
-          <td>${viewportLabel ? escapeHtml(viewportLabel) : '—'}</td>
-          <td>${pagesList}</td>
-          <td>${escapeHtml(formatCount(nodeCount))}</td>
-          <td>${wcagHtml}</td>
-        </tr>
-      `;
+      const cells = [
+        `<td>${escapeHtml(formatIssueImpactLabel(impact))}</td>`,
+        `<td>${escapeHtml(issue.message || 'Issue')}</td>`,
+        `<td>${viewportLabel ? escapeHtml(viewportLabel) : '—'}</td>`,
+        `<td>${pagesList}</td>`,
+        `<td>${escapeHtml(formatCount(nodeCount))}</td>`,
+      ];
+
+      if (hasWcagData) {
+        cells.push(`<td>${wcagHtml}</td>`);
+      }
+
+      return `<tr class="impact-${escapeHtml(impact)}">${cells.join('')}</tr>`;
     })
     .join('');
+
+  const headers = ['Impact', 'Issue', 'Viewport(s)', 'Pages', 'Nodes'];
+  if (hasWcagData) {
+    headers.push('WCAG level');
+  }
 
   return `
     <section class="${baseClass}">
       <h3>${escapeHtml(title)}</h3>
       <table class="schema-table">
-        <thead><tr><th>Impact</th><th>Issue</th><th>Viewport(s)</th><th>Pages</th><th>Nodes</th><th>WCAG level</th></tr></thead>
+        <thead><tr>${headers.map((heading) => `<th>${escapeHtml(heading)}</th>`).join('')}</tr></thead>
         <tbody>${rows}</tbody>
       </table>
     </section>
@@ -243,15 +261,17 @@ const renderIssueSectionPair = ({
   advisoryEmptyMessage = 'No advisories detected.',
   viewportLabel = null,
 } = {}) => {
+  const gatingCount = Array.isArray(gatingIssues) ? gatingIssues.length : 0;
+  const advisoryCount = Array.isArray(advisoryIssues) ? advisoryIssues.length : 0;
   const sections = [
     renderUnifiedIssuesTable(gatingIssues, {
-      title: gatingTitle,
+      title: formatUniqueRulesHeading(gatingTitle, gatingCount),
       emptyMessage: gatingEmptyMessage,
       variant: 'gating',
       viewportLabel,
     }),
     renderUnifiedIssuesTable(advisoryIssues, {
-      title: advisoryTitle,
+      title: formatUniqueRulesHeading(advisoryTitle, advisoryCount),
       emptyMessage: advisoryEmptyMessage,
       variant: 'advisory',
       viewportLabel,
@@ -393,6 +413,11 @@ const collectIssueMessages = (pages, fields, defaultImpact, options = {}) => {
       samples: Array.from(entry.samples || []),
     };
   });
+};
+
+const formatUniqueRulesHeading = (title, count, { noun = 'unique rules' } = {}) => {
+  if (!count) return title;
+  return `${title} (${formatCount(count)} ${noun})`;
 };
 
 const IMPACT_PRIORITY = {
@@ -2844,7 +2869,7 @@ const renderVisualPageCard = (summary, { viewportLabel, thresholdsUsed = [] } = 
   const gatingSection =
     renderEntriesTable(
       gatingEntries,
-      `Blocking visual issues (${formatCount(gatingEntries.length)})`
+      formatUniqueRulesHeading('Blocking visual issues', gatingEntries.length)
     ) || '<p class="details">No blocking visual issues detected.</p>';
 
   const warningSection =
@@ -2854,7 +2879,7 @@ const renderVisualPageCard = (summary, { viewportLabel, thresholdsUsed = [] } = 
   const advisorySection =
     renderEntriesTable(
       advisoryEntries,
-      `Visual advisories (${formatCount(advisoryEntries.length)})`,
+      formatUniqueRulesHeading('Visual advisories', advisoryEntries.length),
       { headingClass: 'summary-heading-best-practice' }
     ) || '';
 
@@ -3807,7 +3832,7 @@ const renderFormsPageCard = (summary, { projectLabel } = {}) => {
     gatingEntries.length > 0
       ? renderWcagPageIssueTable(
           gatingEntries,
-          `Blocking issues (${formatCount(gatingEntries.length)})`
+          formatUniqueRulesHeading('Blocking issues', gatingEntries.length)
         )
       : '<p class="details">No blocking issues detected for this form.</p>';
 
@@ -3820,7 +3845,7 @@ const renderFormsPageCard = (summary, { projectLabel } = {}) => {
     advisoryEntries.length > 0
       ? renderWcagPageIssueTable(
           advisoryEntries,
-          `Advisories (${formatCount(advisoryEntries.length)})`,
+          formatUniqueRulesHeading('Advisories', advisoryEntries.length),
           { headingClass: 'summary-heading-best-practice' }
         )
       : '';
@@ -4097,7 +4122,7 @@ const renderInteractivePageCard = (summary, { projectLabel } = {}) => {
   const gatingSection =
     renderEntriesTable(
       gatingEntries,
-      `Console & resource errors (${formatCount(gatingEntries.length)})`
+      formatUniqueRulesHeading('Console & resource errors', gatingEntries.length)
     ) || (hasGating ? '' : '<p class="details">No console or resource errors detected.</p>');
 
   const warningsSection =
@@ -4108,7 +4133,7 @@ const renderInteractivePageCard = (summary, { projectLabel } = {}) => {
 
   const advisoriesSection = renderEntriesTable(
     advisoryEntries,
-    `Console advisories (${formatCount(advisoryEntries.length)})`,
+    formatUniqueRulesHeading('Console advisories', advisoryEntries.length),
     { headingClass: 'summary-heading-best-practice' }
   );
 
@@ -4212,6 +4237,21 @@ const renderAvailabilityPageCard = (summary, { projectLabel } = {}) => {
         .join('')}</ul></details>`
     : '';
 
+  const gatingHeading = formatUniqueRulesHeading('Blocking issues', gatingEntries.length);
+  const gatingSection =
+    renderEntriesTable(gatingEntries, gatingHeading) ||
+    '<p class="details">No blocking availability issues detected.</p>';
+
+  const warningSection =
+    renderEntriesTable(warningEntries, `Warnings (${formatCount(warningEntries.length)})`) ||
+    (hasWarnings ? '' : '<p class="details">No warnings recorded.</p>');
+
+  const advisoryHeading = formatUniqueRulesHeading('Advisories', advisoryEntries.length);
+  const advisorySection =
+    renderEntriesTable(advisoryEntries, advisoryHeading, {
+      headingClass: 'summary-heading-best-practice',
+    }) || '';
+
   return `
     <section class="summary-report summary-a11y summary-a11y--page-card">
       <div class="page-card__header">
@@ -4225,21 +4265,9 @@ const renderAvailabilityPageCard = (summary, { projectLabel } = {}) => {
       ${structureHtml}
       ${notesHtml}
       ${infoHtml}
-      ${
-        renderEntriesTable(
-          gatingEntries,
-          `Blocking issues (${formatCount(gatingEntries.length)})`
-        ) || '<p class="details">No blocking availability issues detected.</p>'
-      }
-      ${
-        renderEntriesTable(warningEntries, `Warnings (${formatCount(warningEntries.length)})`) ||
-        (hasWarnings ? '' : '<p class="details">No warnings recorded.</p>')
-      }
-      ${
-        renderEntriesTable(advisoryEntries, `Advisories (${formatCount(advisoryEntries.length)})`, {
-          headingClass: 'summary-heading-best-practice',
-        }) || ''
-      }
+      ${gatingSection}
+      ${warningSection}
+      ${advisorySection}
     </section>
   `;
 };
@@ -4325,6 +4353,21 @@ const renderHttpPageCard = (summary, { projectLabel, viewportLabel } = {}) => {
     )}</p>`,
   ].join('\n');
 
+  const gatingHeading = formatUniqueRulesHeading('Blocking HTTP issues', gatingEntries.length);
+  const gatingSection =
+    renderEntriesTable(gatingEntries, gatingHeading) ||
+    '<p class="details">No blocking HTTP issues detected.</p>';
+
+  const warningSection =
+    renderEntriesTable(warningEntries, `Warnings (${formatCount(warningEntries.length)})`) ||
+    (hasWarnings ? '' : '<p class="details">No warnings recorded.</p>');
+
+  const advisoryHeading = formatUniqueRulesHeading('Advisories', advisoryEntries.length);
+  const advisorySection =
+    renderEntriesTable(advisoryEntries, advisoryHeading, {
+      headingClass: 'summary-heading-best-practice',
+    }) || '';
+
   return `
     <section class="summary-report summary-a11y summary-a11y--page-card">
       <div class="page-card__header">
@@ -4334,21 +4377,9 @@ const renderHttpPageCard = (summary, { projectLabel, viewportLabel } = {}) => {
       <div class="page-card__meta">
         ${metaLines}
       </div>
-      ${
-        renderEntriesTable(
-          gatingEntries,
-          `Blocking HTTP issues (${formatCount(gatingEntries.length)})`
-        ) || '<p class="details">No blocking HTTP issues detected.</p>'
-      }
-      ${
-        renderEntriesTable(warningEntries, `Warnings (${formatCount(warningEntries.length)})`) ||
-        (hasWarnings ? '' : '<p class="details">No warnings recorded.</p>')
-      }
-      ${
-        renderEntriesTable(advisoryEntries, `Advisories (${formatCount(advisoryEntries.length)})`, {
-          headingClass: 'summary-heading-best-practice',
-        }) || ''
-      }
+      ${gatingSection}
+      ${warningSection}
+      ${advisorySection}
       ${failedCheckDetails}
     </section>
   `;
@@ -4450,7 +4481,7 @@ const renderPerformancePageCard = (summary, { projectLabel } = {}) => {
       ${
         renderEntriesTable(
           gatingEntries,
-          `Budget breaches (${formatCount(gatingEntries.length)})`
+          formatUniqueRulesHeading('Budget breaches', gatingEntries.length)
         ) || '<p class="details">No performance budget breaches detected.</p>'
       }
       ${
@@ -4458,9 +4489,13 @@ const renderPerformancePageCard = (summary, { projectLabel } = {}) => {
         (hasWarnings ? '' : '<p class="details">No warnings recorded.</p>')
       }
       ${
-        renderEntriesTable(advisoryEntries, `Advisories (${formatCount(advisoryEntries.length)})`, {
-          headingClass: 'summary-heading-best-practice',
-        }) || ''
+        renderEntriesTable(
+          advisoryEntries,
+          formatUniqueRulesHeading('Advisories', advisoryEntries.length),
+          {
+            headingClass: 'summary-heading-best-practice',
+          }
+        ) || ''
       }
     </section>
   `;
@@ -4745,7 +4780,9 @@ const renderKeyboardPageCard = (summary, { projectLabel } = {}) => {
 
   const executionSection = renderKeyboardPageIssuesTable(
     executionEntries,
-    `Execution failures (${formatCount(executionEntries.length)})`,
+    formatUniqueRulesHeading('Execution failures', executionEntries.length, {
+      noun: 'unique issues',
+    }),
     {
       emptyHtml: '',
     }
@@ -4753,7 +4790,7 @@ const renderKeyboardPageCard = (summary, { projectLabel } = {}) => {
 
   const gatingSection = renderKeyboardPageIssuesTable(
     gatingEntries,
-    `Gating keyboard issues (${formatCount(gatingEntries.length)})`,
+    formatUniqueRulesHeading('Gating keyboard issues', gatingEntries.length),
     {
       emptyHtml: '<p class="details">No gating issues detected.</p>',
     }
@@ -4761,7 +4798,7 @@ const renderKeyboardPageCard = (summary, { projectLabel } = {}) => {
 
   const advisorySection = renderKeyboardPageIssuesTable(
     advisoryEntries,
-    `Advisories (${formatCount(advisoryEntries.length)})`,
+    formatUniqueRulesHeading('Advisories', advisoryEntries.length),
     { headingClass: 'summary-heading-best-practice' }
   );
 
@@ -4887,7 +4924,9 @@ const renderKeyboardGroupHtml = (group) => {
       const issueSections = [
         executionFailureIssues.length
           ? renderUnifiedIssuesTable(executionFailureIssues, {
-              title: 'Execution failures',
+              title: formatUniqueRulesHeading('Execution failures', executionFailureIssues.length, {
+                noun: 'unique issues',
+              }),
               emptyMessage: 'Execution failures recorded during this run.',
               variant: 'gating',
               viewportLabel,
@@ -5027,7 +5066,7 @@ const renderReducedMotionPageCard = (summary) => {
     gatingEntries.length > 0
       ? renderWcagPageIssueTable(
           gatingEntries,
-          `Blocking reduced-motion issues (${formatCount(gatingEntries.length)})`
+          formatUniqueRulesHeading('Blocking reduced-motion issues', gatingEntries.length)
         )
       : '<p class="details">No blocking reduced-motion issues detected.</p>';
 
@@ -5040,7 +5079,7 @@ const renderReducedMotionPageCard = (summary) => {
     advisoryEntries.length > 0
       ? renderWcagPageIssueTable(
           advisoryEntries,
-          `Advisories (${formatCount(advisoryEntries.length)})`,
+          formatUniqueRulesHeading('Advisories', advisoryEntries.length),
           { headingClass: 'summary-heading-best-practice' }
         )
       : '';
@@ -5285,7 +5324,7 @@ const renderReflowPageCard = (summary) => {
     gatingEntries.length > 0
       ? renderWcagPageIssueTable(
           gatingEntries,
-          `Blocking reflow issues (${formatCount(gatingEntries.length)})`
+          formatUniqueRulesHeading('Blocking reflow issues', gatingEntries.length)
         )
       : '<p class="details">No blocking reflow issues detected.</p>';
 
@@ -5300,7 +5339,7 @@ const renderReflowPageCard = (summary) => {
     advisoryEntries.length > 0
       ? renderWcagPageIssueTable(
           advisoryEntries,
-          `Advisories (${formatCount(advisoryEntries.length)})`,
+          formatUniqueRulesHeading('Advisories', advisoryEntries.length),
           { headingClass: 'summary-heading-best-practice' }
         )
       : '';
@@ -5517,7 +5556,7 @@ const renderIframePageCard = (summary) => {
     gatingEntries.length > 0
       ? renderWcagPageIssueTable(
           gatingEntries,
-          `Blocking iframe issues (${formatCount(gatingEntries.length)})`
+          formatUniqueRulesHeading('Blocking iframe issues', gatingEntries.length)
         )
       : '<p class="details">No blocking iframe issues detected.</p>';
 
@@ -5534,7 +5573,7 @@ const renderIframePageCard = (summary) => {
     advisoryEntries.length > 0
       ? renderWcagPageIssueTable(
           advisoryEntries,
-          `Advisories (${formatCount(advisoryEntries.length)})`,
+          formatUniqueRulesHeading('Advisories', advisoryEntries.length),
           { headingClass: 'summary-heading-best-practice' }
         )
       : '';
@@ -6051,17 +6090,23 @@ const renderResponsiveStructurePageCard = (summary, { viewportLabel } = {}) => {
       : '';
 
   const gatingSection =
-    renderEntriesTable(gatingEntries, `Blocking issues (${formatCount(gatingEntries.length)})`) ||
-    '<p class="details">No blocking responsive issues detected.</p>';
+    renderEntriesTable(
+      gatingEntries,
+      formatUniqueRulesHeading('Blocking issues', gatingEntries.length)
+    ) || '<p class="details">No blocking responsive issues detected.</p>';
 
   const warningSection =
     renderEntriesTable(warningEntries, `Warnings (${formatCount(warningEntries.length)})`) ||
     (warnings.length > 0 ? '' : '<p class="details">No warnings recorded.</p>');
 
   const advisorySection =
-    renderEntriesTable(advisoryEntries, `Advisories (${formatCount(advisoryEntries.length)})`, {
-      headingClass: 'summary-heading-best-practice',
-    }) || '';
+    renderEntriesTable(
+      advisoryEntries,
+      formatUniqueRulesHeading('Advisories', advisoryEntries.length),
+      {
+        headingClass: 'summary-heading-best-practice',
+      }
+    ) || '';
 
   const notesHtml = notes.length
     ? `<details class="summary-note"><summary>Notes (${notes.length})</summary><ul class="details">${notes
@@ -6314,7 +6359,7 @@ const renderResponsiveWpPageCard = (summary, { projectLabel } = {}) => {
     gatingEntries.length > 0
       ? renderWcagPageIssueTable(
           gatingEntries,
-          `Blocking issues (${formatCount(gatingEntries.length)})`
+          formatUniqueRulesHeading('Blocking issues', gatingEntries.length)
         )
       : '<p class="details">No blocking issues detected for this viewport.</p>';
 
@@ -6327,7 +6372,7 @@ const renderResponsiveWpPageCard = (summary, { projectLabel } = {}) => {
     advisoryEntries.length > 0
       ? renderWcagPageIssueTable(
           advisoryEntries,
-          `Advisories (${formatCount(advisoryEntries.length)})`,
+          formatUniqueRulesHeading('Advisories', advisoryEntries.length),
           { headingClass: 'summary-heading-best-practice' }
         )
       : '';
@@ -6553,14 +6598,17 @@ const renderStructureGroupHtml = (group) => {
       `;
 
       gatingIssuesTable = renderUnifiedIssuesTable(gatingIssues, {
-        title: 'Gating structural issues',
+        title: formatUniqueRulesHeading('Gating structural issues', gatingIssues.length),
         emptyMessage: 'No gating issues detected.',
         variant: 'gating',
         viewportLabel,
       });
 
       advisoryIssuesTable = renderUnifiedIssuesTable(combinedAdvisories, {
-        title: 'Structural advisories and warnings',
+        title: formatUniqueRulesHeading(
+          'Structural advisories and warnings',
+          combinedAdvisories.length
+        ),
         emptyMessage: 'No advisories detected.',
         variant: 'advisory',
         viewportLabel,
