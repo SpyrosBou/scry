@@ -131,6 +131,82 @@ const formatCount = (value) => {
   return value;
 };
 
+const describeCount = (value, noun, pluralForm) => {
+  const count = Number(value);
+  const safeCount = Number.isFinite(count) ? count : 0;
+  const label = safeCount === 1 ? noun : pluralForm || `${noun}s`;
+  return `${formatCount(safeCount)} ${label}`;
+};
+
+const INSIGHT_TONES = new Set(['success', 'danger', 'warning', 'info', 'muted']);
+
+const renderInsightTiles = (tiles = []) => {
+  const items = Array.isArray(tiles)
+    ? tiles
+        .map((tile) => {
+          if (!tile || !tile.label) return null;
+          const value =
+            tile.value == null || tile.value === ''
+              ? '—'
+              : typeof tile.value === 'number' && Number.isFinite(tile.value)
+                ? tile.value.toLocaleString()
+                : String(tile.value);
+          const tone =
+            tile.tone && INSIGHT_TONES.has(tile.tone) ? ` insight-tiles__item--${tile.tone}` : '';
+          const hint =
+            tile.description != null && tile.description !== ''
+              ? `<small class="insight-tiles__hint">${escapeHtml(String(tile.description))}</small>`
+              : '';
+          return `<div class="insight-tiles__item${tone}"><dt>${escapeHtml(
+            tile.label
+          )}</dt><dd>${escapeHtml(value)}</dd>${hint}</div>`;
+        })
+        .filter(Boolean)
+    : [];
+
+  if (items.length === 0) return '';
+  return `<dl class="insight-tiles">${items.join('')}</dl>`;
+};
+
+const renderIssueGroup = ({ title, items, tone = 'muted', emptyMessage } = {}) => {
+  const listItems = Array.isArray(items)
+    ? items
+        .map((item) => {
+          if (item == null) return null;
+          const text = String(item).trim();
+          return text ? `<li>${escapeHtml(text)}</li>` : null;
+        })
+        .filter(Boolean)
+    : [];
+  const toneClass = tone && INSIGHT_TONES.has(tone) ? ` issue-group--${tone}` : '';
+  const heading = escapeHtml(title || 'Details');
+  if (listItems.length === 0) {
+    if (!emptyMessage) return '';
+    return `<section class="issue-group${toneClass}"><h4>${heading}</h4><p class="issue-group__empty">${escapeHtml(
+      emptyMessage
+    )}</p></section>`;
+  }
+  return `<section class="issue-group${toneClass}"><h4>${heading}</h4><ul class="issue-list">${listItems.join(
+    ''
+  )}</ul></section>`;
+};
+
+const summariseIssueEntries = (entries) => {
+  if (!Array.isArray(entries) || entries.length === 0) return [];
+  return entries
+    .map((entry) => {
+      if (!entry) return null;
+      const message = entry.message || entry.rule || entry.id || entry.summary;
+      const text = String(message || '').trim();
+      if (!text) return null;
+      if (entry.count && entry.count > 1) {
+        return `${text} (${formatCount(entry.count)})`;
+      }
+      return text;
+    })
+    .filter(Boolean);
+};
+
 const formatMillisecondsDisplay = (value) => {
   if (!Number.isFinite(value)) return '—';
   return `${Math.round(value).toLocaleString()} ms`;
@@ -4381,8 +4457,10 @@ const renderAvailabilityPageCard = (summary, { projectLabel } = {}) => {
   const advisories = Array.isArray(summary.advisories) ? summary.advisories : [];
   const notes = Array.isArray(summary.notes) ? summary.notes.filter(Boolean) : [];
   const info = Array.isArray(summary.info) ? summary.info.filter(Boolean) : [];
-  const elements = summary.elements || {};
-  const statusCode = summary.status != null ? String(summary.status) : 'n/a';
+  const elements = isPlainObject(summary.elements) ? summary.elements : null;
+  const rawStatus = summary.status != null ? Number(summary.status) : Number.NaN;
+
+  const statusCode = Number.isFinite(rawStatus) ? rawStatus : summary.status ?? 'n/a';
 
   const hasGating = gating.length > 0;
   const hasWarnings = warnings.length > 0;
@@ -4412,76 +4490,239 @@ const renderAvailabilityPageCard = (summary, { projectLabel } = {}) => {
   const warningEntries = aggregateMessages(warnings, 'moderate');
   const advisoryEntries = aggregateMessages(advisories, 'minor');
 
-  const renderEntriesTable = (entries, heading, options = {}) =>
-    entries.length
-      ? renderWcagPageIssueTable(
-          entries.map((entry) => ({
-            impact: entry.impact,
-            id: entry.message,
-            nodesCount: entry.count,
-          })),
-          heading,
-          options
-        )
-      : '';
+  const statusTone = Number.isFinite(rawStatus)
+    ? rawStatus >= 500
+      ? 'danger'
+      : rawStatus >= 400
+        ? 'warning'
+        : rawStatus >= 300
+          ? 'info'
+          : 'success'
+    : 'muted';
 
-  const structureHtml =
-    Object.keys(elements).length > 0
-      ? `<details><summary>Structure landmarks</summary><ul class="checks">${Object.entries(
-          elements
-        )
-          .map(
-            ([key, value]) =>
-              `<li class="${value ? 'check-pass' : 'check-fail'}">${escapeHtml(
-                humaniseKey(key)
-              )}: ${value ? 'present' : 'missing'}</li>`
-          )
-          .join('')}</ul></details>`
-      : '<p class="details">No structure checks recorded.</p>';
+  const statusDescription = Number.isFinite(rawStatus)
+    ? rawStatus >= 500
+      ? 'Server error – page unavailable'
+      : rawStatus >= 400
+        ? 'Client error – investigate response'
+        : rawStatus >= 300
+          ? 'Redirected response'
+          : 'Successful response'
+    : 'Status not recorded';
 
-  const notesHtml = notes.length
-    ? `<details class="summary-note"><summary>Notes (${notes.length})</summary><ul class="details">${notes
-        .map((note) => `<li>${escapeHtml(String(note))}</li>`)
-        .join('')}</ul></details>`
+  const landmarkKeys = ['header', 'navigation', 'content', 'footer'];
+  const totalLandmarks = landmarkKeys.length;
+  const presentLandmarks = landmarkKeys.filter((key) => elements && elements[key] === true).length;
+  const missingLandmarks = landmarkKeys
+    .filter((key) => elements && elements[key] === false)
+    .map((key) => `${humaniseKey(key)} landmark missing`);
+  const unknownLandmarks = elements
+    ? Math.max(totalLandmarks - presentLandmarks - missingLandmarks.length, 0)
+    : totalLandmarks;
+
+  const structureTone = !elements
+    ? 'muted'
+    : missingLandmarks.length
+      ? 'danger'
+      : 'success';
+  const structureValue = !elements
+    ? 'Not captured'
+    : `${presentLandmarks}/${totalLandmarks} present`;
+  const structureDescription = !elements
+    ? 'Structure scan not recorded'
+    : missingLandmarks.length
+      ? `${missingLandmarks.map((label) => label.replace(' landmark missing', '')).join(', ')} missing`
+      : unknownLandmarks > 0
+        ? 'Some landmarks not verified'
+        : 'All critical landmarks detected';
+
+  const statusTiles = renderInsightTiles(
+    [
+      {
+        label: 'HTTP status',
+        value: statusCode,
+        tone: statusTone,
+        description: statusDescription,
+      },
+      {
+        label: 'Critical landmarks',
+        value: structureValue,
+        tone: structureTone,
+        description: structureDescription,
+      },
+      {
+        label: 'Viewport',
+        value: projectLabel || 'Not recorded',
+        tone: 'info',
+      },
+    ].filter(Boolean)
+  );
+
+  const issueTiles = renderInsightTiles(
+    [
+      {
+        label: 'Blocking issues',
+        value: formatCount(gatingEntries.length),
+        tone: gatingEntries.length ? 'danger' : 'success',
+        description: gatingEntries.length
+          ? 'Resolve before launch'
+          : 'No blocking availability issues detected',
+      },
+      {
+        label: 'Warnings',
+        value: formatCount(warningEntries.length),
+        tone: warningEntries.length ? 'warning' : 'muted',
+        description: warningEntries.length ? 'Follow up recommended' : 'No warnings recorded',
+      },
+      {
+        label: 'Advisories',
+        value: formatCount(advisoryEntries.length),
+        tone: advisoryEntries.length ? 'info' : 'muted',
+        description: advisoryEntries.length ? 'Non-blocking feedback' : 'None captured',
+      },
+      {
+        label: 'Notes logged',
+        value: formatCount(notes.length),
+        tone: notes.length ? 'info' : 'muted',
+        description: notes.length ? 'See tester notes below' : 'No notes recorded',
+      },
+      {
+        label: 'Informational checks',
+        value: formatCount(info.length),
+        tone: info.length ? 'info' : 'muted',
+        description: info.length ? 'Additional context captured' : 'No additional info recorded',
+      },
+    ].filter(Boolean)
+  );
+
+  const structureGroup = renderIssueGroup({
+    title: 'Critical landmark check',
+    items: missingLandmarks,
+    tone: structureTone,
+    emptyMessage: !elements
+      ? 'Structure scan not recorded for this page.'
+      : 'All tracked landmarks confirmed.',
+  });
+
+  const gatingGroup = renderIssueGroup({
+    title: formatUniqueRulesHeading('Blocking issues', gatingEntries.length),
+    items: summariseIssueEntries(gatingEntries),
+    tone: gatingEntries.length ? 'danger' : 'success',
+    emptyMessage: 'No blocking availability issues detected.',
+  });
+
+  const warningGroup = renderIssueGroup({
+    title: `Warnings (${formatCount(warningEntries.length)})`,
+    items: summariseIssueEntries(warningEntries),
+    tone: warningEntries.length ? 'warning' : 'muted',
+    emptyMessage: hasWarnings ? null : 'No warnings recorded.',
+  });
+
+  const advisoryGroup = renderIssueGroup({
+    title: formatUniqueRulesHeading('Advisories', advisoryEntries.length),
+    items: summariseIssueEntries(advisoryEntries),
+    tone: advisoryEntries.length ? 'info' : 'muted',
+    emptyMessage: null,
+  });
+
+  const notesGroup = renderIssueGroup({
+    title: `Notes${notes.length ? ` (${formatCount(notes.length)})` : ''}`,
+    items: notes.map((note) => String(note)),
+    tone: notes.length ? 'info' : 'muted',
+    emptyMessage: notes.length ? null : 'No notes recorded for this page.',
+  });
+
+  const infoGroup = renderIssueGroup({
+    title: `Informational checks${info.length ? ` (${formatCount(info.length)})` : ''}`,
+    items: info.map((item) => String(item)),
+    tone: info.length ? 'info' : 'muted',
+    emptyMessage: info.length ? null : 'No additional informational checks logged.',
+  });
+
+  const sectionsHtml = [
+    structureGroup,
+    gatingGroup,
+    warningGroup,
+    advisoryGroup,
+    notesGroup,
+    infoGroup,
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  const narrativeParts = [];
+
+  if (Number.isFinite(rawStatus)) {
+    if (rawStatus >= 500) {
+      narrativeParts.push(`Responded with ${rawStatus} – server error.`);
+    } else if (rawStatus >= 400) {
+      narrativeParts.push(`Responded with ${rawStatus} – investigate the request.`);
+    } else if (rawStatus >= 300) {
+      narrativeParts.push(`Redirected with status ${rawStatus}.`);
+    } else {
+      narrativeParts.push(`Responded with ${rawStatus} OK.`);
+    }
+  } else {
+    narrativeParts.push('No HTTP status recorded for this request.');
+  }
+
+  if (!elements) {
+    narrativeParts.push('Structure scan was not captured.');
+  } else if (missingLandmarks.length) {
+    const landmarkList = missingLandmarks
+      .map((label) => label.replace(' landmark missing', ''))
+      .join(', ');
+    narrativeParts.push(`Missing ${landmarkList} landmark${missingLandmarks.length > 1 ? 's' : ''}.`);
+  } else {
+    narrativeParts.push('All critical landmarks were detected.');
+  }
+
+  if (gatingEntries.length) {
+    narrativeParts.push(`${describeCount(gatingEntries.length, 'blocking issue')} found.`);
+  } else {
+    narrativeParts.push('No blocking availability issues detected.');
+  }
+
+  if (warningEntries.length) {
+    narrativeParts.push(`${describeCount(warningEntries.length, 'warning')} recorded.`);
+  }
+
+  if (notes.length) {
+    narrativeParts.push(`${describeCount(notes.length, 'note')} logged for follow-up.`);
+  }
+
+  const summaryNarrative = narrativeParts.length
+    ? `<p class="page-card__lede">${escapeHtml(narrativeParts.join(' '))}</p>`
     : '';
 
-  const infoHtml = info.length
-    ? `<details><summary>Informational checks (${info.length})</summary><ul class="details">${info
-        .map((item) => `<li>${escapeHtml(String(item))}</li>`)
-        .join('')}</ul></details>`
+  const insightSections = [
+    statusTiles ? { title: 'Run overview', content: statusTiles } : null,
+    issueTiles ? { title: 'Alerts & notes', content: issueTiles } : null,
+  ]
+    .filter(Boolean)
+    .map(
+      (section) =>
+        `<div class="page-card__insights"><h4 class="page-card__insights-title">${escapeHtml(
+          section.title
+        )}</h4>${section.content}</div>`
+    )
+    .join('\n');
+
+  const insightsHtml = insightSections
+    ? `<div class="page-card__insights-grid">${insightSections}</div>`
     : '';
-
-  const gatingHeading = formatUniqueRulesHeading('Blocking issues', gatingEntries.length);
-  const gatingSection =
-    renderEntriesTable(gatingEntries, gatingHeading) ||
-    '<p class="details">No blocking availability issues detected.</p>';
-
-  const warningSection =
-    renderEntriesTable(warningEntries, `Warnings (${formatCount(warningEntries.length)})`) ||
-    (hasWarnings ? '' : '<p class="details">No warnings recorded.</p>');
-
-  const advisoryHeading = formatUniqueRulesHeading('Advisories', advisoryEntries.length);
-  const advisorySection =
-    renderEntriesTable(advisoryEntries, advisoryHeading, {
-      headingClass: 'summary-heading-best-practice',
-    }) || '';
 
   return `
-    <section class="summary-report summary-a11y summary-a11y--page-card">
+    <section class="summary-report summary-a11y summary-a11y--page-card availability-card">
       <div class="page-card__header">
         <h3>${escapeHtml(summary.page || 'Unknown page')}</h3>
         <span class="status-pill ${statusMeta.className}">${escapeHtml(statusMeta.label)}</span>
       </div>
-      <div class="page-card__meta">
-        <p class="details"><strong>Status:</strong> ${escapeHtml(statusCode)}</p>
-        <p class="details"><strong>Viewport:</strong> ${escapeHtml(projectLabel || 'Not recorded')}</p>
+      ${summaryNarrative}
+      ${insightsHtml}
+      <div class="page-card__sections">
+        ${sectionsHtml}
       </div>
-      ${structureHtml}
-      ${notesHtml}
-      ${infoHtml}
-      ${gatingSection}
-      ${warningSection}
-      ${advisorySection}
     </section>
   `;
 };
@@ -4606,21 +4847,7 @@ const renderPerformancePageCard = (summary, { projectLabel } = {}) => {
   const gating = Array.isArray(summary.gating) ? summary.gating : [];
   const warnings = Array.isArray(summary.warnings) ? summary.warnings : [];
   const advisories = Array.isArray(summary.advisories) ? summary.advisories : [];
-
-  const hasGating = breaches.length > 0 || gating.length > 0;
-  const hasWarnings = warnings.length > 0;
-  const hasAdvisories = advisories.length > 0;
-
-  const statusMeta = hasGating
-    ? {
-        className: 'status-error',
-        label: `${formatCount(breaches.length || gating.length)} breach(es)`,
-      }
-    : hasWarnings
-      ? { className: 'status-warning', label: 'Warnings present' }
-      : hasAdvisories
-        ? { className: 'status-info', label: 'Advisories present' }
-        : { className: 'status-ok', label: 'Pass' };
+  const notes = Array.isArray(summary.notes) ? summary.notes.filter(Boolean) : [];
 
   const aggregateMessages = (items, impact, formatter) => {
     const list = [];
@@ -4638,7 +4865,7 @@ const renderPerformancePageCard = (summary, { projectLabel } = {}) => {
     breaches,
     'critical',
     (breach) =>
-      `${breach.metric} exceeded budget (${Math.round(breach.value)}ms > ${Math.round(
+      `${humaniseKey(breach.metric)} exceeded budget (${Math.round(breach.value)}ms > ${Math.round(
         breach.budget
       )}ms)`
   );
@@ -4646,71 +4873,232 @@ const renderPerformancePageCard = (summary, { projectLabel } = {}) => {
   const warningEntries = aggregateMessages(warnings, 'moderate');
   const advisoryEntries = aggregateMessages(advisories, 'minor');
 
-  const renderEntriesTable = (entries, heading, options = {}) =>
-    entries.length
-      ? renderWcagPageIssueTable(
-          entries.map((entry) => ({
-            impact: entry.impact,
-            id: entry.message,
-            nodesCount: entry.count,
-          })),
-          heading,
-          options
-        )
-      : '';
+  const blockingCount = gatingEntries.length;
+  const hasWarnings = warningEntries.length > 0;
+  const hasAdvisories = advisoryEntries.length > 0;
 
-  const formatMetric = (value) =>
-    Number.isFinite(value) ? `${Math.round(value).toLocaleString()} ms` : '—';
+  const statusMeta = blockingCount
+    ? {
+        className: 'status-error',
+        label: `${formatCount(blockingCount)} blocking issue(s)`,
+      }
+    : hasWarnings
+      ? { className: 'status-warning', label: 'Warnings present' }
+      : hasAdvisories
+        ? { className: 'status-info', label: 'Advisories present' }
+        : { className: 'status-ok', label: 'Pass' };
 
-  const metricsHtml = `
-    <dl class="schema-metrics">
-      <div class="schema-metrics__item"><dt>Load time</dt><dd><span class="schema-value">${escapeHtml(
-        formatMetric(summary.loadTimeMs)
-      )}</span></dd></div>
-      <div class="schema-metrics__item"><dt>DOMContentLoaded</dt><dd><span class="schema-value">${escapeHtml(
-        formatMetric(summary.domContentLoadedMs)
-      )}</span></dd></div>
-      <div class="schema-metrics__item"><dt>Load complete</dt><dd><span class="schema-value">${escapeHtml(
-        formatMetric(summary.loadCompleteMs)
-      )}</span></dd></div>
-      <div class="schema-metrics__item"><dt>First Contentful Paint</dt><dd><span class="schema-value">${escapeHtml(
-        formatMetric(summary.firstContentfulPaintMs)
-      )}</span></dd></div>
-      <div class="schema-metrics__item"><dt>First Paint</dt><dd><span class="schema-value">${escapeHtml(
-        formatMetric(summary.firstPaintMs)
-      )}</span></dd></div>
-    </dl>
-  `;
+  const budgetLookup = new Map();
+  breaches.forEach((breach) => {
+    const key = String(breach.metric || '').toLowerCase();
+    if (key) budgetLookup.set(key, breach);
+  });
+
+  const metricDefinitions = [
+    { key: 'loadtime', label: 'Load time', value: summary.loadTimeMs },
+    { key: 'domcontentloaded', label: 'DOMContentLoaded', value: summary.domContentLoadedMs },
+    { key: 'loadcomplete', label: 'Load complete', value: summary.loadCompleteMs },
+    { key: 'firstcontentfulpaint', label: 'First Contentful Paint', value: summary.firstContentfulPaintMs },
+    { key: 'firstpaint', label: 'First Paint', value: summary.firstPaintMs },
+  ];
+
+  const recordedMetrics = metricDefinitions
+    .map(({ key, label, value }) => {
+      const numeric = Number(value);
+      if (!Number.isFinite(numeric)) return null;
+      const metricKey = String(key || '').toLowerCase();
+      return {
+        key: metricKey,
+        label,
+        value: numeric,
+        breach: budgetLookup.get(metricKey) || null,
+      };
+    })
+    .filter(Boolean);
+
+  const metricsTiles = renderInsightTiles(
+    recordedMetrics.map((metric) => ({
+      label: metric.label,
+      value: formatMillisecondsDisplay(metric.value),
+      tone: metric.breach ? 'danger' : 'success',
+      description:
+        metric.breach && Number.isFinite(metric.breach.budget)
+          ? `Budget ${Math.round(metric.breach.budget)} ms`
+          : 'Recorded timing',
+    }))
+  );
+
+  const slowestMetric = recordedMetrics.reduce((acc, metric) => {
+    if (!acc) return metric;
+    return metric.value > acc.value ? metric : acc;
+  }, null);
+
+  const additionalBlocking = Math.max(blockingCount - breachEntries.length, 0);
+  const blockingDescription = blockingCount
+    ? [
+        breachEntries.length ? describeCount(breachEntries.length, 'budget breach') : null,
+        additionalBlocking ? describeCount(additionalBlocking, 'additional issue') : null,
+      ]
+        .filter(Boolean)
+        .join(' • ') || 'Resolve before launch'
+    : 'No blocking issues detected';
+
+  const statusTiles = renderInsightTiles(
+    [
+      {
+        label: 'Viewport',
+        value: projectLabel || 'Not recorded',
+        tone: 'info',
+      },
+      {
+        label: 'Timings captured',
+        value: formatCount(recordedMetrics.length),
+        tone: recordedMetrics.length ? 'info' : 'muted',
+        description: recordedMetrics.length
+          ? 'Key performance timings recorded'
+          : 'No timing data captured',
+      },
+      slowestMetric
+        ? {
+            label: 'Longest timing',
+            value: formatMillisecondsDisplay(slowestMetric.value),
+            tone: slowestMetric.breach ? 'danger' : 'info',
+            description: slowestMetric.label,
+          }
+        : null,
+    ].filter(Boolean)
+  );
+
+  const issueTiles = renderInsightTiles(
+    [
+      {
+        label: 'Budgets breached',
+        value: formatCount(breaches.length),
+        tone: breaches.length ? 'danger' : 'success',
+        description: breaches.length ? 'Over configured budget' : 'All monitored budgets met',
+      },
+      {
+        label: 'Blocking issues',
+        value: formatCount(blockingCount),
+        tone: blockingCount ? 'danger' : 'success',
+        description: blockingDescription,
+      },
+      {
+        label: 'Warnings',
+        value: formatCount(warningEntries.length),
+        tone: warningEntries.length ? 'warning' : 'muted',
+        description: warningEntries.length ? 'Follow up recommended' : 'No warnings recorded',
+      },
+      {
+        label: 'Advisories',
+        value: formatCount(advisoryEntries.length),
+        tone: advisoryEntries.length ? 'info' : 'muted',
+        description: advisoryEntries.length ? 'Non-blocking guidance' : 'None captured',
+      },
+      {
+        label: 'Notes logged',
+        value: formatCount(notes.length),
+        tone: notes.length ? 'info' : 'muted',
+        description: notes.length ? 'See tester notes below' : 'No notes recorded',
+      },
+    ].filter(Boolean)
+  );
+
+  const breachesGroup = renderIssueGroup({
+    title: formatUniqueRulesHeading('Budget breaches', gatingEntries.length),
+    items: summariseIssueEntries(gatingEntries),
+    tone: blockingCount ? 'danger' : 'success',
+    emptyMessage: 'No performance budget breaches detected.',
+  });
+
+  const warningGroup = renderIssueGroup({
+    title: `Warnings (${formatCount(warningEntries.length)})`,
+    items: summariseIssueEntries(warningEntries),
+    tone: warningEntries.length ? 'warning' : 'muted',
+    emptyMessage: hasWarnings ? null : 'No warnings recorded.',
+  });
+
+  const advisoryGroup = renderIssueGroup({
+    title: formatUniqueRulesHeading('Advisories', advisoryEntries.length),
+    items: summariseIssueEntries(advisoryEntries),
+    tone: advisoryEntries.length ? 'info' : 'muted',
+    emptyMessage: null,
+  });
+
+  const notesGroup = renderIssueGroup({
+    title: `Notes${notes.length ? ` (${formatCount(notes.length)})` : ''}`,
+    items: notes.map((note) => String(note)),
+    tone: notes.length ? 'info' : 'muted',
+    emptyMessage: notes.length ? null : 'No notes recorded for this page.',
+  });
+
+  const sectionsHtml = [breachesGroup, warningGroup, advisoryGroup, notesGroup]
+    .filter(Boolean)
+    .join('\n');
+
+  const narrativeParts = [];
+
+  if (breaches.length) {
+    narrativeParts.push(`${describeCount(breaches.length, 'budget')} exceeded.`);
+  } else {
+    narrativeParts.push('No performance budgets were breached.');
+  }
+
+  if (recordedMetrics.length) {
+    if (slowestMetric) {
+      narrativeParts.push(
+        `${slowestMetric.label} was the slowest timing at ${formatMillisecondsDisplay(slowestMetric.value)}.`
+      );
+    }
+  } else {
+    narrativeParts.push('Performance timings were not captured for this page.');
+  }
+
+  if (warningEntries.length) {
+    narrativeParts.push(`${describeCount(warningEntries.length, 'warning')} recorded.`);
+  }
+
+  if (advisoryEntries.length) {
+    narrativeParts.push(`${describeCount(advisoryEntries.length, 'advisory')} logged.`);
+  }
+
+  if (notes.length) {
+    narrativeParts.push(`${describeCount(notes.length, 'note')} captured for follow-up.`);
+  }
+
+  const summaryNarrative = narrativeParts.length
+    ? `<p class="page-card__lede">${escapeHtml(narrativeParts.join(' '))}</p>`
+    : '';
+
+  const insightSections = [
+    statusTiles ? { title: 'Run overview', content: statusTiles } : null,
+    metricsTiles ? { title: 'Key timings', content: metricsTiles } : null,
+    issueTiles ? { title: 'Alerts & notes', content: issueTiles } : null,
+  ]
+    .filter(Boolean)
+    .map(
+      (section) =>
+        `<div class="page-card__insights"><h4 class="page-card__insights-title">${escapeHtml(
+          section.title
+        )}</h4>${section.content}</div>`
+    )
+    .join('\n');
+
+  const insightsHtml = insightSections
+    ? `<div class="page-card__insights-grid">${insightSections}</div>`
+    : '';
 
   return `
-    <section class="summary-report summary-a11y summary-a11y--page-card">
+    <section class="summary-report summary-a11y summary-a11y--page-card performance-card">
       <div class="page-card__header">
         <h3>${escapeHtml(summary.page || 'Unknown page')}</h3>
         <span class="status-pill ${statusMeta.className}">${escapeHtml(statusMeta.label)}</span>
       </div>
-      <div class="page-card__meta">
-        <p class="details"><strong>Viewport:</strong> ${escapeHtml(projectLabel || 'Not recorded')}</p>
+      ${summaryNarrative}
+      ${insightsHtml}
+      <div class="page-card__sections">
+        ${sectionsHtml}
       </div>
-      ${metricsHtml}
-      ${
-        renderEntriesTable(
-          gatingEntries,
-          formatUniqueRulesHeading('Budget breaches', gatingEntries.length)
-        ) || '<p class="details">No performance budget breaches detected.</p>'
-      }
-      ${
-        renderEntriesTable(warningEntries, `Warnings (${formatCount(warningEntries.length)})`) ||
-        (hasWarnings ? '' : '<p class="details">No warnings recorded.</p>')
-      }
-      ${
-        renderEntriesTable(
-          advisoryEntries,
-          formatUniqueRulesHeading('Advisories', advisoryEntries.length),
-          {
-            headingClass: 'summary-heading-best-practice',
-          }
-        ) || ''
-      }
     </section>
   `;
 };

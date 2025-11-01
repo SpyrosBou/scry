@@ -17,9 +17,9 @@ The mock HTML report remains our source of truth. This roadmap captures what is 
 | `tests/a11y.structure.landmarks.spec.js` | `renderStructureGroupHtml` | Complete | Combines `gatingIssues`, `headingSkips`, `warnings`, and `advisories` into shared tables, normalising copy with helper lambdas before dedupe; per-page accordion uses `renderStructurePageCard`. |
 | `tests/functionality.links.internal.spec.js` | `renderInternalLinksGroupHtml` | Complete | Uses `collectIssueMessages` with default normalisation to collapse duplicate link failures; per-page cards (`renderInternalLinksPageCard`) surface meta counts and sample lists. |
 | `tests/functionality.interactive.smoke.spec.js` | `renderInteractiveGroupHtml` | Complete | Console/API stability now relies on `normalizeInteractiveMessage` (trims ANSI, condenses retries, simplifies URLs) before passing data to `renderUnifiedIssuesTable` and `renderInteractivePageCard`. |
-| `tests/functionality.infrastructure.health.spec.js` | `renderAvailabilityGroupHtml` | Pending | Still outputs bespoke tables; needs four-section layout and summarised status pills. |
+| `tests/functionality.infrastructure.health.spec.js` | `renderAvailabilityGroupHtml` | In progress | Per-page cards now use insight tiles and grouped findings; run summary still needs shared four-section layout. |
 | `renderHttpGroupHtml` (HTTP response validation) | — | Pending | Convert to run summary + deduped gating/advisory tables; create per-page card. |
-| `renderPerformanceGroupHtml` (performance budgets) | — | Pending | Needs four-section layout with budget failures as gating/advisories, per-page table for timings. |
+| `renderPerformanceGroupHtml` (performance budgets) | — | In progress | Per-page cards now surface insight tiles plus grouped findings; run summary/per-page accordion still needs shared layout. |
 | Responsive suites (`renderResponsive*` helpers) | — | Pending | Reflow/reduced-motion done; layout/WordPress feature panels still need four-section conversion. |
 | Visual regression (`renderVisualGroupHtml`) | — | Pending | Must match mock hero, gating/advisory tables, and per-page diff deck. |
 
