@@ -2,6 +2,7 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const chokidar = require('chokidar');
 const minimist = require('minimist');
 
 let openModule;
@@ -28,6 +29,19 @@ const args = minimist(process.argv.slice(2), {
 const PORT = Number(args.port) || 4173;
 const REPORTS_DIR = path.join(process.cwd(), 'reports');
 const LATEST_RUN_FILE = path.join(REPORTS_DIR, 'latest-run.json');
+const TEMPLATE_ENTRY = path.join(__dirname, '..', 'utils', 'report-templates.js');
+const TEMPLATE_CACHE_ROOTS = [
+  TEMPLATE_ENTRY,
+  path.join(__dirname, '..', 'utils', 'report-templates'),
+  path.join(__dirname, '..', 'utils', 'reporting-utils.js'),
+  path.join(__dirname, '..', 'utils', 'reporting-utils'),
+];
+const TEMPLATE_WATCH_PATTERNS = [
+  TEMPLATE_ENTRY,
+  path.join(__dirname, '..', 'utils', 'report-templates', '**', '*.js'),
+  path.join(__dirname, '..', 'utils', 'reporting-utils.js'),
+  path.join(__dirname, '..', 'docs', 'mocks', '**', '*.scss'),
+];
 
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -50,7 +64,17 @@ const MIME_TYPES = {
   '.otf': 'font/otf',
 };
 
+const SSE_PATH = '/__report-dev/events';
+const HEARTBEAT_INTERVAL = 25000;
+
+const sseClients = new Set();
+let runDirWatcher = null;
+let reportsDirWatcher = null;
+let runRefreshTimer = null;
+let templateWatcher = null;
+
 const fixedRunInfo = resolveFixedRun(args.run);
+let dynamicRunInfo = fixedRunInfo || null;
 let announcedRunId = fixedRunInfo ? fixedRunInfo.id : null;
 
 function safeJsonParse(filePath) {
@@ -112,18 +136,220 @@ function discoverLatestRun() {
 }
 
 function resolveRunInfo() {
-  return fixedRunInfo || discoverLatestRun();
+  if (fixedRunInfo) return fixedRunInfo;
+
+  if (dynamicRunInfo && !fs.existsSync(dynamicRunInfo.dataPath)) {
+    dynamicRunInfo = null;
+  }
+
+  if (!dynamicRunInfo) {
+    dynamicRunInfo = discoverLatestRun();
+  }
+
+  return dynamicRunInfo;
+}
+
+function scheduleRunRefresh(reason) {
+  if (fixedRunInfo) return;
+  if (runRefreshTimer) return;
+
+  runRefreshTimer = setTimeout(() => {
+    runRefreshTimer = null;
+    const latest = discoverLatestRun();
+
+    if (!latest) {
+      if (dynamicRunInfo) {
+        const removedId = dynamicRunInfo.id;
+        dynamicRunInfo = null;
+        rebuildRunWatcher(null);
+        broadcast('run-changed', { runId: null, reason: reason || 'removed' });
+        console.log(`[report-dev] Run ${removedId} no longer available.`);
+      }
+      return;
+    }
+
+    if (!dynamicRunInfo || latest.id !== dynamicRunInfo.id) {
+      const hadRun = Boolean(dynamicRunInfo);
+      dynamicRunInfo = latest;
+      rebuildRunWatcher(latest);
+      if (hadRun) {
+        console.log(`[report-dev] Detected new run: ${latest.id}`);
+      }
+      broadcast('run-changed', { runId: latest.id, reason: reason || 'updated' });
+    }
+  }, 120);
+
+  if (typeof runRefreshTimer.unref === 'function') {
+    runRefreshTimer.unref();
+  }
+}
+
+function rebuildRunWatcher(runInfo) {
+  if (runDirWatcher) {
+    runDirWatcher
+      .close()
+      .catch((error) => console.error(`[report-dev] Run watcher close error: ${error.message}`));
+    runDirWatcher = null;
+  }
+
+  if (!runInfo) return;
+
+  runDirWatcher = chokidar.watch(runInfo.dir, {
+    ignoreInitial: true,
+    awaitWriteFinish: {
+      stabilityThreshold: 250,
+      pollInterval: 100,
+    },
+  });
+
+  const notifyChange = (event, filePath) => {
+    broadcast('content-changed', {
+      runId: runInfo.id,
+      event,
+      path: filePath ? path.relative(runInfo.dir, filePath) : null,
+    });
+  };
+
+  runDirWatcher.on('add', (filePath) => notifyChange('add', filePath));
+  runDirWatcher.on('change', (filePath) => notifyChange('change', filePath));
+  runDirWatcher.on('unlink', (filePath) => notifyChange('unlink', filePath));
+  runDirWatcher.on('error', (error) => {
+    console.error(`[report-dev] Run watcher error: ${error.message}`);
+  });
+}
+
+function ensureReportsWatcher() {
+  if (fixedRunInfo || reportsDirWatcher) return;
+
+  reportsDirWatcher = chokidar.watch([REPORTS_DIR, LATEST_RUN_FILE], {
+    ignoreInitial: true,
+    depth: 1,
+  });
+
+  const queueRefresh = () => scheduleRunRefresh('run-detected');
+
+  ['add', 'change', 'unlink', 'addDir', 'unlinkDir'].forEach((eventName) => {
+    reportsDirWatcher.on(eventName, queueRefresh);
+  });
+
+  reportsDirWatcher.on('error', (error) => {
+    console.error(`[report-dev] Reports watcher error: ${error.message}`);
+  });
+}
+
+function ensureTemplateWatcher() {
+  if (templateWatcher) return;
+
+  templateWatcher = chokidar.watch(TEMPLATE_WATCH_PATTERNS, {
+    ignoreInitial: true,
+    awaitWriteFinish: {
+      stabilityThreshold: 150,
+      pollInterval: 75,
+    },
+    ignored: (watchPath) => /report-styles\.css$/i.test(watchPath),
+  });
+
+  templateWatcher.on('all', (event, changedPath) => {
+    const relativePath = path.relative(process.cwd(), changedPath);
+    console.log(`[report-dev] Template asset ${event}: ${relativePath}`);
+    invalidateTemplateCache();
+    broadcast('template-changed', {
+      event,
+      path: relativePath,
+    });
+  });
+
+  templateWatcher.on('error', (error) => {
+    console.error(`[report-dev] Template watcher error: ${error.message}`);
+  });
 }
 
 function renderReportHtmlFromData(runInfo) {
-  const templatesPath = path.join(__dirname, '..', 'utils', 'report-templates.js');
-  delete require.cache[templatesPath];
-  const { renderReportHtml } = require(templatesPath);
+  invalidateTemplateCache();
+  const { renderReportHtml } = require(TEMPLATE_ENTRY);
   const runData = safeJsonParse(runInfo.dataPath);
   if (!runData) {
     throw new Error(`Unable to load run data from ${runInfo.dataPath}`);
   }
   return renderReportHtml(runData);
+}
+
+function invalidateTemplateCache() {
+  const cachedPaths = Object.keys(require.cache);
+  cachedPaths.forEach((modulePath) => {
+    const normalizedPath = modulePath.replace(/\\/g, '/');
+    const shouldInvalidate = TEMPLATE_CACHE_ROOTS.some((root) => {
+      const normalizedRoot = root.replace(/\\/g, '/');
+      return (
+        normalizedPath === normalizedRoot ||
+        normalizedPath.startsWith(`${normalizedRoot.replace(/\.js$/, '')}/`)
+      );
+    });
+    if (shouldInvalidate) {
+      delete require.cache[modulePath];
+    }
+  });
+}
+
+function injectLiveReload(html, runInfo) {
+  if (!runInfo) return html;
+
+  const snippet = `<script id="report-dev-live-reload">
+(() => {
+  const RUN_ID = ${JSON.stringify(runInfo.id)};
+  let reconnectTimer = null;
+  const connect = () => {
+    const source = new EventSource('${SSE_PATH}');
+    let reloadScheduled = false;
+
+    const scheduleReload = () => {
+      if (reloadScheduled) return;
+      reloadScheduled = true;
+      setTimeout(() => {
+        try {
+          const url = new URL(window.location.href);
+          url.searchParams.set('__refresh', Date.now().toString(36));
+          window.location.replace(url.toString());
+        } catch (_error) {
+          window.location.reload();
+        }
+      }, 60);
+    };
+
+    const readPayload = (event) => {
+      if (!event || !event.data) return {};
+      try {
+        return JSON.parse(event.data);
+      } catch (_error) {
+        return {};
+      }
+    };
+
+    source.addEventListener('hydrate', (event) => {
+      const payload = readPayload(event);
+      if (payload.runId && payload.runId !== RUN_ID) {
+        scheduleReload();
+      }
+    });
+    source.addEventListener('run-changed', () => scheduleReload());
+    source.addEventListener('content-changed', () => scheduleReload());
+    source.addEventListener('template-changed', () => scheduleReload());
+    source.onerror = () => {
+      source.close();
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      reconnectTimer = setTimeout(connect, 1500);
+    };
+  };
+
+  connect();
+})();
+</script>`;
+
+  if (html.includes('</body>')) {
+    return html.replace('</body>', `${snippet}\n</body>`);
+  }
+
+  return `${html}\n${snippet}`;
 }
 
 function respondWithError(res, status, message) {
@@ -157,13 +383,76 @@ function serveStaticAsset(res, runInfo, urlPath) {
         respondWithError(res, readError.code === 'ENOENT' ? 404 : 500, 'Server Error');
         return;
       }
-      res.writeHead(200, { 'Content-Type': type });
+      res.writeHead(200, {
+        'Content-Type': type,
+        'Cache-Control': 'no-store',
+      });
       res.end(buffer);
     });
   });
 }
 
+function broadcast(eventName, payload) {
+  if (sseClients.size === 0) return;
+
+  const message = `event: ${eventName}\ndata: ${JSON.stringify(payload || {})}\n\n`;
+  for (const client of sseClients) {
+    try {
+      client.res.write(message);
+      continue;
+    } catch (_error) {
+      if (typeof client.res.destroy === 'function') {
+        client.res.destroy();
+      }
+    }
+    sseClients.delete(client);
+  }
+}
+
+function handleEventStream(req, res) {
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream; charset=utf-8',
+    'Cache-Control': 'no-cache',
+    Connection: 'keep-alive',
+  });
+  res.write('\n');
+
+  const client = { res };
+  sseClients.add(client);
+
+  const runInfo = resolveRunInfo();
+  if (runInfo) {
+    res.write(`event: hydrate\n`);
+    res.write(`data: ${JSON.stringify({ runId: runInfo.id })}\n\n`);
+  }
+
+  if (!fixedRunInfo) {
+    scheduleRunRefresh('sse-connect');
+  }
+
+  const heartbeat = setInterval(() => {
+    try {
+      res.write(`event: ping\ndata: {}\n\n`);
+    } catch (_error) {
+      clearInterval(heartbeat);
+    }
+  }, HEARTBEAT_INTERVAL);
+  heartbeat.unref();
+
+  req.on('close', () => {
+    clearInterval(heartbeat);
+    sseClients.delete(client);
+  });
+}
+
 const server = http.createServer((req, res) => {
+  const requestUrl = new URL(req.url, `http://${req.headers.host}`);
+
+  if (req.method === 'GET' && requestUrl.pathname === SSE_PATH) {
+    handleEventStream(req, res);
+    return;
+  }
+
   const runInfo = resolveRunInfo();
   if (!runInfo) {
     respondWithError(
@@ -174,33 +463,78 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  if (!fixedRunInfo && runInfo.id !== announcedRunId) {
+  if (!fixedRunInfo) {
+    scheduleRunRefresh('request-sync');
+  }
+
+  if (runInfo.id !== announcedRunId) {
     announcedRunId = runInfo.id;
     console.log(`[report-dev] Now serving run: ${runInfo.id}`);
   }
 
-  const url = new URL(req.url, `http://${req.headers.host}`);
-  if (url.pathname === '/' || url.pathname === '/index.html' || url.pathname === '/report.html') {
+  if (
+    requestUrl.pathname === '/' ||
+    requestUrl.pathname === '/index.html' ||
+    requestUrl.pathname === '/report.html'
+  ) {
     try {
       const html = renderReportHtmlFromData(runInfo);
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-      res.end(html);
+      const withRuntime = injectLiveReload(html, runInfo);
+      res.writeHead(200, {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Cache-Control': 'no-store',
+      });
+      res.end(withRuntime);
     } catch (error) {
       respondWithError(res, 500, `Failed to render report: ${error.message}`);
     }
     return;
   }
 
-  serveStaticAsset(res, runInfo, url.pathname);
+  serveStaticAsset(res, runInfo, requestUrl.pathname);
 });
+
+function closeAllWatchers() {
+  const closers = [];
+  if (runDirWatcher) {
+    closers.push(runDirWatcher.close());
+    runDirWatcher = null;
+  }
+  if (reportsDirWatcher) {
+    closers.push(reportsDirWatcher.close());
+    reportsDirWatcher = null;
+  }
+  if (templateWatcher) {
+    closers.push(templateWatcher.close());
+    templateWatcher = null;
+  }
+  return Promise.allSettled(closers);
+}
+
+function closeAllClients() {
+  for (const client of sseClients) {
+    try {
+      client.res.end();
+    } catch (_error) {
+      if (typeof client.res.destroy === 'function') {
+        client.res.destroy();
+      }
+    }
+  }
+  sseClients.clear();
+}
 
 let shuttingDown = false;
 function shutdown(code = 0) {
   if (shuttingDown) return;
   shuttingDown = true;
   console.log('\n[report-dev] Shutting down preview server...');
-  server.close(() => {
-    process.exit(code);
+
+  closeAllClients();
+  closeAllWatchers().finally(() => {
+    server.close(() => {
+      process.exit(code);
+    });
   });
 
   const forcedExit = setTimeout(() => {
@@ -216,6 +550,13 @@ function shutdown(code = 0) {
 server.on('error', (error) => {
   console.error(`[report-dev] Server error: ${error.message}`);
 });
+
+const initialRun = resolveRunInfo();
+if (initialRun) {
+  rebuildRunWatcher(initialRun);
+}
+ensureReportsWatcher();
+ensureTemplateWatcher();
 
 server.listen(PORT, () => {
   const runInfo = resolveRunInfo();

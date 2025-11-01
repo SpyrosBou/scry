@@ -3870,11 +3870,11 @@ const buildPanelToggleStyles = (panels) =>
       const highlight = (() => {
         switch (panel.status) {
           case 'fail':
-            return `  background: rgba(220, 38, 38, 0.28);\n  color: #101828;`;
+            return `  background: var(--nav-card-fail-hover-bg);\n  color: var(--nav-status-fail-text);`;
           case 'pass':
-            return `  background: rgba(16, 185, 129, 0.24);\n  color: #101828;`;
+            return `  background: var(--nav-card-pass-hover-bg);\n  color: var(--nav-status-pass-text);`;
           case 'warn':
-            return `  background: rgba(234, 179, 8, 0.24);\n  color: #101828;`;
+            return `  background: var(--nav-card-info-hover-bg);\n  color: var(--nav-status-info-text);`;
           case 'info':
           default:
             return '';

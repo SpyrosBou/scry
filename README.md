@@ -48,7 +48,7 @@ Helpful environment variables:
 
 ## Reports and Artifacts
 - Run outputs live under `reports/run-*/` with HTML in `report.html` and structured data in `data/run.json`.
-- Use `npm run reports:dev` to start a lightweight preview server for the latest report (opens at http://127.0.0.1:4173/ by default). The HTML (HyperText Markup Language) is re-rendered on each refresh so tweaks to `docs/mocks/report-styles.scss`, `utils/report-templates.js`, or the latest run artefacts appear without restarting the server.
+- Use `npm run reports:dev` to start a preview server with live reload at http://127.0.0.1:4173/ (default). It watches `reports/run-*`, `reports/latest-run.json`, plus the template and SCSS sources in `utils/` and `docs/mocks/`, auto-refreshing immediately when report data, styling, or helper code changes.
 - Use `npm run reports:read [count]` to open the most recent report(s) without hunting filenames.
 - Regenerate an interactive report from stored data via `npm run reports:regenerate`.
 - Clean up old artifacts with `npm run clean:reports`, `npm run clean:manifests`, or `npm run clean:test-results`.
