@@ -66,6 +66,8 @@ const MIME_TYPES = {
 
 const SSE_PATH = '/__report-dev/events';
 const HEARTBEAT_INTERVAL = 25000;
+const MAX_PORT_RETRIES = 10;
+const PORT_RETRY_DELAY = 150;
 
 const sseClients = new Set();
 let runDirWatcher = null;
@@ -547,18 +549,17 @@ function shutdown(code = 0) {
   process.on(signal, () => shutdown(0));
 });
 
-server.on('error', (error) => {
-  console.error(`[report-dev] Server error: ${error.message}`);
-});
+let currentPort = PORT;
+let portRetryCount = 0;
+let browserOpened = false;
 
-const initialRun = resolveRunInfo();
-if (initialRun) {
-  rebuildRunWatcher(initialRun);
-}
-ensureReportsWatcher();
-ensureTemplateWatcher();
+const handleListening = () => {
+  const address = server.address();
+  if (address && typeof address === 'object' && address.port) {
+    currentPort = address.port;
+  }
+  portRetryCount = 0;
 
-server.listen(PORT, () => {
   const runInfo = resolveRunInfo();
   console.log('[report-dev] Report preview ready.');
   if (runInfo) {
@@ -569,8 +570,46 @@ server.listen(PORT, () => {
       '[report-dev] No report detected yet. Generate a run and refresh when it finishes.'
     );
   }
-  console.log(`[report-dev] Visit http://127.0.0.1:${PORT}/`);
-  if (args.open) {
-    openInBrowser(`http://127.0.0.1:${PORT}/`).catch(() => {});
+  console.log(`[report-dev] Visit http://127.0.0.1:${currentPort}/`);
+  if (args.open && !browserOpened) {
+    browserOpened = true;
+    openInBrowser(`http://127.0.0.1:${currentPort}/`).catch(() => {});
   }
+};
+
+const startListening = (port) => {
+  currentPort = port;
+  server.listen(port);
+};
+
+server.on('listening', handleListening);
+
+server.on('error', (error) => {
+  if (error && error.code === 'EADDRINUSE') {
+    if (portRetryCount >= MAX_PORT_RETRIES) {
+      console.error(
+        `[report-dev] Port ${currentPort} is unavailable and no alternative ports were free after ${MAX_PORT_RETRIES} retries.`
+      );
+      shutdown(1);
+      return;
+    }
+    const nextPort = currentPort + 1;
+    portRetryCount += 1;
+    console.warn(
+      `[report-dev] Port ${currentPort} unavailable, attempting to listen on ${nextPort}...`
+    );
+    setTimeout(() => startListening(nextPort), PORT_RETRY_DELAY);
+    return;
+  }
+
+  console.error(`[report-dev] Server error: ${error.message}`);
 });
+
+const initialRun = resolveRunInfo();
+if (initialRun) {
+  rebuildRunWatcher(initialRun);
+}
+ensureReportsWatcher();
+ensureTemplateWatcher();
+
+startListening(PORT);
