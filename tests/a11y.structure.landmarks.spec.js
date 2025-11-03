@@ -37,7 +37,7 @@ const formatStructureBadgeLabel = (reference) => {
 };
 
 const createStructureFinding = (message, wcagId, extras = {}) => {
-  const { summary, sample, samples, impact = 'minor', tags: extraTags } = extras;
+  const { summary, sample, samples, nodes, impact = 'minor', tags: extraTags } = extras;
   const reference = wcagId ? findStructureReference(wcagId) : null;
   const badge = reference ? formatStructureBadgeLabel(reference) : null;
   const tags = Array.isArray(extraTags) ? extraTags.filter(Boolean) : [];
@@ -67,12 +67,16 @@ const createStructureFinding = (message, wcagId, extras = {}) => {
     tags: uniqueTags,
     sample: collectedSamples.length === 1 ? collectedSamples[0] : null,
     samples: collectedSamples.length > 1 ? collectedSamples : null,
+    // allow callers to attach structured nodes (with screenshotDataUri/target/html)
+    nodes: Array.isArray(nodes) ? nodes.filter(Boolean) : undefined,
   };
 };
 
 const evaluateStructure = async (page) => {
   return page.evaluate(() => {
-    const headings = Array.from(document.querySelectorAll('h1, h2, h3, h4, h5, h6')).map((heading) => ({
+    const headingNodes = Array.from(document.querySelectorAll('h1, h2, h3, h4, h5, h6'));
+    const headings = headingNodes.map((heading, index) => ({
+      index,
       level: Number(heading.tagName.substring(1)),
       text: (heading.textContent || '').trim(),
     }));
@@ -89,9 +93,15 @@ const evaluateStructure = async (page) => {
       if (previousLevel !== null) {
         const delta = heading.level - previousLevel;
         if (delta > 1) {
-          headingSkips.push(
-            `Level jumps from H${previousLevel} to H${heading.level} — "${heading.text || 'Untitled heading'}"`
-          );
+          const text = heading.text || 'Untitled heading';
+          const message = `Level jumps from H${previousLevel} to H${heading.level} — "${text}"`;
+          headingSkips.push({
+            index: heading.index,
+            level: heading.level,
+            prevLevel: previousLevel,
+            text,
+            message,
+          });
         }
       }
       previousLevel = heading.level;
@@ -234,26 +244,36 @@ test.describe('Accessibility: Structural landmarks', () => {
         }
 
         const headingSkipCount = structure.headingSkips.length;
-        report.headingSkips = structure.headingSkips.map((detail) =>
-          createStructureFinding(detail, '2.4.6', {
-            impact: 'moderate',
-            summary: 'Heading level sequence issue',
-            sample: detail,
-          })
-        );
+        // Enrich heading skip findings with precise targets and screenshots
+        report.headingSkips = [];
+        for (const skip of structure.headingSkips) {
+          // best-effort target label for readability in the report
+          const targetLabel = `h${skip.level}: "${skip.text}"`;
+          let screenshotDataUri = null;
+          try {
+            const locator = page.locator('h1, h2, h3, h4, h5, h6').nth(skip.index);
+            const buffer = await locator.screenshot();
+            screenshotDataUri = `data:image/png;base64,${buffer.toString('base64')}`;
+          } catch (_) {
+            // non-fatal: continue without screenshot
+          }
 
-        if (headingSkipCount) {
-          report.advisories.push(
-            createStructureFinding(
-              `Heading levels skip levels on this page (${headingSkipCount} occurrence(s)).`,
-              '2.4.6',
-              {
-                summary: 'Heading level sequence issue',
-                sample: `${headingSkipCount} occurrence(s)`,
-              }
-            )
+          report.headingSkips.push(
+            createStructureFinding(skip.message, '2.4.6', {
+              impact: 'moderate',
+              summary: 'Heading level sequence issue',
+              nodes: [
+                {
+                  target: [targetLabel],
+                  screenshotDataUri: screenshotDataUri || undefined,
+                },
+              ],
+            })
           );
         }
+
+        // Do not also add a duplicative advisory for heading skips; the per-occurrence
+        // warnings above already capture the issue with precise targets and screenshots.
 
         report.notes.push(
           `Heading outline captured ${structure.headings.length} nodes with ${headingSkipCount} level skip(s).`

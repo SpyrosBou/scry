@@ -955,6 +955,26 @@ const extractNodeTargets = (nodes, limit = 3) => {
     .join('<br />');
 };
 
+// Build a compact list of screenshot links for nodes that include
+// a screenshot reference (data URI or relative path).
+const extractNodeScreenshots = (nodes, limit = 3) => {
+  if (!Array.isArray(nodes) || nodes.length === 0) return null;
+  const hrefs = [];
+  nodes.forEach((node) => {
+    const href = node?.screenshotDataUri || node?.screenshot || node?.image || node?.preview || null;
+    if (!href) return;
+    const safeHref = String(href).startsWith('data:') || String(href).startsWith('http') || String(href).startsWith('/')
+      ? String(href)
+      : `./${String(href)}`;
+    hrefs.push(safeHref);
+  });
+  if (hrefs.length === 0) return null;
+  const unique = Array.from(new Set(hrefs)).slice(0, limit);
+  return unique
+    .map((href, idx) => `<a class="screenshot-link" href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">View${unique.length > 1 ? ` #${idx + 1}` : ''}</a>`)
+    .join('<br />');
+};
+
 const formatMilliseconds = (value) => {
   if (!Number.isFinite(value)) return null;
   if (value >= 1000) {
@@ -1778,6 +1798,7 @@ const renderWcagPageIssueTable = (entries, heading, options = {}) => {
       const nodesCount = Array.isArray(entry.nodes) ? entry.nodes.length : entry.nodesCount || 0;
       const helpUrl = entry.helpUrl || entry.help || null;
       const targetsHtml = extractNodeTargets(entry.nodes || []);
+      const screenshotsHtml = extractNodeScreenshots(entry.nodes || []);
       const wcagHtml = renderWcagTagBadges(entry.tags || entry.wcagTags || []);
       return `
         <tr class="impact-${escapeHtml((impact || 'info').toLowerCase())}">
@@ -1786,6 +1807,7 @@ const renderWcagPageIssueTable = (entries, heading, options = {}) => {
           <td>${escapeHtml(formatCount(nodesCount))}</td>
           <td>${helpUrl ? `<a href="${escapeHtml(helpUrl)}" target="_blank" rel="noopener noreferrer">rule docs</a>` : '<span class="details">—</span>'}</td>
           <td>${wcagHtml}</td>
+          <td>${screenshotsHtml || '<span class="details">—</span>'}</td>
           <td>${targetsHtml || '<span class="details">—</span>'}</td>
         </tr>
       `;
@@ -1796,7 +1818,7 @@ const renderWcagPageIssueTable = (entries, heading, options = {}) => {
     <h4${headingClass}>${escapeHtml(heading)}</h4>
     <div class="page-card__table">
       <table>
-        <thead><tr><th>Impact</th><th>Rule</th><th>Nodes</th><th>Help</th><th>WCAG level</th><th>Sample targets</th></tr></thead>
+        <thead><tr><th>Impact</th><th>Rule</th><th>Nodes</th><th>Help</th><th>WCAG level</th><th>Screenshot</th><th>Sample targets</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
     </div>
@@ -6466,7 +6488,15 @@ const renderStructurePageCard = (summary) => {
 
   const gatingEntries = aggregateStructureIssues(gating, 'critical');
   const warningEntries = aggregateStructureIssues([...warnings, ...headingSkips], 'moderate');
-  const advisoryEntries = aggregateStructureIssues(advisories, 'minor');
+  let advisoryEntries = aggregateStructureIssues(advisories, 'minor');
+  // Remove advisories that duplicate warnings by message/id to avoid
+  // showing the same "Heading level sequence" issue as both moderate and minor.
+  if (warningEntries.length && advisoryEntries.length) {
+    const warnKeys = new Set(warningEntries.map((w) => (w.id || w.rule || '').toLowerCase()));
+    advisoryEntries = advisoryEntries.filter(
+      (a) => !warnKeys.has(String(a.id || a.rule || '').toLowerCase())
+    );
+  }
 
   const metaLines = [
     `<p class="details"><strong>H1 count:</strong> ${escapeHtml(

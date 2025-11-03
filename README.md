@@ -58,7 +58,7 @@ Helpful environment variables:
 - Use `npm run reports:read [count]` to open the most recent report(s) without hunting filenames.
 - Regenerate an interactive report from stored data via `npm run reports:regenerate`.
 - Clean up old artifacts with `npm run clean:reports`, `npm run clean:manifests`, or `npm run clean:test-results`.
- - Per‑page tables include a “Sample targets” column. When specs attach element screenshots to nodes, each pill is a clickable link that opens the captured node image (Keyboard audit attaches a focused‑element screenshot when focus indicators are missing).
+- Per‑page tables now include a “Screenshot” column and a “Sample targets” column. When specs attach element screenshots to nodes, the Screenshot column shows one or more "View" links that open the captured image in a new tab. The Sample targets column lists the relevant element(s) (e.g., `h2: "Section title"`) and links the pill to the same screenshot when available. (Keyboard audit continues to attach focused‑element screenshots when focus indicators are missing.)
 
 ## Reporter Layout Migration Guide
 - **Layout blueprint:** Every spec panel now targets the four-block structure used by the WCAG (Web Content Accessibility Guidelines) audit — run summary, gating violations, best-practice advisories, and per-page findings. Reuse `renderUnifiedIssuesTable` for the first two tables and `renderPerPageAccordion` plus a spec-specific page card renderer for the accordion.
