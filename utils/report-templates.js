@@ -8354,6 +8354,7 @@ function renderReportHtml(run) {
   <style>
 ${baseStyles}
 ${toggleStyles}
+${imageViewerStyles}
   </style>
   ${SUMMARY_STYLES}
 </head>
@@ -8368,6 +8369,7 @@ ${toggleStyles}
       ${panelsHtml}
     </main>
   </div>
+  <script>${imageViewerScript}</script>
   <script>${filterScript}</script>
 </body>
 </html>`;
@@ -8380,6 +8382,54 @@ module.exports = {
   renderSchemaSummariesMarkdown,
   renderRunSummariesMarkdown,
 };
+
+// Lightweight in-page image viewer to avoid new-tab data: URL issues in some browsers.
+const imageViewerStyles = `
+.image-viewer-overlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,0.66); z-index: 9999; padding: 2rem; }
+.image-viewer-overlay[open] { display: flex; }
+.image-viewer { position: relative; max-width: 92vw; max-height: 92vh; background: var(--surface-panel); border: 1px solid var(--border-default); border-radius: var(--radius-md); box-shadow: var(--shadow-floating); padding: .5rem; }
+.image-viewer img { display: block; max-width: 90vw; max-height: 88vh; }
+.image-viewer__close { position: absolute; top: .5rem; right: .5rem; background: var(--surface-card); border: 1px solid var(--border-default); border-radius: 8px; padding: .35rem .6rem; cursor: pointer; }
+`;
+
+const imageViewerScript = `
+(function () {
+  let overlay;
+  function ensureOverlay() {
+    if (overlay) return overlay;
+    overlay = document.createElement('div');
+    overlay.className = 'image-viewer-overlay';
+    overlay.innerHTML = '<button class="image-viewer__close" aria-label="Close image">✕</button><div class="image-viewer"><img alt="Issue screenshot" /></div>';
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay || e.target.classList.contains('image-viewer__close')) {
+        overlay.removeAttribute('open');
+      }
+    });
+    return overlay;
+  }
+  function openImage(href) {
+    const ov = ensureOverlay();
+    const img = ov.querySelector('img');
+    if (img) img.src = href;
+    ov.setAttribute('open', '');
+  }
+  function isImageHref(href) {
+    if (!href) return false;
+    if (href.startsWith('data:image/')) return true;
+    return /\.(png|jpe?g|webp|gif|bmp)$/i.test(href);
+  }
+  document.addEventListener('click', (e) => {
+    const a = e.target && e.target.closest && e.target.closest('a.screenshot-link, a.sample-pill');
+    if (!a) return;
+    const href = a.getAttribute('href');
+    if (isImageHref(href)) {
+      e.preventDefault();
+      openImage(href);
+    }
+  });
+})();
+`;
 
 module.exports.__test__ = {
   renderIssueSectionPair,
