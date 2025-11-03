@@ -938,20 +938,7 @@ const extractNodeTargets = (nodes, limit = 3) => {
   const unique = Array.from(new Set(targets)).slice(0, limit);
   const byLabel = new Map(enrichments.map((e) => [e.label, e]));
   return unique
-    .map((label) => {
-      const info = byLabel.get(label);
-      const pill = `<code>${escapeHtml(label)}</code>`;
-      const href = info && info.screenshot ? String(info.screenshot) : null;
-      if (href) {
-        const safeHref = href.startsWith('data:') || href.startsWith('http') || href.startsWith('/')
-          ? href
-          : `./${href}`;
-        return `<a class="sample-pill" href="${escapeHtml(
-          safeHref
-        )}" target="_blank" rel="noopener noreferrer">${pill}</a>`;
-      }
-      return pill;
-    })
+    .map((label) => `<code>${escapeHtml(label)}</code>`)
     .join('<br />');
 };
 
@@ -1818,7 +1805,7 @@ const renderWcagPageIssueTable = (entries, heading, options = {}) => {
     <h4${headingClass}>${escapeHtml(heading)}</h4>
     <div class="page-card__table">
       <table>
-        <thead><tr><th>Impact</th><th>Rule</th><th>Nodes</th><th>Help</th><th>WCAG level</th><th>Screenshot</th><th>Sample targets</th></tr></thead>
+        <thead><tr><th>Impact</th><th>Rule</th><th>Nodes</th><th>Help</th><th>WCAG level</th><th>Screenshot</th><th>Culprit</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
     </div>
@@ -8420,7 +8407,7 @@ const imageViewerScript = `
     return /\.(png|jpe?g|webp|gif|bmp)$/i.test(href);
   }
   document.addEventListener('click', (e) => {
-    const a = e.target && e.target.closest && e.target.closest('a.screenshot-link, a.sample-pill');
+    const a = e.target && e.target.closest && e.target.closest('a.screenshot-link');
     if (!a) return;
     const href = a.getAttribute('href');
     if (isImageHref(href)) {
