@@ -1547,11 +1547,31 @@ const resolveViewportsTested = (records = []) => {
   return Array.from(viewports);
 };
 
+// Map raw viewport/project labels to high-level layout categories
+// like "Mobile", "Tablet", or "Desktop".
+const classifyLayouts = (labels = []) => {
+  const cats = new Set();
+  labels.forEach((raw) => {
+    const v = String(raw || '').toLowerCase();
+    if (!v) return;
+    if (/mobile|iphone|android|phone/.test(v)) {
+      cats.add('Mobile');
+    } else if (/tablet|ipad/.test(v)) {
+      cats.add('Tablet');
+    } else {
+      cats.add('Desktop');
+    }
+  });
+  return Array.from(cats);
+};
+
 const renderSummaryStatCards = (run, summaryMap, suiteCards, schemaRecords, suitePanels = []) => {
   const pagesTested = resolvePagesTested(summaryMap);
   const projects = Array.isArray(run?.projects) ? run.projects.filter(Boolean) : [];
   const viewportsTested = resolveViewportsTested(schemaRecords);
   const siteLabel = run?.site?.baseUrl || run?.site?.name || null;
+
+  const layoutCategories = classifyLayouts(viewportsTested);
 
   const stats = [
     {
@@ -1576,8 +1596,8 @@ const renderSummaryStatCards = (run, summaryMap, suiteCards, schemaRecords, suit
     },
     {
       label: 'LAYOUTS COVERED',
-      count: viewportsTested.length ? formatNumber(viewportsTested.length) : '—',
-      meta: viewportsTested.length ? formatList(viewportsTested) : 'Not captured',
+      count: layoutCategories.length ? formatNumber(layoutCategories.length) : '—',
+      meta: layoutCategories.length ? formatList(layoutCategories) : 'Not captured',
     },
   ];
 
