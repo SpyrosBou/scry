@@ -21,7 +21,10 @@ Whilst working on this repo you can assume we are concerned with the functionali
 - `npm run test:unit` runs the Node test suite in `tests/unit/`.
 - Suite shortcuts: `npm run test:visual -- --site=<name> [--pages=<n|all>]`, `npm run test:responsive -- --site=<name> [--pages=<n|all>]`, `npm run test:functionality -- --site=<name> [--pages=<n|all>]`, `npm run test:accessibility -- --site=<name> [--pages=<n|all>]`.
 - Suite flags and `--test` patterns are mutually exclusive—choose one style per invocation.
-- `npm run discover -- <site>` hits sitemap discovery and updates the matching config; review the diff before committing.
+- `npm run discover -- <site|https://base.url>` updates sitemap-backed pages and can scaffold new configs. The base URL must include `http://` or `https://`. Examples:
+  - Interactive from URL: `npm run discover -- https://woodworking.ddev.site --local`
+  - Non-interactive flags: `npm run discover -- --base-url=https://example.com --yes --site-name=example-live [--name "Example Live"] [--allow-duplicate] [--local]`
+  - Reuse existing by name: `npm run discover -- example-live`
 - `npm run baselines:update -- <site>` refreshes visual regression snapshots for any configured site.
 - Prefer `ddev exec` when interacting with containerized WordPress instances in `/home/warui/sites`.
 

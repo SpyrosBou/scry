@@ -288,6 +288,45 @@ async function gatherNewConfigContext({
 
 async function main() {
   const args = minimist(process.argv.slice(2));
+  if (args.help || args.h) {
+    const lines = [
+      '',
+      'Discover pages and scaffold/update site configs',
+      '',
+      'Usage:',
+      '  npm run discover -- <site-name|https://base.url> [--local]',
+      '  npm run discover -- --base-url=https://example.com --yes --site-name=example-live [--local]',
+      '',
+      'Notes:',
+      '  - The base URL must include the protocol (http:// or https://).',
+      '  - Positional form accepts either a site config key (e.g. "my-site-live") or a full URL.',
+      '  - When no config exists, you can run interactively or pass --yes with flags to auto-create.',
+      '',
+      'Flags:',
+      '  --base-url, --baseUrl      Full base URL (with protocol) for the site',
+      '  --site-name, --config-name Config key (filename without .json), e.g. "my-site-live"',
+      '  --name, --display          Display name for the site (optional)',
+      '  --yes, -y                  Auto-approve prompts (non-interactive mode)',
+      '  --no, -n                   Abort creation if prompted',
+      '  --allow-duplicate          Create a new file even if base URL already exists',
+      '  --local                    Enable local DDEV preflight for .ddev.site/localhost hosts',
+      '  --help, -h                 Show this help message',
+      '',
+      'Examples:',
+      '  # Interactive: scaffold from URL (prompts for config key/name):',
+      '  npm run discover -- https://woodworking.ddev.site --local',
+      '',
+      '  # Non-interactive: fully specified flags (CI-friendly):',
+      '  npm run discover -- --base-url=https://woodworking.ddev.site \\ ',
+      '    --yes --site-name=woodworking-ddev --name "Woodworking Ddev" --local',
+      '',
+      '  # Reuse existing config by name and refresh sitemap-backed pages:',
+      '  npm run discover -- woodworking-ddev',
+      '',
+    ];
+    console.log(lines.join('\n'));
+    process.exit(0);
+  }
   const rawSiteArg = args._[0] || args.site || '';
   const siteNameArg = args['site-name'] || args['config-name'] || '';
   const allowDuplicateBase = Boolean(args['allow-duplicate'] || args.allowDuplicate);
@@ -295,10 +334,12 @@ async function main() {
   const autoApprove = Boolean(args.yes || args.y);
 
   if (!rawSiteArg && !siteNameArg) {
-    console.error('Usage: npm run discover -- <site-name|base-url> [--local]');
-    console.error(
-      '       npm run discover -- https://example.com --yes --site-name=example-live --allow-duplicate'
-    );
+    const lines = [
+      'Usage: npm run discover -- <site-name|https://base.url> [--local]',
+      '       npm run discover -- --base-url=https://example.com --yes --site-name=example-live [--local]',
+      '       (Use --help for full documentation)',
+    ];
+    console.error(lines.join('\n'));
     process.exit(1);
   }
 

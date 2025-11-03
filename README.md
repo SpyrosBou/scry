@@ -38,7 +38,13 @@ node run-tests.js --site example-site --pages 5 --responsive
 - **Multiple sites:** repeat `--site` or append additional site names after the options.
 - **Custom specs:** `node run-tests.js --site <name> --pages <n|all> --test tests/a11y.audit.wcag.spec.js`
 - **Projects:** select Playwright projects with `--browsers=chrome,firefox` or `--browsers=all`.
-- **Discovery:** append `--discover` to refresh sitemap-backed manifests before execution. Pass a full base URL to `npm run discover -- <url>` to scaffold a new `sites/*.json` interactively when one does not exist yet. The prompt lets you choose the config filename; the runner reuses existing configs when the supplied base URL already exists. In non-interactive environments supply `--yes --base-url=<url> --site-name=<config-key> [--name "<Display Name>"] [--allow-duplicate]`.
+- **Discovery:** append `--discover` to refresh sitemap-backed manifests before execution. You can also run the standalone discovery command to scaffold or refresh a site config.
+  - Requirement: the base URL must include the protocol (http:// or https://).
+  - Interactive (positional URL): `npm run discover -- https://woodworking.ddev.site [--local]`
+  - Non-interactive (flags): `npm run discover -- --base-url=https://woodworking.ddev.site --yes --site-name=woodworking-ddev [--name "Woodworking Ddev"] [--allow-duplicate] [--local]`
+  - Reuse by name (refresh sitemap-backed pages only): `npm run discover -- woodworking-ddev`
+  - Flags supported: `--base-url|--baseUrl`, `--site-name|--config-name`, `--name|--display`, `--yes|-y`, `--no|-n`, `--allow-duplicate`, `--local`, `--help`.
+  - Behavior: if a config for the base URL already exists, it will be reused unless `--allow-duplicate` is passed. In interactive mode you’ll be prompted; in non-interactive mode pair `--yes` with the necessary flags.
 - **Debugging:** use `--debug` for Playwright trace mode or `--output <path>` to persist manifest JSON.
 - **Page cap:** omit `--pages` to use the default of 5, pass a positive integer to override, or use `--pages all` to test every available page.
 
