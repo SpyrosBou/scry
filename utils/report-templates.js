@@ -5251,12 +5251,21 @@ const makeKeyboardIssueEntry = (issue, impact) => {
   }
 
   const text = String(issue || '').trim() || 'Issue';
+  const lower = text.toLowerCase();
+  const inferred = [];
+  if (/keyboard\s*trap/.test(lower) || /returned\s+focus\s+to\s*<body>/.test(lower)) {
+    inferred.push('WCAG 2.1.2 A');
+  } else if (/did not progress beyond the first interactive element/.test(lower)) {
+    inferred.push('WCAG 2.4.3 A');
+  } else if (/visually hidden/.test(lower) || /no active element after tabbing/.test(lower)) {
+    inferred.push('WCAG 2.4.7 AA');
+  }
   return {
     impact: impact || 'info',
     id: text,
     rule: text,
     nodes: [],
-    tags: [],
+    tags: inferred,
   };
 };
 
