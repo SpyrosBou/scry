@@ -263,12 +263,7 @@ const renderUnifiedIssuesTable = (issues, { title, emptyMessage, variant, viewpo
     if (Array.isArray(issue?.wcagTags) && issue.wcagTags.length > 0) return true;
     return false;
   });
-  const hasHelpData = issues.some((issue) => {
-    if (typeof issue?.helpHtml === 'string' && issue.helpHtml.trim()) return true;
-    if (issue?.helpUrl != null && String(issue.helpUrl).trim()) return true;
-    if (issue?.help != null && String(issue.help).trim()) return true;
-    return false;
-  });
+  const hasHelpData = false; // Help column removed; WCAG badges become the link
 
   const rows = issues
     .slice()
@@ -293,26 +288,10 @@ const renderUnifiedIssuesTable = (issues, { title, emptyMessage, variant, viewpo
       const wcagHtml = (() => {
         if (!hasWcagData) return '';
         if (typeof issue.wcagHtml === 'string' && issue.wcagHtml.trim()) return issue.wcagHtml;
-        if (issue.wcagBadge) {
-          return `<span class="badge badge-wcag">${escapeHtml(issue.wcagBadge)}</span>`;
-        }
-        if (Array.isArray(issue.wcagTags) && issue.wcagTags.length > 0) {
-          return renderWcagTagBadges(issue.wcagTags);
-        }
-        return '<span class="details">—</span>';
-      })();
-      const helpHtml = (() => {
-        if (!hasHelpData) return '';
-        if (typeof issue.helpHtml === 'string' && issue.helpHtml.trim()) return issue.helpHtml;
-        const rawUrl =
-          issue.helpUrl != null ? String(issue.helpUrl).trim() : String(issue.help || '').trim();
-        if (rawUrl) {
-          const label = issue.helpLabel ? String(issue.helpLabel).trim() : 'rule docs';
-          return `<a href="${escapeHtml(rawUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(
-            label || 'rule docs'
-          )}</a>`;
-        }
-        return '<span class="details">—</span>';
+        const tags = []
+          .concat(issue.wcagBadge ? [issue.wcagBadge] : [])
+          .concat(Array.isArray(issue.wcagTags) ? issue.wcagTags : []);
+        return renderWcagBadgesLinked(tags);
       })();
 
       const cells = [
@@ -326,21 +305,14 @@ const renderUnifiedIssuesTable = (issues, { title, emptyMessage, variant, viewpo
       if (hasWcagData) {
         cells.push(`<td>${wcagHtml}</td>`);
       }
-      if (hasHelpData) {
-        cells.push(`<td>${helpHtml}</td>`);
-      }
+      // No Help column; WCAG badges act as link
 
       return `<tr class="impact-${escapeHtml(impact)}">${cells.join('')}</tr>`;
     })
     .join('');
 
   const headers = ['Impact', 'Issue', 'Viewport(s)', 'Pages', 'Nodes'];
-  if (hasWcagData) {
-    headers.push('WCAG level');
-  }
-  if (hasHelpData) {
-    headers.push('Help');
-  }
+  if (hasWcagData) headers.push('WCAG level');
 
   return `
     <section class="${baseClass}">
@@ -916,6 +888,16 @@ const renderWcagTagBadges = (tags) => {
     .join('');
 };
 
+// Wrap WCAG badges in a link to the appropriate "Understanding" page when derivable.
+const renderWcagBadgesLinked = (tags) => {
+  const badges = renderWcagTagBadges(tags);
+  const derived = deriveWcagHelpLink(tags || []);
+  if (derived && derived.helpUrl) {
+    return `<a href="${escapeHtml(derived.helpUrl)}" target="_blank" rel="noopener noreferrer">${badges}</a>`;
+  }
+  return badges;
+};
+
 const extractNodeTargets = (nodes, limit = 3) => {
   if (!Array.isArray(nodes) || nodes.length === 0) return null;
   const targets = [];
@@ -1130,7 +1112,7 @@ const renderAccessibilityRuleTable = (title, rules, { headingClass, sectionClass
       const helpLink = rule.helpUrl
         ? `<a href="${escapeHtml(rule.helpUrl)}" target="_blank" rel="noopener noreferrer">rule docs</a>`
         : '<span class="details">—</span>';
-      const wcagHtml = wcagTags.length ? renderWcagTagBadges(wcagTags) : renderWcagTagBadges([]);
+      const wcagHtml = wcagTags.length ? renderWcagBadgesLinked(wcagTags) : renderWcagTagBadges([]);
       return `
         <tr class="impact-${escapeHtml((rule.impact || rule.category || 'info').toLowerCase())}">
           <td>${escapeHtml(rule.impact || rule.category || 'info')}</td>
@@ -1139,7 +1121,6 @@ const renderAccessibilityRuleTable = (title, rules, { headingClass, sectionClass
           <td>${escapeHtml(formatCount(Array.isArray(rule.pages) ? rule.pages.length : rule.pages || 0))}</td>
           <td>${escapeHtml(formatCount(rule.nodes ?? 0))}</td>
           <td>${wcagHtml}</td>
-          <td>${helpLink}</td>
         </tr>
       `;
     })
@@ -1151,7 +1132,7 @@ const renderAccessibilityRuleTable = (title, rules, { headingClass, sectionClass
       <h3${headingAttr}>${escapeHtml(title)}</h3>
       <table>
         <thead>
-          <tr><th>Impact</th><th>Rule</th><th>Viewport(s)</th><th>Pages</th><th>Nodes</th><th>WCAG level</th><th>Help</th></tr>
+          <tr><th>Impact</th><th>Rule</th><th>Viewport(s)</th><th>Pages</th><th>Nodes</th><th>WCAG level</th></tr>
         </thead>
         <tbody>${rows}</tbody>
       </table>
@@ -1823,17 +1804,24 @@ const renderWcagPageIssueTable = (entries, heading, options = {}) => {
     .map((entry) => {
       const impact = entry.impact || entry.category || 'info';
       const nodesCount = Array.isArray(entry.nodes) ? entry.nodes.length : entry.nodesCount || 0;
-      const helpUrl = entry.helpUrl || entry.help || null;
+      let helpUrl = entry.helpUrl || entry.help || null;
       const targetsHtml = extractNodeTargets(entry.nodes || []);
       const screenshotsHtml = extractNodeScreenshots(entry.nodes || []);
-      const wcagHtml = renderWcagTagBadges(entry.tags || entry.wcagTags || []);
+      const wcagHtml = renderWcagBadgesLinked(entry.tags || entry.wcagTags || []);
+      // Derive Help link from WCAG tags if not explicitly provided
+      if (!helpUrl) {
+        const tags = (entry.tags || entry.wcagTags || []).filter(Boolean);
+        const derived = deriveWcagHelpLink(tags);
+        if (derived && derived.helpUrl) {
+          helpUrl = derived.helpUrl;
+        }
+      }
       const detailsText = deriveIssueDetails(entry);
       return `
         <tr class="impact-${escapeHtml((impact || 'info').toLowerCase())}">
           <td>${escapeHtml(impact || 'info')}</td>
           <td>${escapeHtml(entry.id || entry.rule || 'Unnamed rule')}</td>
           <td>${escapeHtml(formatCount(nodesCount))}</td>
-          <td>${helpUrl ? `<a href="${escapeHtml(helpUrl)}" target="_blank" rel="noopener noreferrer">rule docs</a>` : '<span class="details">—</span>'}</td>
           <td>${wcagHtml}</td>
           <td>${escapeHtml(detailsText)}</td>
           <td>${screenshotsHtml || '<span class="details">—</span>'}</td>
@@ -1847,7 +1835,7 @@ const renderWcagPageIssueTable = (entries, heading, options = {}) => {
     <h4${headingClass}>${escapeHtml(heading)}</h4>
     <div class="page-card__table">
       <table>
-        <thead><tr><th>Impact</th><th>Rule</th><th>Nodes</th><th>Help</th><th>WCAG level</th><th>Details</th><th>Screenshot</th><th>Culprit</th></tr></thead>
+        <thead><tr><th>Impact</th><th>Rule</th><th>Nodes</th><th>WCAG level</th><th>Details</th><th>Screenshot</th><th>Culprit</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
     </div>
