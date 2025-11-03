@@ -37,7 +37,7 @@ const formatStructureBadgeLabel = (reference) => {
 };
 
 const createStructureFinding = (message, wcagId, extras = {}) => {
-  const { summary, sample, samples, nodes, impact = 'minor', tags: extraTags } = extras;
+  const { summary, sample, samples, nodes, details, impact = 'minor', tags: extraTags } = extras;
   const reference = wcagId ? findStructureReference(wcagId) : null;
   const badge = reference ? formatStructureBadgeLabel(reference) : null;
   const tags = Array.isArray(extraTags) ? extraTags.filter(Boolean) : [];
@@ -69,6 +69,7 @@ const createStructureFinding = (message, wcagId, extras = {}) => {
     samples: collectedSamples.length > 1 ? collectedSamples : null,
     // allow callers to attach structured nodes (with screenshotDataUri/target/html)
     nodes: Array.isArray(nodes) ? nodes.filter(Boolean) : undefined,
+    details: details ? String(details) : undefined,
   };
 };
 
@@ -262,6 +263,7 @@ test.describe('Accessibility: Structural landmarks', () => {
             createStructureFinding(skip.message, '2.4.6', {
               impact: 'moderate',
               summary: 'Heading level sequence issue',
+              details: `Jumps H${skip.prevLevel} → H${skip.level}`,
               nodes: [
                 {
                   target: [targetLabel],

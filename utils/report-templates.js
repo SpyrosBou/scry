@@ -958,8 +958,46 @@ const extractNodeScreenshots = (nodes, limit = 3) => {
   if (hrefs.length === 0) return null;
   const unique = Array.from(new Set(hrefs)).slice(0, limit);
   return unique
-    .map((href, idx) => `<a class="screenshot-link" href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">View${unique.length > 1 ? ` #${idx + 1}` : ''}</a>`)
+    .map(
+      (href, idx) =>
+        `<a class="screenshot-link" href="#" data-image="${escapeHtml(
+          href
+        )}">View${unique.length > 1 ? ` #${idx + 1}` : ''}</a>`
+    )
     .join('<br />');
+};
+
+// Derive a brief, specific description of an issue for the "Details" column.
+const deriveIssueDetails = (entry) => {
+  if (!entry) return '—';
+  // Prefer explicit details if provided by the spec
+  const explicit = entry.details != null ? String(entry.details).trim() : '';
+  if (explicit) return explicit;
+
+  const id = String(entry.id || '').trim();
+  const rule = String(entry.rule || '').trim();
+
+  // Structural headings (e.g. "Level jumps from H1 to H4 — \"Title\"")
+  const m = rule.match(/Level\s+jumps\s+from\s+H(\d)\s+to\s+H(\d)/i);
+  if (m) return `Jumps H${m[1]} → H${m[2]}`;
+
+  // Keyboard specifics
+  if (/^unable to detect focus indicator change/i.test(rule)) return 'No focus indicator change';
+  if (/^skip navigation link not detected/i.test(rule)) return 'Skip link missing';
+
+  // If rule is more specific than id, use it
+  if (rule && rule.toLowerCase() !== id.toLowerCase()) return rule;
+
+  // Fall back to first target if available
+  const nodes = Array.isArray(entry.nodes) ? entry.nodes : [];
+  for (const n of nodes) {
+    if (Array.isArray(n?.target) && n.target.length > 0) {
+      const label = String(n.target[0] || '').trim();
+      if (label) return label;
+    }
+  }
+
+  return '—';
 };
 
 const formatMilliseconds = (value) => {
@@ -1787,6 +1825,7 @@ const renderWcagPageIssueTable = (entries, heading, options = {}) => {
       const targetsHtml = extractNodeTargets(entry.nodes || []);
       const screenshotsHtml = extractNodeScreenshots(entry.nodes || []);
       const wcagHtml = renderWcagTagBadges(entry.tags || entry.wcagTags || []);
+      const detailsText = deriveIssueDetails(entry);
       return `
         <tr class="impact-${escapeHtml((impact || 'info').toLowerCase())}">
           <td>${escapeHtml(impact || 'info')}</td>
@@ -1794,6 +1833,7 @@ const renderWcagPageIssueTable = (entries, heading, options = {}) => {
           <td>${escapeHtml(formatCount(nodesCount))}</td>
           <td>${helpUrl ? `<a href="${escapeHtml(helpUrl)}" target="_blank" rel="noopener noreferrer">rule docs</a>` : '<span class="details">—</span>'}</td>
           <td>${wcagHtml}</td>
+          <td>${escapeHtml(detailsText)}</td>
           <td>${screenshotsHtml || '<span class="details">—</span>'}</td>
           <td>${targetsHtml || '<span class="details">—</span>'}</td>
         </tr>
@@ -1805,7 +1845,7 @@ const renderWcagPageIssueTable = (entries, heading, options = {}) => {
     <h4${headingClass}>${escapeHtml(heading)}</h4>
     <div class="page-card__table">
       <table>
-        <thead><tr><th>Impact</th><th>Rule</th><th>Nodes</th><th>Help</th><th>WCAG level</th><th>Screenshot</th><th>Culprit</th></tr></thead>
+        <thead><tr><th>Impact</th><th>Rule</th><th>Nodes</th><th>Help</th><th>WCAG level</th><th>Details</th><th>Screenshot</th><th>Culprit</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
     </div>
@@ -4145,16 +4185,25 @@ const renderFormsPageCard = (summary, { projectLabel } = {}) => {
         )
       : '<p class="details">No blocking issues detected for this form.</p>';
 
+  // Deduplicate advisories that are identical to warnings by id
+  let filteredAdvisories = advisoryEntries;
+  if (warningEntries.length && advisoryEntries.length) {
+    const warnKeys = new Set(warningEntries.map((w) => (w.id || w.rule || '').toLowerCase()));
+    filteredAdvisories = advisoryEntries.filter(
+      (a) => !warnKeys.has(String(a.id || a.rule || '').toLowerCase())
+    );
+  }
+
   const warningSection =
     warningEntries.length > 0
       ? renderWcagPageIssueTable(warningEntries, `Warnings (${formatCount(warningEntries.length)})`)
       : '';
 
   const advisorySection =
-    advisoryEntries.length > 0
+    filteredAdvisories.length > 0
       ? renderWcagPageIssueTable(
-          advisoryEntries,
-          formatUniqueRulesHeading('Advisories', advisoryEntries.length),
+          filteredAdvisories,
+          formatUniqueRulesHeading('Advisories', filteredAdvisories.length),
           { headingClass: 'summary-heading-best-practice' }
         )
       : '';
@@ -8393,6 +8442,11 @@ const imageViewerScript = `
         overlay.removeAttribute('open');
       }
     });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && overlay.hasAttribute('open')) {
+        overlay.removeAttribute('open');
+      }
+    });
     return overlay;
   }
   function openImage(href) {
@@ -8409,7 +8463,7 @@ const imageViewerScript = `
   document.addEventListener('click', (e) => {
     const a = e.target && e.target.closest && e.target.closest('a.screenshot-link');
     if (!a) return;
-    const href = a.getAttribute('href');
+    const href = a.getAttribute('data-image') || a.getAttribute('href');
     if (isImageHref(href)) {
       e.preventDefault();
       openImage(href);
