@@ -464,6 +464,8 @@ const collectIssueMessages = (pages, fields, defaultImpact, options = {}) => {
             if (normalized.helpUrl) help = normalized.helpUrl;
             if (normalized.helpHtml) helpHtml = normalized.helpHtml;
             if (normalized.helpLabel) helpLabel = normalized.helpLabel;
+            if (Array.isArray(normalized.wcagTags)) wcagTags = normalized.wcagTags.slice();
+            if (normalized.wcagBadge) wcagBadge = normalized.wcagBadge;
           }
         }
 
@@ -5196,6 +5198,18 @@ const makeKeyboardIssueEntry = (issue, impact) => {
       tags.push(issue.wcag);
     }
 
+    // Try to infer WCAG from message if tags are empty.
+    if (tags.length === 0) {
+      const lower = message.toLowerCase();
+      if (/keyboard\s*trap/.test(lower) || /returned\s+focus\s+to\s*<body>/.test(lower)) {
+        tags.push('WCAG 2.1.2 A');
+      } else if (/did not progress beyond the first interactive element/.test(lower)) {
+        tags.push('WCAG 2.4.3 A');
+      } else if (/visually hidden/.test(lower) || /no active element after tabbing/.test(lower)) {
+        tags.push('WCAG 2.4.7 AA');
+      }
+    }
+
     const nodes = Array.isArray(issue.nodes) ? [...issue.nodes] : [];
     const sampleTargets = new Set();
     const addSample = (value) => {
@@ -5650,6 +5664,8 @@ const renderKeyboardGroupHtml = (group) => {
             helpUrl,
             helpHtml,
             helpLabel,
+            wcagTags: ['2.4.7'],
+            wcagBadge: 'WCAG 2.4.7 AA',
           };
         }
 
@@ -5666,10 +5682,27 @@ const renderKeyboardGroupHtml = (group) => {
             helpUrl,
             helpHtml,
             helpLabel,
+            wcagTags: ['2.4.1'],
+            wcagBadge: 'WCAG 2.4.1 A',
           };
         }
 
         return { key: source, label: source, helpUrl, helpHtml, helpLabel };
+      };
+
+      const normalizeKeyboardGating = ({ message }) => {
+        const text = String(message || '').toLowerCase();
+        const base = { key: message, label: message };
+        if (/keyboard\s*trap/.test(text) || /returned\s+focus\s+to\s*<body>/.test(text)) {
+          return { ...base, wcagTags: ['2.1.2'], wcagBadge: 'WCAG 2.1.2 A' };
+        }
+        if (/did not progress beyond the first interactive element/.test(text)) {
+          return { ...base, wcagTags: ['2.4.3'], wcagBadge: 'WCAG 2.4.3 A' };
+        }
+        if (/visually hidden/.test(text) || /no active element after tabbing/.test(text)) {
+          return { ...base, wcagTags: ['2.4.7'], wcagBadge: 'WCAG 2.4.7 AA' };
+        }
+        return base;
       };
 
       const runSummaryHtml = renderKeyboardRunSummary(
@@ -5689,7 +5722,8 @@ const renderKeyboardGroupHtml = (group) => {
       const gatingIssues = collectIssueMessages(
         pagesData,
         ['gating', 'gatingIssues'],
-        'critical'
+        'critical',
+        { normalize: normalizeKeyboardGating }
       ).filter((issue) => issue.pageCount > 0);
       const advisoryIssues = collectIssueMessages(pagesData, 'advisories', 'minor', {
         normalize: normalizeKeyboardAdvisory,
