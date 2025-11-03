@@ -251,6 +251,14 @@ const a11yResultsBaseDir = path.join(
   '__a11y',
   slugify(siteConfig.name || siteName)
 );
+
+// Some Axe best-practice rules overlap with richer, dedicated specs in this
+// suite. Suppress them from the WCAG audit's best-practice list to avoid
+// duplicate surfacing across reports. Heading order is covered in
+// a11y.structure.landmarks with detailed per-occurrence context and outline.
+const SUPPRESS_BEST_PRACTICE_RULES = new Set([
+  'heading-order',
+]);
 const globalSummaryDir = path.join(a11yResultsBaseDir, '__global');
 const resolveGlobalSummaryFlagPath = () =>
   path.join(globalSummaryDir, `${RUN_TOKEN}-summary.json`);
@@ -524,7 +532,7 @@ test.describe('Functionality: Accessibility (WCAG)', () => {
             (violation) =>
               !failOnSet.has(String(violation.impact || '').toLowerCase()) &&
               !violationHasWcagCoverage(violation)
-          );
+          ).filter((violation) => !SUPPRESS_BEST_PRACTICE_RULES.has(violation.id));
 
           pageReport.violations = gatingViolations;
           pageReport.advisory = advisoryViolations;

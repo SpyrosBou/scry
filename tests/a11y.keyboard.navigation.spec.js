@@ -229,7 +229,8 @@ const detectFocusIndicator = async (page, elementHandle) => {
       { threshold: 0.2 }
     );
     const diffRatio = pixelDiff / (focusedPng.width * focusedPng.height);
-    return { hasIndicator: diffRatio >= FOCUS_DIFF_THRESHOLD, diffRatio };
+    const screenshotDataUri = `data:image/png;base64,${focusedBuffer.toString('base64')}`;
+    return { hasIndicator: diffRatio >= FOCUS_DIFF_THRESHOLD, diffRatio, screenshotDataUri };
   } catch (_) {
     return { hasIndicator: false, diffRatio: 0 };
   }
@@ -380,9 +381,11 @@ test.describe('Accessibility: Keyboard navigation', () => {
 
           const activeElementHandle = await page.evaluateHandle(() => document.activeElement);
           let hasIndicator = false;
+          let nodeScreenshot = null;
           if (activeElementHandle && activeElementHandle.asElement()) {
             const result = await detectFocusIndicator(page, activeElementHandle.asElement());
             hasIndicator = result.hasIndicator;
+            nodeScreenshot = result.screenshotDataUri || null;
           }
           if (activeElementHandle) await activeElementHandle.dispose();
 
@@ -399,7 +402,9 @@ test.describe('Accessibility: Keyboard navigation', () => {
                 '2.4.7',
                 {
                   summary: 'Unable to detect focus indicator change',
-                  sample: focusTarget.sample,
+                  samples: [
+                    { label: focusTarget.sample, screenshotDataUri: nodeScreenshot },
+                  ],
                 }
               )
             );

@@ -386,6 +386,7 @@ const collectIssueMessages = (pages, fields, defaultImpact, options = {}) => {
   if (!Array.isArray(pages) || pages.length === 0) return [];
   const fieldList = Array.isArray(fields) ? fields : [fields];
   const normalizeFn = typeof options.normalize === 'function' ? options.normalize : null;
+  const dedupeIgnoreImpact = Boolean(options.dedupeIgnoreImpact);
 
   const map = new Map();
 
@@ -468,7 +469,7 @@ const collectIssueMessages = (pages, fields, defaultImpact, options = {}) => {
 
         const key = JSON.stringify([
           messageKey,
-          impact || '',
+          dedupeIgnoreImpact ? '' : impact || '',
           help || helpHtml || '',
           wcagBadge || '',
         ]);
@@ -916,18 +917,42 @@ const renderWcagTagBadges = (tags) => {
 const extractNodeTargets = (nodes, limit = 3) => {
   if (!Array.isArray(nodes) || nodes.length === 0) return null;
   const targets = [];
+  const enrichments = [];
   nodes.forEach((node) => {
-    if (Array.isArray(node.target) && node.target.length > 0) {
+    const screenshot =
+      node?.screenshotDataUri || node?.screenshot || node?.image || node?.preview || null;
+    if (Array.isArray(node?.target) && node.target.length > 0) {
       node.target.forEach((selector) => {
-        if (selector) targets.push(String(selector));
+        if (selector) {
+          targets.push(String(selector));
+          enrichments.push({ label: String(selector), screenshot });
+        }
       });
-    } else if (typeof node.html === 'string' && node.html.trim()) {
-      targets.push(node.html.trim());
+    } else if (typeof node?.html === 'string' && node.html.trim()) {
+      const label = node.html.trim();
+      targets.push(label);
+      enrichments.push({ label, screenshot });
     }
   });
   if (!targets.length) return null;
   const unique = Array.from(new Set(targets)).slice(0, limit);
-  return unique.map((target) => `<code>${escapeHtml(target)}</code>`).join('<br />');
+  const byLabel = new Map(enrichments.map((e) => [e.label, e]));
+  return unique
+    .map((label) => {
+      const info = byLabel.get(label);
+      const pill = `<code>${escapeHtml(label)}</code>`;
+      const href = info && info.screenshot ? String(info.screenshot) : null;
+      if (href) {
+        const safeHref = href.startsWith('data:') || href.startsWith('http') || href.startsWith('/')
+          ? href
+          : `./${href}`;
+        return `<a class="sample-pill" href="${escapeHtml(
+          safeHref
+        )}" target="_blank" rel="noopener noreferrer">${pill}</a>`;
+      }
+      return pill;
+    })
+    .join('<br />');
 };
 
 const formatMilliseconds = (value) => {
@@ -5122,13 +5147,25 @@ const makeKeyboardIssueEntry = (issue, impact) => {
       sampleTargets.add(label);
     };
     if (Array.isArray(issue.samples)) {
-      issue.samples.forEach(addSample);
+      issue.samples.forEach((s) => {
+        if (s && typeof s === 'object') {
+          const label = String(s.label || s.sample || s.selector || '').trim();
+          if (label) {
+            sampleTargets.add(label);
+            nodes.push({ target: [label], screenshotDataUri: s.screenshotDataUri || s.screenshot });
+          }
+        } else {
+          addSample(s);
+        }
+      });
     }
     if (issue.sample) {
       addSample(issue.sample);
     }
     sampleTargets.forEach((label) => {
-      nodes.push({ target: [label] });
+      // only add plain target if not already added above with screenshot
+      const exists = nodes.some((n) => Array.isArray(n.target) && n.target.includes(label));
+      if (!exists) nodes.push({ target: [label] });
     });
 
     return {
@@ -5448,6 +5485,69 @@ const renderKeyboardGroupHtml = (group) => {
       if (pagesData.length === 0) return '';
 
       const wcagRefs = Array.isArray(details.wcagReferences) ? details.wcagReferences : [];
+      // Determine violated WCAG references for header chips (not assessed set).
+      // We derive unique WCAG IDs from advisories/warnings, and map certain
+      // gating messages to their corresponding criteria.
+      const deriveViolatedWcagRefs = () => {
+        const idSet = new Set();
+
+        const addId = (id) => {
+          const trimmed = String(id || '').trim();
+          if (/^\d+\.\d+\.\d+$/.test(trimmed)) idSet.add(trimmed);
+        };
+
+        const extractIdFromItem = (item) => {
+          if (!item || typeof item !== 'object') return null;
+          if (typeof item.wcag === 'string') {
+            const m = item.wcag.match(/(\d+\.\d+\.\d+)/);
+            if (m) return m[1];
+          }
+          const tags = Array.isArray(item.tags) ? item.tags : Array.isArray(item.wcagTags) ? item.wcagTags : [];
+          for (const t of tags) {
+            const m = String(t || '').match(/(\d+\.\d+\.\d+)/);
+            if (m) return m[1];
+          }
+          return null;
+        };
+
+        for (const page of pagesData) {
+          // Advisories and warnings can carry explicit WCAG tags
+          for (const groupKey of ['advisories', 'warnings']) {
+            const items = Array.isArray(page?.[groupKey]) ? page[groupKey] : [];
+            for (const it of items) {
+              const id = extractIdFromItem(it);
+              if (id) addId(id);
+            }
+          }
+
+          // Map common gating messages to WCAG criteria
+          const gating = []
+            .concat(Array.isArray(page?.gating) ? page.gating : [])
+            .concat(Array.isArray(page?.gatingIssues) ? page.gatingIssues : []);
+          for (const raw of gating) {
+            const msg = String((raw && raw.message) || raw || '').toLowerCase();
+            if (!msg) continue;
+            if (/(keyboard|focus) trap/.test(msg) || /returned focus to <body>/.test(msg)) {
+              addId('2.1.2'); // No Keyboard Trap
+            }
+            if (/did not progress beyond the first interactive/.test(msg)) {
+              addId('2.4.3'); // Focus Order
+            }
+            if (/visually hidden/.test(msg) || /no active element after tabbing/.test(msg)) {
+              // Heuristic: often correlates with focus visibility/order issues
+              addId('2.4.7'); // Focus Visible
+            }
+          }
+        }
+
+        if (!idSet.size) return [];
+        // Map back to declared references to get names/levels
+        const byId = new Map(wcagRefs.map((r) => [r.id, r]));
+        return Array.from(idSet)
+          .map((id) => byId.get(id))
+          .filter(Boolean);
+      };
+      const violatedRefs = deriveViolatedWcagRefs();
       const viewportList =
         Array.isArray(details.viewports) && details.viewports.length
           ? details.viewports
@@ -5514,11 +5614,16 @@ const renderKeyboardGroupHtml = (group) => {
         return { key: source, label: source, helpUrl, helpHtml, helpLabel };
       };
 
-      const runSummaryHtml = renderKeyboardRunSummary(overview, pagesData, wcagRefs, {
-        viewportLabel,
-        viewportsCount,
-        failThreshold,
-      });
+      const runSummaryHtml = renderKeyboardRunSummary(
+        overview,
+        pagesData,
+        violatedRefs.length ? violatedRefs : [],
+        {
+          viewportLabel,
+          viewportsCount,
+          failThreshold,
+        }
+      );
 
       const executionFailureIssues = collectIssueMessages(pagesData, 'warnings', 'critical', {
         normalize: normalizeKeyboardAdvisory,
@@ -7215,10 +7320,18 @@ const renderStructureGroupHtml = (group) => {
         viewportLabel,
       });
 
-      advisoryIssuesTable = renderUnifiedIssuesTable(combinedAdvisories, {
+      // Dedupe advisory/warning entries by message regardless of differing impact
+      // to avoid showing the same rule twice when a summarised advisory and a
+      // per-occurrence warning share the same label.
+      const combinedDedupe = collectIssueMessages(pagesData, ['headingSkips', 'warnings', 'advisories'], 'minor', {
+        normalize: normalizeStructureAdvisory,
+        dedupeIgnoreImpact: true,
+      }).filter((issue) => issue.pageCount > 0);
+
+      advisoryIssuesTable = renderUnifiedIssuesTable(combinedDedupe, {
         title: formatUniqueRulesHeading(
           'Structural advisories and warnings',
-          combinedAdvisories.length
+          combinedDedupe.length
         ),
         emptyMessage: 'No advisories detected.',
         variant: 'advisory',
