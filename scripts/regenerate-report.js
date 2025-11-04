@@ -3,34 +3,13 @@ const fs = require('fs');
 const path = require('path');
 const minimist = require('minimist');
 const { renderReportHtml } = require('../utils/report-templates');
+const { loadRunEntries } = require('./report-utils');
 
 const REPORT_FILE_NAME = 'report.html';
 const RUN_DATA_FILE = path.join('data', 'run.json');
 const reportsDir = path.join(process.cwd(), 'reports');
 
 const args = minimist(process.argv.slice(2));
-
-function loadRunEntries() {
-  if (!fs.existsSync(reportsDir)) return [];
-  return fs
-    .readdirSync(reportsDir)
-    .map((name) => {
-      const dir = path.join(reportsDir, name);
-      try {
-        const stats = fs.statSync(dir);
-        if (!stats.isDirectory()) return null;
-        return {
-          name,
-          dir,
-          mtime: stats.mtimeMs,
-        };
-      } catch (_error) {
-        return null;
-      }
-    })
-    .filter(Boolean)
-    .sort((a, b) => b.mtime - a.mtime);
-}
 
 function resolveIndex() {
   const positional = args._.map(String).filter(Boolean);
@@ -50,8 +29,26 @@ function regenerate(entry) {
     return;
   }
 
-  const runData = JSON.parse(fs.readFileSync(runDataPath, 'utf8'));
-  const html = renderReportHtml(runData);
+  let runData;
+  try {
+    const raw = fs.readFileSync(runDataPath, 'utf8');
+    runData = JSON.parse(raw);
+  } catch (error) {
+    console.error(
+      `Failed to read ${entry.name}/${RUN_DATA_FILE}: ${error.message || 'Unknown error'}`
+    );
+    process.exitCode = 1;
+    return;
+  }
+
+  let html;
+  try {
+    html = renderReportHtml(runData);
+  } catch (error) {
+    console.error(`Failed to render report for ${entry.name}: ${error.message || 'Unknown error'}`);
+    process.exitCode = 1;
+    return;
+  }
   const reportPath = path.join(entry.dir, REPORT_FILE_NAME);
   fs.writeFileSync(reportPath, html);
   console.log(`Regenerated ${entry.name}/${REPORT_FILE_NAME}`);
@@ -59,7 +56,7 @@ function regenerate(entry) {
 
 function main() {
   const index = resolveIndex();
-  const entries = loadRunEntries();
+  const entries = loadRunEntries(reportsDir);
   if (entries.length === 0) {
     console.log('No reports found to regenerate.');
     process.exit(1);

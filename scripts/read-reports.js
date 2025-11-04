@@ -5,6 +5,7 @@ const openModule = require('open');
 const openBrowser = openModule.default || openModule;
 
 const minimist = require('minimist');
+const { loadRunEntries } = require('./report-utils');
 
 const normalisedArgv = process.argv.slice(2).map((arg) => (arg === '-past' ? '--past' : arg));
 
@@ -18,7 +19,6 @@ const envBrowser = process.env.REPORT_BROWSER && String(process.env.REPORT_BROWS
 const envBrowserArgs = process.env.REPORT_BROWSER_ARGS
   ? String(process.env.REPORT_BROWSER_ARGS).split(/\s+/).filter(Boolean)
   : [];
-const reportsDir = path.join(process.cwd(), 'reports');
 const REPORT_FILE_NAME = 'report.html';
 
 function coerceNumeric(value) {
@@ -59,28 +59,6 @@ function readNpmOriginalArg(key) {
     // ignore malformed JSON
   }
   return null;
-}
-
-function loadRunEntries() {
-  if (!fs.existsSync(reportsDir)) return [];
-  return fs
-    .readdirSync(reportsDir)
-    .map((name) => {
-      const dir = path.join(reportsDir, name);
-      try {
-        const stats = fs.statSync(dir);
-        if (!stats.isDirectory()) return null;
-        return {
-          name,
-          dir,
-          mtime: stats.mtimeMs,
-        };
-      } catch (_error) {
-        return null;
-      }
-    })
-    .filter(Boolean)
-    .sort((a, b) => b.mtime - a.mtime);
 }
 
 function resolveCount() {
@@ -168,7 +146,7 @@ async function openEntries(entries) {
 }
 
 async function main() {
-  const runEntries = loadRunEntries();
+  const runEntries = loadRunEntries(path.join(process.cwd(), 'reports'));
   if (runEntries.length === 0) {
     console.log('No reports found. Run the test suite to generate one.');
     process.exit(1);
