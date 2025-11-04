@@ -233,7 +233,16 @@ test.describe('Functionality: Internal Links', () => {
     for (const testPage of pagesToTest) {
       await test.step(`Checking internal links on: ${testPage}`, async () => {
         const response = await safeNavigate(page, `${siteConfig.baseUrl}${testPage}`);
-        if (response.status() !== 200) return;
+        if (response.status() !== 200) {
+          // Still record a page entry so discovery/reporting renders this suite
+          pageSummaries.push({
+            page: testPage,
+            totalLinks: 0,
+            uniqueChecked: 0,
+            broken: [],
+          });
+          return;
+        }
         await waitForPageStability(page);
 
         const links = await page
