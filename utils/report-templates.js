@@ -32,22 +32,45 @@ const {
 } = require('./report-components/layout');
 const { KIND_RUN_SUMMARY, KIND_PAGE_SUMMARY } = require('./report-schema');
 
-const renderRuleSnapshotsTable = (snapshots) => {
+const renderRuleSnapshotsTable = (snapshots, { projectName, viewports } = {}) => {
   if (!Array.isArray(snapshots) || snapshots.length === 0) return '';
+  const defaultBrowsers = normaliseStringList(projectName);
+  const defaultViewports = normaliseStringList(viewports);
   const rows = snapshots
     .map((snapshot) => {
       const impact = snapshot.impact || snapshot.category || 'info';
       const pages = Array.isArray(snapshot.pages) ? snapshot.pages : [];
       const viewports = Array.isArray(snapshot.viewports) ? snapshot.viewports : [];
       const wcagTags = Array.isArray(snapshot.wcagTags) ? snapshot.wcagTags : [];
+      const browsers = renderCodeList(
+        normaliseStringList(snapshot.browsers, snapshot.projects, defaultBrowsers),
+        '—'
+      );
+      const viewportList = renderCodeList(viewports.length ? viewports : defaultViewports, '—');
+      const detailsText = snapshot.description || snapshot.help || '';
+      const detailsContent = detailsText
+        ? escapeHtml(detailsText)
+        : snapshot.helpUrl
+          ? 'Guidance available'
+          : '—';
+      const helpLink = snapshot.helpUrl
+        ? `<br /><a class="details-link" href="${escapeHtml(
+            snapshot.helpUrl
+          )}" target="_blank" rel="noopener noreferrer">Guidance</a>`
+        : '';
       return `
         <tr class="impact-${impact.toLowerCase?.() || 'info'}">
           <td>${escapeHtml(impact)}</td>
-          <td>${escapeHtml(snapshot.rule || 'rule')}</td>
-          <td>${pages.length ? escapeHtml(pages.join(', ')) : '—'}</td>
-          <td>${snapshot.nodes != null ? escapeHtml(String(snapshot.nodes)) : '—'}</td>
-          <td>${viewports.length ? escapeHtml(viewports.join(', ')) : '—'}</td>
-          <td>${wcagTags.length ? escapeHtml(wcagTags.join(', ')) : '—'}</td>
+          <td>${escapeHtml(snapshot.rule || snapshot.id || 'rule')}</td>
+          <td><span class="details-text">${detailsContent}</span>${helpLink}</td>
+          <td>${browsers}</td>
+          <td>${viewportList}</td>
+          <td>${pages.length ? renderCodeList(pages) : '—'}</td>
+          <td>${snapshot.nodes != null ? escapeHtml(formatCount(snapshot.nodes)) : '—'}</td>
+          <td>${renderComplianceCell(wcagTags, {
+            ruleId: snapshot.rule || snapshot.id,
+            category: snapshot.category,
+          })}</td>
         </tr>
       `;
     })
@@ -56,13 +79,37 @@ const renderRuleSnapshotsTable = (snapshots) => {
   return `
     <table class="schema-table">
       <thead>
-        <tr><th>Impact</th><th>Rule</th><th>Pages</th><th>Nodes</th><th>Viewports</th><th>WCAG</th></tr>
+        <tr><th>Impact</th><th>Rule</th><th>Details</th><th>Browser</th><th>Viewport</th><th>Pages</th><th>Nodes</th><th>WCAG level</th></tr>
       </thead>
       <tbody>${rows}</tbody>
     </table>
   `;
 };
 
+
+const normaliseStringList = (...inputs) => {
+  const set = new Set();
+  for (const input of inputs) {
+    if (Array.isArray(input)) {
+      input.forEach((value) => {
+        if (value || value === 0) {
+          const trimmed = String(value).trim();
+          if (trimmed) set.add(trimmed);
+        }
+      });
+    } else if (input || input === 0) {
+      const trimmed = String(input).trim();
+      if (trimmed) set.add(trimmed);
+    }
+  }
+  return Array.from(set);
+};
+
+const renderCodeList = (values, fallback = '—') => {
+  const list = normaliseStringList(values);
+  if (list.length === 0) return fallback;
+  return list.map((value) => `<code>${escapeHtml(value)}</code>`).join('<br />');
+};
 
 const defaultHydrateSuiteIssue = (issue) => {
   if (!issue) return null;
@@ -80,13 +127,28 @@ const defaultHydrateSuiteIssue = (issue) => {
         ? issue.nodes
         : pageCount;
 
+  const viewports = normaliseStringList(
+    Array.isArray(issue.viewports) ? issue.viewports : [],
+    issue.viewport,
+    issue.viewportLabel,
+    issue.viewportName
+  );
+  const browsers = normaliseStringList(
+    issue.browsers,
+    issue.browser,
+    issue.projects,
+    issue.projectName,
+    issue.project
+  );
+
   return {
     impact: issue.impact || 'info',
     label: message,
     pages,
     pageCount,
     nodesCount,
-    viewports: Array.isArray(issue.viewports) ? issue.viewports : [],
+    viewports,
+    browsers,
     samples: Array.isArray(issue.samples) ? issue.samples : [],
     wcagHtml: issue.wcagHtml,
     wcagBadge: issue.wcagBadge,
@@ -102,6 +164,8 @@ const defaultHydrateSuiteIssue = (issue) => {
       issue.checkId ||
       null,
     category: issue.category || issue.ruleCategory || issue.issueCategory || null,
+    ruleLabel: issue.ruleLabel || issue.rule || issue.id || null,
+    details: issue.details || message,
   };
 };
 
@@ -144,7 +208,8 @@ const renderUnifiedIssuesTable = (
         pages,
         pageCount,
         nodesCount,
-        viewports: Array.isArray(hydrated.viewports) ? hydrated.viewports : [],
+        viewports: normaliseStringList(hydrated.viewports),
+        browsers: normaliseStringList(hydrated.browsers),
         samples: Array.isArray(hydrated.samples) ? hydrated.samples : [],
         wcagHtml: hydrated.wcagHtml,
         wcagBadge: hydrated.wcagBadge,
@@ -154,6 +219,8 @@ const renderUnifiedIssuesTable = (
         helpLabel: hydrated.helpLabel,
         ruleId: hydrated.ruleId || hydrated.rule || hydrated.id || null,
         category: hydrated.category || hydrated.ruleCategory || null,
+        ruleLabel: hydrated.ruleLabel || hydrated.rule || hydrated.id || null,
+        details: hydrated.details || hydrated.label || hydrated.message || '',
       };
     })
     .filter(Boolean);
@@ -167,15 +234,6 @@ const renderUnifiedIssuesTable = (
     `;
   }
 
-  const hasWcagData =
-    includeWcagColumn &&
-    normalisedRows.some((row) => {
-      if (typeof row.wcagHtml === 'string' && row.wcagHtml.trim()) return true;
-      if (row.wcagBadge != null && String(row.wcagBadge).trim()) return true;
-      if (Array.isArray(row.wcagTags) && row.wcagTags.length > 0) return true;
-      return false;
-    });
-
   const rowsHtml = normalisedRows
     .slice()
     .sort((a, b) => {
@@ -185,18 +243,14 @@ const renderUnifiedIssuesTable = (
       return (a.label || '').localeCompare(b.label || '');
     })
     .map((row) => {
-      const pagesList =
-        row.pages.length > 0
-          ? row.pages.map((page) => `<code>${escapeHtml(page)}</code>`).join('<br />')
-          : '—';
-      const viewportsList =
-        row.viewports.length > 0
-          ? row.viewports.map((vp) => `<code>${escapeHtml(vp)}</code>`).join('<br />')
-          : viewportLabel
-            ? escapeHtml(viewportLabel)
-            : '—';
+      const pagesList = renderCodeList(row.pages, '—');
+      const browserList = renderCodeList(row.browsers, '—');
+      const viewportsList = renderCodeList(
+        row.viewports,
+        viewportLabel ? escapeHtml(viewportLabel) : '—'
+      );
       const wcagHtml = (() => {
-        if (!hasWcagData) return '';
+        if (!includeWcagColumn) return '';
         if (typeof row.wcagHtml === 'string' && row.wcagHtml.trim()) return row.wcagHtml;
         const tags = Array.isArray(row.wcagTags) ? row.wcagTags.filter(Boolean) : [];
         const badge = row.wcagBadge != null ? String(row.wcagBadge).trim() : '';
@@ -209,23 +263,35 @@ const renderUnifiedIssuesTable = (
         if (badge) {
           return `<span class="badge badge-wcag">${escapeHtml(badge)}</span>`;
         }
-        return renderComplianceCell(tags, {
+        return renderComplianceCell([], {
           ruleId: row.ruleId,
           category: row.category,
         });
       })();
+      const ruleLabel = row.ruleLabel || row.ruleId || row.label || 'Unknown rule';
+      const detailsText = row.details || row.label || '';
+      const detailsContent = detailsText ? escapeHtml(detailsText) : '—';
+      const helpLink =
+        row.helpUrl && typeof row.helpUrl === 'string' && row.helpUrl.trim()
+          ? `<br /><a class="details-link" href="${escapeHtml(
+              row.helpUrl
+            )}" target="_blank" rel="noopener noreferrer">Guidance</a>`
+          : '';
 
       const cells = [
         `<td class="impact-cell"><span class="impact impact-${escapeHtml(
           row.impact
         )}">${escapeHtml(formatIssueImpactLabel(row.impact || 'info'))}</span></td>`,
-        `<td>${escapeHtml(row.label || 'Unknown issue')}</td>`,
+        `<td>${escapeHtml(ruleLabel)}</td>`,
+        `<td><span class="details-text">${detailsContent}</span>${helpLink}</td>`,
+        `<td>${browserList}</td>`,
         `<td>${viewportsList}</td>`,
-        `<td>${pagesList}</td>`,
-        `<td>${escapeHtml(formatCount(row.nodesCount))}</td>`,
       ];
 
-      if (includeWcagColumn && hasWcagData) {
+      cells.push(`<td>${pagesList}</td>`);
+      cells.push(`<td>${escapeHtml(formatCount(row.nodesCount))}</td>`);
+
+      if (includeWcagColumn) {
         cells.push(`<td>${wcagHtml || '—'}</td>`);
       }
 
@@ -233,8 +299,8 @@ const renderUnifiedIssuesTable = (
     })
     .join('');
 
-  const headers = ['Impact', 'Issue', 'Viewport(s)', 'Pages', 'Nodes'];
-  if (includeWcagColumn && hasWcagData) headers.push('WCAG level');
+  const headers = ['Impact', 'Rule', 'Details', 'Browser', 'Viewport', 'Pages', 'Nodes'];
+  if (includeWcagColumn) headers.push('WCAG level');
 
   return `
     <section class="${baseClass}">
@@ -301,8 +367,25 @@ const collectIssueMessages = (pages, fields, defaultImpact, options = {}) => {
 
   const map = new Map();
 
+  const pushString = (set, value) => {
+    if (!value && value !== 0) return;
+    const trimmed = String(value).trim();
+    if (!trimmed) return;
+    set.add(trimmed);
+  };
+
   for (const page of pages) {
     const pageId = page?.page || 'Unknown page';
+    const pageProject =
+      page?.projectName ||
+      page?.project ||
+      page?.browser ||
+      (Array.isArray(page?.projects) ? page.projects[0] : null);
+    const pageViewport =
+      page?.viewport ||
+      page?.viewportLabel ||
+      (Array.isArray(page?.viewports) ? page.viewports[0] : null) ||
+      pageProject;
     for (const field of fieldList) {
       const rawItems = Array.isArray(page?.[field]) ? page[field] : [];
       for (const rawItem of rawItems) {
@@ -313,6 +396,8 @@ const collectIssueMessages = (pages, fields, defaultImpact, options = {}) => {
         let helpLabel = null;
         let wcagBadge = null;
         let wcagTags = null;
+        let ruleId = null;
+        let ruleLabel = null;
 
         if (rawItem && typeof rawItem === 'object') {
           const candidate =
@@ -327,6 +412,12 @@ const collectIssueMessages = (pages, fields, defaultImpact, options = {}) => {
           if (rawItem.helpUrl) help = rawItem.helpUrl;
           if (rawItem.helpHtml) helpHtml = rawItem.helpHtml;
           if (rawItem.helpLabel) helpLabel = rawItem.helpLabel;
+          if (rawItem.ruleId) ruleId = rawItem.ruleId;
+          if (!ruleId && rawItem.id) ruleId = rawItem.id;
+          if (!ruleId && rawItem.rule) ruleId = rawItem.rule;
+          if (rawItem.rule) ruleLabel = rawItem.rule;
+          if (!ruleLabel && rawItem.id) ruleLabel = rawItem.id;
+          if (rawItem.ruleLabel) ruleLabel = rawItem.ruleLabel;
           if (rawItem.wcag) {
             if (typeof rawItem.wcag === 'string') {
               wcagBadge = rawItem.wcag;
@@ -362,6 +453,8 @@ const collectIssueMessages = (pages, fields, defaultImpact, options = {}) => {
         let messageKey = normalizedMessage;
         let displayMessage = normalizedMessage;
         let sampleTarget = null;
+        let normalizedProjects = null;
+        let normalizedViewports = null;
         if (normalizeFn) {
           const normalized = normalizeFn({
             message: normalizedMessage,
@@ -377,6 +470,10 @@ const collectIssueMessages = (pages, fields, defaultImpact, options = {}) => {
             if (normalized.helpLabel) helpLabel = normalized.helpLabel;
             if (Array.isArray(normalized.wcagTags)) wcagTags = normalized.wcagTags.slice();
             if (normalized.wcagBadge) wcagBadge = normalized.wcagBadge;
+            if (normalized.ruleId) ruleId = normalized.ruleId;
+            if (normalized.ruleLabel) ruleLabel = normalized.ruleLabel;
+            if (Array.isArray(normalized.projects)) normalizedProjects = normalized.projects;
+            if (Array.isArray(normalized.viewports)) normalizedViewports = normalized.viewports;
           }
         }
 
@@ -398,10 +495,15 @@ const collectIssueMessages = (pages, fields, defaultImpact, options = {}) => {
             pages: new Set(),
             instanceCount: 0,
             samples: new Set(),
+            projects: new Set(),
+            viewports: new Set(),
+            ruleId: null,
+            ruleLabel: null,
           });
         }
 
         const entry = map.get(key);
+        entry.message = displayMessage;
         entry.pages.add(pageId);
         entry.instanceCount += 1;
         if (rawItem && typeof rawItem === 'object' && Array.isArray(rawItem.samples)) {
@@ -440,6 +542,39 @@ const collectIssueMessages = (pages, fields, defaultImpact, options = {}) => {
         if (sampleTarget) {
           entry.samples.add(sampleTarget);
         }
+        if (ruleId && !entry.ruleId) {
+          entry.ruleId = String(ruleId);
+        }
+        if (ruleLabel && !entry.ruleLabel) {
+          entry.ruleLabel = String(ruleLabel);
+        }
+        const ensureProjectSet = entry.projects;
+        const ensureViewportSet = entry.viewports;
+        if (Array.isArray(normalizedProjects)) {
+          normalizedProjects.forEach((value) => pushString(ensureProjectSet, value));
+        }
+        if (Array.isArray(normalizedViewports)) {
+          normalizedViewports.forEach((value) => pushString(ensureViewportSet, value));
+        }
+        if (pageProject) pushString(ensureProjectSet, pageProject);
+        if (pageViewport) pushString(ensureViewportSet, pageViewport);
+        if (rawItem && typeof rawItem === 'object') {
+          if (rawItem.projectName || rawItem.project) {
+            pushString(ensureProjectSet, rawItem.projectName || rawItem.project);
+          }
+          if (rawItem.browser) {
+            pushString(ensureProjectSet, rawItem.browser);
+          }
+          if (rawItem.viewport) {
+            pushString(ensureViewportSet, rawItem.viewport);
+          }
+          if (Array.isArray(rawItem.projects)) {
+            rawItem.projects.forEach((value) => pushString(ensureProjectSet, value));
+          }
+          if (Array.isArray(rawItem.viewports)) {
+            rawItem.viewports.forEach((value) => pushString(ensureViewportSet, value));
+          }
+        }
       }
     }
   }
@@ -458,6 +593,10 @@ const collectIssueMessages = (pages, fields, defaultImpact, options = {}) => {
       pageCount: pages.length,
       instanceCount: entry.instanceCount,
       samples: Array.from(entry.samples || []),
+      projects: Array.from(entry.projects || []).filter(Boolean),
+      viewports: Array.from(entry.viewports || []).filter(Boolean),
+      ruleId: entry.ruleId,
+      ruleLabel: entry.ruleLabel,
     };
   });
 };
@@ -855,59 +994,118 @@ const renderComplianceCell = (tags, { ruleId, category } = {}) => {
   return renderComplianceBadgeFallback({ ruleId, category });
 };
 
-const extractNodeTargets = (nodes, limit = 3) => {
+const deriveCulpritSummary = (nodes) => {
   if (!Array.isArray(nodes) || nodes.length === 0) return null;
-  const targets = [];
-  const enrichments = [];
-  nodes.forEach((node) => {
-    const screenshot =
-      node?.screenshotDataUri || node?.screenshot || node?.image || node?.preview || null;
-    if (Array.isArray(node?.target) && node.target.length > 0) {
-      node.target.forEach((selector) => {
-        if (selector) {
-          targets.push(String(selector));
-          enrichments.push({ label: String(selector), screenshot });
-        }
-      });
-    } else if (typeof node?.html === 'string' && node.html.trim()) {
-      const label = node.html.trim();
-      targets.push(label);
-      enrichments.push({ label, screenshot });
-    }
-  });
-  if (!targets.length) return null;
-  const unique = Array.from(new Set(targets)).slice(0, limit);
-  const byLabel = new Map(enrichments.map((e) => [e.label, e]));
-  return unique.map((label) => `<code>${escapeHtml(label)}</code>`).join('<br />');
-};
 
-// Build a compact list of screenshot links for nodes that include
-// a screenshot reference (data URI or relative path).
-const extractNodeScreenshots = (nodes, limit = 3) => {
-  if (!Array.isArray(nodes) || nodes.length === 0) return null;
-  const hrefs = [];
-  nodes.forEach((node) => {
-    const href =
-      node?.screenshotDataUri || node?.screenshot || node?.image || node?.preview || null;
-    if (!href) return;
-    const safeHref =
-      String(href).startsWith('data:') ||
-      String(href).startsWith('http') ||
-      String(href).startsWith('/')
-        ? String(href)
-        : `./${String(href)}`;
-    hrefs.push(safeHref);
-  });
-  if (hrefs.length === 0) return null;
-  const unique = Array.from(new Set(hrefs)).slice(0, limit);
-  return unique
-    .map(
-      (href, idx) =>
-        `<a class="screenshot-link" href="#" data-image="${escapeHtml(
-          href
-        )}">View${unique.length > 1 ? ` #${idx + 1}` : ''}</a>`
-    )
-    .join('<br />');
+  const scoreSelector = (selector) => {
+    if (!selector) return -Infinity;
+    const trimmed = String(selector).trim();
+    if (!trimmed) return -Infinity;
+    if (trimmed.startsWith('#')) return 120 - trimmed.length;
+    if (/#[a-z0-9_-]+/i.test(trimmed)) return 110 - trimmed.length;
+    if (trimmed.startsWith('.')) return 90 - trimmed.length;
+    if (trimmed.includes(' ') || trimmed.includes('>')) return 70 - trimmed.length;
+    return 60 - trimmed.length;
+  };
+
+  const selectorFromHtml = (html) => {
+    if (typeof html !== 'string') return null;
+    const snippet = html.trim();
+    if (!snippet) return null;
+    const idMatch = snippet.match(/id="([^"]+)"/i);
+    if (idMatch && idMatch[1]) return `#${idMatch[1]}`;
+    const classMatch = snippet.match(/class="([^"]+)"/i);
+    if (classMatch && classMatch[1]) {
+      const classes = classMatch[1]
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 2)
+        .join('.');
+      if (classes) return `.${classes}`;
+    }
+    const tagMatch = snippet.match(/^<([a-z0-9-]+)/i);
+    if (tagMatch && tagMatch[1]) return `<${tagMatch[1]}>`;
+    return snippet.length > 80 ? `${snippet.slice(0, 77)}…` : snippet;
+  };
+
+  const formatLabel = (value) => {
+    const trimmed = String(value || '').trim().replace(/\s+/g, ' ');
+    if (!trimmed) return null;
+    const shortened = trimmed.length > 80 ? `${trimmed.slice(0, 77)}…` : trimmed;
+    return `<code>${escapeHtml(shortened)}</code>`;
+  };
+
+  let best = null;
+  for (const node of nodes) {
+    if (!node || typeof node !== 'object') continue;
+    const selectors = Array.isArray(node.target)
+      ? node.target
+          .map((selector) => String(selector || '').trim())
+          .filter(Boolean)
+      : [];
+    let candidateSelector = null;
+    let candidateScore = -Infinity;
+    for (const selector of selectors) {
+      const score = scoreSelector(selector);
+      if (score > candidateScore) {
+        candidateScore = score;
+        candidateSelector = selector;
+      }
+    }
+    if (!candidateSelector) {
+      const fromHtml = selectorFromHtml(node.html);
+      if (fromHtml) {
+        candidateSelector = fromHtml;
+        candidateScore = scoreSelector(fromHtml);
+      }
+    }
+    if (!candidateSelector) continue;
+    const screenshot =
+      node.screenshotDataUri || node.screenshot || node.image || node.preview || null;
+    const adjustedScore = candidateScore + (screenshot ? 5 : 0);
+    if (!best || adjustedScore > best.score) {
+      best = {
+        selector: candidateSelector,
+        screenshot: screenshot ? String(screenshot) : null,
+        score: adjustedScore,
+      };
+    }
+  }
+
+  if (!best) {
+    const htmlNode = nodes.find(
+      (node) => node && typeof node.html === 'string' && node.html.trim().length > 0
+    );
+    if (htmlNode) {
+      const fallbackSelector = selectorFromHtml(htmlNode.html) || htmlNode.html;
+      const screenshot =
+        htmlNode.screenshotDataUri || htmlNode.screenshot || htmlNode.image || htmlNode.preview || null;
+      best = {
+        selector: fallbackSelector,
+        screenshot: screenshot ? String(screenshot) : null,
+        score: scoreSelector(fallbackSelector) || 0,
+      };
+    }
+  }
+
+  if (!best || !best.selector) return null;
+
+  const display = formatLabel(best.selector);
+  if (!display) return null;
+
+  return {
+    display,
+    screenshot:
+      best.screenshot &&
+      (best.screenshot.startsWith('data:') ||
+        best.screenshot.startsWith('http') ||
+        best.screenshot.startsWith('/'))
+        ? best.screenshot
+        : best.screenshot
+          ? `./${best.screenshot}`
+          : null,
+  };
 };
 
 // Derive a brief, specific description of an issue for the "Details" column.
@@ -1055,32 +1253,48 @@ const WCAG_PER_PAGE_TOGGLE_SCRIPT = `
 const formatRuleHeading = (label, count) =>
   count ? `${label} (${formatCount(count)} unique rules)` : label;
 
-const renderAccessibilityRuleTable = (title, rules, { headingClass, sectionClass } = {}) => {
+const renderAccessibilityRuleTable = (
+  title,
+  rules,
+  { headingClass, sectionClass, projectName, defaultViewports } = {}
+) => {
   if (!Array.isArray(rules) || rules.length === 0) return '';
+  const fallbackBrowsers = normaliseStringList(projectName);
+  const fallbackViewports = normaliseStringList(defaultViewports);
   const rows = rules
     .map((rule) => {
+      const browserList = renderCodeList(
+        normaliseStringList(rule.browsers, rule.projects, rule.projectName, fallbackBrowsers),
+        '—'
+      );
       const wcagTags =
         Array.isArray(rule.wcagTags) && rule.wcagTags.length > 0 ? rule.wcagTags : [];
-      const viewportsRaw = rule.viewports || rule.viewportsTested || [];
-      const viewportList = Array.isArray(viewportsRaw)
-        ? viewportsRaw.filter(Boolean)
-        : viewportsRaw
-          ? [viewportsRaw]
-          : [];
-      const viewportCell = viewportList.length ? viewportList.join(', ') : '—';
-      const helpLink = rule.helpUrl
-        ? `<a href="${escapeHtml(rule.helpUrl)}" target="_blank" rel="noopener noreferrer">rule docs</a>`
-        : '<span class="details">—</span>';
+      const viewportsRaw = rule.viewports || rule.viewportsTested || fallbackViewports;
+      const viewportCell = renderCodeList(viewportsRaw, '—');
+      const pageList = renderCodeList(Array.isArray(rule.pages) ? rule.pages : [], '—');
       const wcagHtml = renderComplianceCell(wcagTags, {
         ruleId: rule.rule || rule.id,
         category: rule.category,
       });
+      const detailsText = rule.description || rule.help || '';
+      const detailsContent = detailsText
+        ? escapeHtml(detailsText)
+        : rule.helpUrl
+          ? 'Guidance available'
+          : '—';
+      const helpLink = rule.helpUrl
+        ? `<br /><a class="details-link" href="${escapeHtml(
+            rule.helpUrl
+          )}" target="_blank" rel="noopener noreferrer">Guidance</a>`
+        : '';
       return `
         <tr class="impact-${escapeHtml((rule.impact || rule.category || 'info').toLowerCase())}">
           <td>${escapeHtml(rule.impact || rule.category || 'info')}</td>
           <td>${escapeHtml(rule.rule || rule.id || 'Unnamed rule')}</td>
-          <td>${escapeHtml(viewportCell)}</td>
-          <td>${escapeHtml(formatCount(Array.isArray(rule.pages) ? rule.pages.length : rule.pages || 0))}</td>
+          <td><span class="details-text">${detailsContent}</span>${helpLink}</td>
+          <td>${browserList}</td>
+          <td>${viewportCell}</td>
+          <td>${pageList}</td>
           <td>${escapeHtml(formatCount(rule.nodes ?? 0))}</td>
           <td>${wcagHtml}</td>
         </tr>
@@ -1094,7 +1308,7 @@ const renderAccessibilityRuleTable = (title, rules, { headingClass, sectionClass
       <h3${headingAttr}>${escapeHtml(title)}</h3>
       <table>
         <thead>
-          <tr><th>Impact</th><th>Rule</th><th>Viewport(s)</th><th>Pages</th><th>Nodes</th><th>WCAG level</th></tr>
+          <tr><th>Impact</th><th>Rule</th><th>Details</th><th>Browser</th><th>Viewport</th><th>Pages</th><th>Nodes</th><th>WCAG level</th></tr>
         </thead>
         <tbody>${rows}</tbody>
       </table>
@@ -1733,7 +1947,16 @@ const renderSchemaRunEntry = (entry) => {
     : payload.overview
       ? renderSchemaMetrics(payload.overview)
       : '';
-  const rulesHtml = hasCustomHtml ? '' : renderRuleSnapshotsTable(payload.ruleSnapshots);
+  const rulesHtml = hasCustomHtml
+    ? ''
+    : renderRuleSnapshotsTable(payload.ruleSnapshots, {
+        projectName: metadata.projectName || entry.projectName,
+        viewports:
+          (Array.isArray(metadata.viewports) && metadata.viewports.length
+            ? metadata.viewports
+            : null) ||
+          (Array.isArray(payload.details?.viewports) ? payload.details.viewports : null),
+      });
 
   const body = [metaHtml, overviewHtml, rulesHtml].filter(Boolean).join('\n');
   if (!body) return '';
@@ -1854,13 +2077,11 @@ const renderWcagPageIssueTable = (entries, heading, options = {}) => {
   if (!Array.isArray(entries) || entries.length === 0) return '';
   const headingClass = options.headingClass ? ` class="${escapeHtml(options.headingClass)}"` : '';
   const includeWcagColumn = options.includeWcagColumn !== false;
+  const viewportFallback = options.viewportLabel || null;
   const rows = entries
     .map((entry) => {
       const impact = entry.impact || entry.category || 'info';
-      const nodesCount = Array.isArray(entry.nodes) ? entry.nodes.length : entry.nodesCount || 0;
       let helpUrl = entry.helpUrl || entry.help || null;
-      const targetsHtml = extractNodeTargets(entry.nodes || []);
-      const screenshotsHtml = extractNodeScreenshots(entry.nodes || []);
       const wcagHtml = renderComplianceCell(entry.tags || entry.wcagTags || [], {
         ruleId: entry.id || entry.rule,
         category: entry.category,
@@ -1874,15 +2095,43 @@ const renderWcagPageIssueTable = (entries, heading, options = {}) => {
         }
       }
       const detailsText = deriveIssueDetails(entry);
+      const detailsContent = detailsText ? escapeHtml(detailsText) : '—';
+      const helpLink = helpUrl
+        ? `<br /><a class="details-link" href="${escapeHtml(
+            helpUrl
+          )}" target="_blank" rel="noopener noreferrer">Guidance</a>`
+        : '';
+      const browserList = renderCodeList(
+        normaliseStringList(
+          entry.browser,
+          entry.browsers,
+          entry.projectName,
+          entry.project,
+          entry.projects
+        ),
+        '—'
+      );
+      const viewportList = renderCodeList(
+        normaliseStringList(entry.viewport, entry.viewportName, entry.viewports, viewportFallback),
+        '—'
+      );
+      const culprit = deriveCulpritSummary(entry.nodes || []);
+      const culpritCell = culprit
+        ? culprit.screenshot
+          ? `<a class="culprit-link screenshot-link" href="#" data-image="${escapeHtml(
+              culprit.screenshot
+            )}" title="View offending element">${culprit.display}</a>`
+          : culprit.display
+        : '<span class="details">—</span>';
       return `
         <tr class="impact-${escapeHtml((impact || 'info').toLowerCase())}">
           <td>${escapeHtml(impact || 'info')}</td>
           <td>${escapeHtml(entry.id || entry.rule || 'Unnamed rule')}</td>
-          <td>${escapeHtml(formatCount(nodesCount))}</td>
+          <td><span class="details-text">${detailsContent}</span>${helpLink}</td>
+          <td>${browserList}</td>
+          <td>${viewportList}</td>
           ${includeWcagColumn ? `<td>${wcagHtml}</td>` : ''}
-          <td>${escapeHtml(detailsText)}</td>
-          <td>${screenshotsHtml || '<span class="details">—</span>'}</td>
-          <td>${targetsHtml || '<span class="details">—</span>'}</td>
+          <td>${culpritCell}</td>
         </tr>
       `;
     })
@@ -1892,7 +2141,7 @@ const renderWcagPageIssueTable = (entries, heading, options = {}) => {
     <h4${headingClass}>${escapeHtml(heading)}</h4>
     <div class="page-card__table">
       <table>
-        <thead><tr><th>Impact</th><th>Rule</th><th>Nodes</th>${includeWcagColumn ? '<th>WCAG level</th>' : ''}<th>Details</th><th>Screenshot</th><th>Culprit</th></tr></thead>
+        <thead><tr><th>Impact</th><th>Rule</th><th>Details</th><th>Browser</th><th>Viewport</th>${includeWcagColumn ? '<th>WCAG level</th>' : ''}<th>Culprit</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
     </div>
@@ -2235,12 +2484,20 @@ const renderAccessibilityGroupHtml = (group) => {
         renderAccessibilityRuleTable(
           formatRuleHeading('Gating WCAG violations', gatingRules.length),
           gatingRules,
-          { sectionClass: 'summary-a11y--rule-table summary-a11y--rule-table-gating' }
+          {
+            sectionClass: 'summary-a11y--rule-table summary-a11y--rule-table-gating',
+            projectName: projectLabel,
+            defaultViewports: viewportList,
+          }
         ),
         renderAccessibilityRuleTable(
           formatRuleHeading('WCAG advisory findings', advisoryRules.length),
           advisoryRules,
-          { sectionClass: 'summary-a11y--rule-table summary-a11y--rule-table-advisory' }
+          {
+            sectionClass: 'summary-a11y--rule-table summary-a11y--rule-table-advisory',
+            projectName: projectLabel,
+            defaultViewports: viewportList,
+          }
         ),
         renderAccessibilityRuleTable(
           formatRuleHeading('Best-practice advisories', bestPracticeRules.length),
@@ -2248,6 +2505,8 @@ const renderAccessibilityGroupHtml = (group) => {
           {
             headingClass: 'summary-heading-best-practice',
             sectionClass: 'summary-a11y--rule-table summary-a11y--rule-table-best-practice',
+            projectName: projectLabel,
+            defaultViewports: viewportList,
           }
         ),
       ]
