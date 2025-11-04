@@ -64,9 +64,57 @@ const renderRuleSnapshotsTable = (snapshots) => {
 };
 
 
+const defaultHydrateSuiteIssue = (issue) => {
+  if (!issue) return null;
+  const message =
+    issue.message || issue.rule || issue.id || issue.text || issue.description || '';
+  if (!message.trim()) return null;
+
+  const pages = Array.isArray(issue.pages) ? issue.pages : [];
+  const pageCount = Number.isFinite(issue.pageCount) ? issue.pageCount : pages.length;
+  const nodesCount = Number.isFinite(issue.nodesCount)
+    ? issue.nodesCount
+    : Number.isFinite(issue.instanceCount)
+      ? issue.instanceCount
+      : Number.isFinite(issue.nodes)
+        ? issue.nodes
+        : pageCount;
+
+  return {
+    impact: issue.impact || 'info',
+    label: message,
+    pages,
+    pageCount,
+    nodesCount,
+    viewports: Array.isArray(issue.viewports) ? issue.viewports : [],
+    samples: Array.isArray(issue.samples) ? issue.samples : [],
+    wcagHtml: issue.wcagHtml,
+    wcagBadge: issue.wcagBadge,
+    wcagTags: Array.isArray(issue.wcagTags) ? issue.wcagTags : [],
+    helpHtml: issue.helpHtml,
+    helpUrl: issue.helpUrl,
+    helpLabel: issue.helpLabel,
+    ruleId:
+      issue.ruleId ||
+      issue.rule ||
+      issue.id ||
+      issue.auditId ||
+      issue.checkId ||
+      null,
+    category: issue.category || issue.ruleCategory || issue.issueCategory || null,
+  };
+};
+
 const renderUnifiedIssuesTable = (
   issues,
-  { title, emptyMessage, variant, viewportLabel, includeWcagColumn = false } = {}
+  {
+    title,
+    emptyMessage,
+    variant,
+    viewportLabel,
+    includeWcagColumn = false,
+    hydrate,
+  } = {}
 ) => {
   if (!title) return '';
 
@@ -75,7 +123,42 @@ const renderUnifiedIssuesTable = (
     variant === 'gating' ? 'summary-a11y--rule-table-gating' : 'summary-a11y--rule-table-advisory',
   ].join(' ');
 
-  if (!Array.isArray(issues) || issues.length === 0) {
+  const hydrator = typeof hydrate === 'function' ? hydrate : defaultHydrateSuiteIssue;
+  const normalisedRows = (Array.isArray(issues) ? issues : [])
+    .map((issue) => {
+      const hydrated = hydrator(issue, { variant, viewportLabel }) || null;
+      if (!hydrated) return null;
+      const pages = Array.isArray(hydrated.pages) ? hydrated.pages : [];
+      const pageCount = Number.isFinite(hydrated.pageCount) ? hydrated.pageCount : pages.length;
+      const nodesCount = Number.isFinite(hydrated.nodesCount)
+        ? hydrated.nodesCount
+        : Number.isFinite(hydrated.instanceCount)
+          ? hydrated.instanceCount
+          : Number.isFinite(hydrated.nodes)
+            ? hydrated.nodes
+            : pageCount;
+
+      return {
+        impact: String(hydrated.impact || 'info').toLowerCase(),
+        label: hydrated.label || hydrated.message || hydrated.rule || 'Unknown issue',
+        pages,
+        pageCount,
+        nodesCount,
+        viewports: Array.isArray(hydrated.viewports) ? hydrated.viewports : [],
+        samples: Array.isArray(hydrated.samples) ? hydrated.samples : [],
+        wcagHtml: hydrated.wcagHtml,
+        wcagBadge: hydrated.wcagBadge,
+        wcagTags: Array.isArray(hydrated.wcagTags) ? hydrated.wcagTags : [],
+        helpHtml: hydrated.helpHtml,
+        helpUrl: hydrated.helpUrl,
+        helpLabel: hydrated.helpLabel,
+        ruleId: hydrated.ruleId || hydrated.rule || hydrated.id || null,
+        category: hydrated.category || hydrated.ruleCategory || null,
+      };
+    })
+    .filter(Boolean);
+
+  if (normalisedRows.length === 0) {
     return `
       <section class="${baseClass}">
         <h3>${escapeHtml(title)}</h3>
@@ -86,60 +169,67 @@ const renderUnifiedIssuesTable = (
 
   const hasWcagData =
     includeWcagColumn &&
-    issues.some((issue) => {
-      if (typeof issue?.wcagHtml === 'string' && issue.wcagHtml.trim()) return true;
-      if (issue?.wcagBadge != null && String(issue.wcagBadge).trim()) return true;
-      if (Array.isArray(issue?.wcagTags) && issue.wcagTags.length > 0) return true;
+    normalisedRows.some((row) => {
+      if (typeof row.wcagHtml === 'string' && row.wcagHtml.trim()) return true;
+      if (row.wcagBadge != null && String(row.wcagBadge).trim()) return true;
+      if (Array.isArray(row.wcagTags) && row.wcagTags.length > 0) return true;
       return false;
     });
-  const hasHelpData = false; // Help column removed; WCAG badges become the link
 
-  const rows = issues
+  const rowsHtml = normalisedRows
     .slice()
     .sort((a, b) => {
       const aCount = Number.isFinite(a.pageCount) ? a.pageCount : 0;
       const bCount = Number.isFinite(b.pageCount) ? b.pageCount : 0;
       if (bCount !== aCount) return bCount - aCount;
-      return (a.message || '').localeCompare(b.message || '');
+      return (a.label || '').localeCompare(b.label || '');
     })
-    .map((issue) => {
-      const impact = String(issue.impact || 'info').toLowerCase();
+    .map((row) => {
       const pagesList =
-        Array.isArray(issue.pages) && issue.pages.length > 0
-          ? issue.pages.map((page) => `<code>${escapeHtml(page)}</code>`).join('<br />')
+        row.pages.length > 0
+          ? row.pages.map((page) => `<code>${escapeHtml(page)}</code>`).join('<br />')
           : '—';
-      const nodeCount =
-        issue.instanceCount != null
-          ? issue.instanceCount
-          : issue.pageCount != null
-            ? issue.pageCount
-            : 0;
+      const viewportsList =
+        row.viewports.length > 0
+          ? row.viewports.map((vp) => `<code>${escapeHtml(vp)}</code>`).join('<br />')
+          : viewportLabel
+            ? escapeHtml(viewportLabel)
+            : '—';
       const wcagHtml = (() => {
         if (!hasWcagData) return '';
-        if (typeof issue.wcagHtml === 'string' && issue.wcagHtml.trim()) return issue.wcagHtml;
-        const tags = []
-          .concat(issue.wcagBadge ? [issue.wcagBadge] : [])
-          .concat(Array.isArray(issue.wcagTags) ? issue.wcagTags : []);
+        if (typeof row.wcagHtml === 'string' && row.wcagHtml.trim()) return row.wcagHtml;
+        const tags = Array.isArray(row.wcagTags) ? row.wcagTags.filter(Boolean) : [];
+        const badge = row.wcagBadge != null ? String(row.wcagBadge).trim() : '';
+        if (tags.length > 0) {
+          return renderComplianceCell(tags, {
+            ruleId: row.ruleId,
+            category: row.category,
+          });
+        }
+        if (badge) {
+          return `<span class="badge badge-wcag">${escapeHtml(badge)}</span>`;
+        }
         return renderComplianceCell(tags, {
-          ruleId: issue.rule || issue.id,
-          category: issue.category,
+          ruleId: row.ruleId,
+          category: row.category,
         });
       })();
 
       const cells = [
-        `<td>${escapeHtml(formatIssueImpactLabel(impact))}</td>`,
-        `<td>${escapeHtml(issue.message || 'Issue')}</td>`,
-        `<td>${viewportLabel ? escapeHtml(viewportLabel) : '—'}</td>`,
+        `<td class="impact-cell"><span class="impact impact-${escapeHtml(
+          row.impact
+        )}">${escapeHtml(formatIssueImpactLabel(row.impact || 'info'))}</span></td>`,
+        `<td>${escapeHtml(row.label || 'Unknown issue')}</td>`,
+        `<td>${viewportsList}</td>`,
         `<td>${pagesList}</td>`,
-        `<td>${escapeHtml(formatCount(nodeCount))}</td>`,
+        `<td>${escapeHtml(formatCount(row.nodesCount))}</td>`,
       ];
 
       if (includeWcagColumn && hasWcagData) {
-        cells.push(`<td>${wcagHtml}</td>`);
+        cells.push(`<td>${wcagHtml || '—'}</td>`);
       }
-      // No Help column; WCAG badges act as link
 
-      return `<tr class="impact-${escapeHtml(impact)}">${cells.join('')}</tr>`;
+      return `<tr class="impact-${escapeHtml(row.impact)}">${cells.join('')}</tr>`;
     })
     .join('');
 
@@ -151,11 +241,23 @@ const renderUnifiedIssuesTable = (
       <h3>${escapeHtml(title)}</h3>
       <table class="schema-table">
         <thead><tr>${headers.map((heading) => `<th>${escapeHtml(heading)}</th>`).join('')}</tr></thead>
-        <tbody>${rows}</tbody>
+        <tbody>${rowsHtml}</tbody>
       </table>
     </section>
   `;
 };
+
+const renderSuiteGatingTable = (issues, options = {}) =>
+  renderUnifiedIssuesTable(issues, {
+    ...options,
+    variant: 'gating',
+  });
+
+const renderSuiteAdvisoryTable = (issues, options = {}) =>
+  renderUnifiedIssuesTable(issues, {
+    ...options,
+    variant: 'advisory',
+  });
 
 const renderIssueSectionPair = ({
   gatingIssues = [],
@@ -166,23 +268,25 @@ const renderIssueSectionPair = ({
   advisoryEmptyMessage = 'No advisories detected.',
   viewportLabel = null,
   includeWcagColumn = false,
+  gatingHydrate = null,
+  advisoryHydrate = null,
 } = {}) => {
   const gatingCount = Array.isArray(gatingIssues) ? gatingIssues.length : 0;
   const advisoryCount = Array.isArray(advisoryIssues) ? advisoryIssues.length : 0;
   const sections = [
-    renderUnifiedIssuesTable(gatingIssues, {
+    renderSuiteGatingTable(gatingIssues, {
       title: formatUniqueRulesHeading(gatingTitle, gatingCount),
       emptyMessage: gatingEmptyMessage,
-      variant: 'gating',
       viewportLabel,
       includeWcagColumn,
+      hydrate: gatingHydrate,
     }),
-    renderUnifiedIssuesTable(advisoryIssues, {
+    renderSuiteAdvisoryTable(advisoryIssues, {
       title: formatUniqueRulesHeading(advisoryTitle, advisoryCount),
       emptyMessage: advisoryEmptyMessage,
-      variant: 'advisory',
       viewportLabel,
       includeWcagColumn,
+      hydrate: advisoryHydrate,
     }),
   ].filter(Boolean);
 
@@ -1793,6 +1897,18 @@ const renderWcagPageIssueTable = (entries, heading, options = {}) => {
       </table>
     </div>
   `;
+};
+
+const defaultHydratePageIssue = (entry) => entry;
+
+const renderPerPageIssuesTable = (entries, heading, options = {}) => {
+  const { hydrate, ...rest } = options;
+  const hydrator = typeof hydrate === 'function' ? hydrate : defaultHydratePageIssue;
+  const normalisedEntries = (Array.isArray(entries) ? entries : [])
+    .map((entry) => hydrator(entry, { heading }))
+    .filter(Boolean);
+  if (normalisedEntries.length === 0) return '';
+  return renderWcagPageIssueTable(normalisedEntries, heading, rest);
 };
 
 const renderWcagRunSummary = (overview, details, { viewportLabel, viewportsCount }) => {
@@ -3686,7 +3802,7 @@ const renderVisualPageCard = (summary, { viewportLabel, thresholdsUsed = [] } = 
 
   const renderEntriesTable = (entries, heading, options = {}) =>
     entries.length
-      ? renderWcagPageIssueTable(
+      ? renderPerPageIssuesTable(
           entries.map((entry) => ({
             impact: entry.impact,
             id: entry.message,
@@ -4729,7 +4845,7 @@ const renderFormsPageCard = (summary, { projectLabel } = {}) => {
 
   const gatingSection =
     gatingEntries.length > 0
-      ? renderWcagPageIssueTable(
+      ? renderPerPageIssuesTable(
           gatingEntries,
           formatUniqueRulesHeading('Blocking issues', gatingEntries.length)
         )
@@ -4746,12 +4862,12 @@ const renderFormsPageCard = (summary, { projectLabel } = {}) => {
 
   const warningSection =
     warningEntries.length > 0
-      ? renderWcagPageIssueTable(warningEntries, `Warnings (${formatCount(warningEntries.length)})`)
+      ? renderPerPageIssuesTable(warningEntries, `Warnings (${formatCount(warningEntries.length)})`)
       : '';
 
   const advisorySection =
     filteredAdvisories.length > 0
-      ? renderWcagPageIssueTable(
+      ? renderPerPageIssuesTable(
           filteredAdvisories,
           formatUniqueRulesHeading('Advisories', filteredAdvisories.length),
           { headingClass: 'summary-heading-best-practice' }
@@ -4846,7 +4962,7 @@ const renderInternalLinksPageCard = (summary, { projectLabel } = {}) => {
 
   const renderEntriesTable = (entries, heading, options = {}) =>
     entries.length
-      ? renderWcagPageIssueTable(
+      ? renderPerPageIssuesTable(
           entries.map((entry) => ({
             impact: entry.impact,
             id: entry.message,
@@ -5013,7 +5129,7 @@ const renderInteractivePageCard = (summary, { projectLabel } = {}) => {
 
   const renderEntriesTable = (entries, heading, options = {}) =>
     entries.length
-      ? renderWcagPageIssueTable(
+      ? renderPerPageIssuesTable(
           entries.map((entry) => ({
             impact: entry.impact,
             id: entry.message,
@@ -5494,7 +5610,7 @@ const renderHttpPageCard = (summary, { projectLabel, viewportLabel } = {}) => {
 
   const renderEntriesTable = (entries, heading, options = {}) =>
     entries.length
-      ? renderWcagPageIssueTable(
+      ? renderPerPageIssuesTable(
           entries.map((entry) => ({
             impact: entry.impact,
             id: entry.message,
@@ -5927,7 +6043,7 @@ const renderKeyboardPageIssuesTable = (entries, heading, options = {}) => {
   if (!Array.isArray(entries) || entries.length === 0) {
     return options.emptyHtml || '';
   }
-  return renderWcagPageIssueTable(entries, heading, options);
+  return renderPerPageIssuesTable(entries, heading, options);
 };
 
 const normaliseStructureIssueItem = (issue, defaultImpact) => {
@@ -6395,18 +6511,19 @@ const renderKeyboardGroupHtml = (group) => {
         normalize: normalizeKeyboardAdvisory,
       });
 
+      const executionFailureTable = executionFailureIssues.length
+        ? renderSuiteGatingTable(executionFailureIssues, {
+            title: formatUniqueRulesHeading('Execution failures', executionFailureIssues.length, {
+              noun: 'unique issues',
+            }),
+            emptyMessage: 'Execution failures recorded during this run.',
+            viewportLabel,
+            includeWcagColumn: true,
+          })
+        : '';
+
       const issueSections = [
-        executionFailureIssues.length
-          ? renderUnifiedIssuesTable(executionFailureIssues, {
-              title: formatUniqueRulesHeading('Execution failures', executionFailureIssues.length, {
-                noun: 'unique issues',
-              }),
-              emptyMessage: 'Execution failures recorded during this run.',
-              variant: 'gating',
-              viewportLabel,
-              includeWcagColumn: true,
-            })
-          : '',
+        executionFailureTable,
         renderIssueSectionPair({
           gatingIssues,
           advisoryIssues,
@@ -6532,7 +6649,7 @@ const renderReducedMotionPageCard = (summary) => {
 
   const gatingSection =
     gatingEntries.length > 0
-      ? renderWcagPageIssueTable(
+      ? renderPerPageIssuesTable(
           gatingEntries,
           formatUniqueRulesHeading('Blocking reduced-motion issues', gatingEntries.length)
         )
@@ -6540,12 +6657,12 @@ const renderReducedMotionPageCard = (summary) => {
 
   const warningSection =
     warningEntries.length > 0
-      ? renderWcagPageIssueTable(warningEntries, `Warnings (${formatCount(warningEntries.length)})`)
+      ? renderPerPageIssuesTable(warningEntries, `Warnings (${formatCount(warningEntries.length)})`)
       : '';
 
   const advisorySection =
     advisoryEntries.length > 0
-      ? renderWcagPageIssueTable(
+      ? renderPerPageIssuesTable(
           advisoryEntries,
           formatUniqueRulesHeading('Advisories', advisoryEntries.length),
           { headingClass: 'summary-heading-best-practice' }
@@ -6800,7 +6917,7 @@ const renderReflowPageCard = (summary) => {
 
   const gatingSection =
     gatingEntries.length > 0
-      ? renderWcagPageIssueTable(
+      ? renderPerPageIssuesTable(
           gatingEntries,
           formatUniqueRulesHeading('Blocking reflow issues', gatingEntries.length)
         )
@@ -6808,14 +6925,14 @@ const renderReflowPageCard = (summary) => {
 
   const warningSection =
     warningEntries.length > 0
-      ? renderWcagPageIssueTable(warningEntries, `Warnings (${formatCount(warningEntries.length)})`)
+      ? renderPerPageIssuesTable(warningEntries, `Warnings (${formatCount(warningEntries.length)})`)
       : horizontalOverflow > 0
         ? `<p class="details">Horizontal overflow measured at ${escapeHtml(formatPx(horizontalOverflow))}.</p>`
         : '';
 
   const advisorySection =
     advisoryEntries.length > 0
-      ? renderWcagPageIssueTable(
+      ? renderPerPageIssuesTable(
           advisoryEntries,
           formatUniqueRulesHeading('Advisories', advisoryEntries.length),
           { headingClass: 'summary-heading-best-practice' }
@@ -7044,7 +7161,7 @@ const renderIframePageCard = (summary) => {
 
   const gatingSection =
     gatingEntries.length > 0
-      ? renderWcagPageIssueTable(
+      ? renderPerPageIssuesTable(
           gatingEntries,
           formatUniqueRulesHeading('Blocking iframe issues', gatingEntries.length)
         )
@@ -7052,7 +7169,7 @@ const renderIframePageCard = (summary) => {
 
   const warningSection =
     warningEntries.length > 0
-      ? renderWcagPageIssueTable(warningEntries, `Warnings (${formatCount(warningEntries.length)})`)
+      ? renderPerPageIssuesTable(warningEntries, `Warnings (${formatCount(warningEntries.length)})`)
       : unlabeledFrames > 0
         ? `<p class="details">${escapeHtml(
             formatCount(unlabeledFrames)
@@ -7061,7 +7178,7 @@ const renderIframePageCard = (summary) => {
 
   const advisorySection =
     advisoryEntries.length > 0
-      ? renderWcagPageIssueTable(
+      ? renderPerPageIssuesTable(
           advisoryEntries,
           formatUniqueRulesHeading('Advisories', advisoryEntries.length),
           { headingClass: 'summary-heading-best-practice' }
@@ -7300,21 +7417,21 @@ const renderStructurePageCard = (summary) => {
     : '';
 
   const gatingSection = gatingEntries.length
-    ? renderWcagPageIssueTable(
+    ? renderPerPageIssuesTable(
         gatingEntries,
         `Gating structural issues (${formatCount(gatingEntries.length)})`
       )
     : '<p class="details">No gating issues detected.</p>';
 
   const warningsSection = warningEntries.length
-    ? renderWcagPageIssueTable(
+    ? renderPerPageIssuesTable(
         warningEntries,
         `Structural warnings (${formatCount(warningEntries.length)})`
       )
     : '<p class="details">No structural warnings detected.</p>';
 
   const advisoriesSection = advisoryEntries.length
-    ? renderWcagPageIssueTable(
+    ? renderPerPageIssuesTable(
         advisoryEntries,
         `Structural advisories (${formatCount(advisoryEntries.length)})`,
         { headingClass: 'summary-heading-best-practice' }
@@ -7651,7 +7768,7 @@ const renderResponsiveStructurePageCard = (summary, { viewportLabel } = {}) => {
 
   const renderEntriesTable = (entries, heading, options = {}) =>
     entries.length
-      ? renderWcagPageIssueTable(
+      ? renderPerPageIssuesTable(
           entries.map((entry) => ({
             impact: entry.impact,
             id: entry.message,
@@ -8010,7 +8127,7 @@ const renderResponsiveWpPageCard = (summary, { projectLabel } = {}) => {
 
   const gatingSection =
     gatingEntries.length > 0
-      ? renderWcagPageIssueTable(
+      ? renderPerPageIssuesTable(
           gatingEntries,
           formatUniqueRulesHeading('Blocking issues', gatingEntries.length)
         )
@@ -8018,12 +8135,12 @@ const renderResponsiveWpPageCard = (summary, { projectLabel } = {}) => {
 
   const warningSection =
     warningEntries.length > 0
-      ? renderWcagPageIssueTable(warningEntries, `Warnings (${formatCount(warningEntries.length)})`)
+      ? renderPerPageIssuesTable(warningEntries, `Warnings (${formatCount(warningEntries.length)})`)
       : '';
 
   const advisorySection =
     advisoryEntries.length > 0
-      ? renderWcagPageIssueTable(
+      ? renderPerPageIssuesTable(
           advisoryEntries,
           formatUniqueRulesHeading('Advisories', advisoryEntries.length),
           { headingClass: 'summary-heading-best-practice' }
@@ -8264,10 +8381,9 @@ const renderStructureGroupHtml = (group) => {
         </section>
       `;
 
-      gatingIssuesTable = renderUnifiedIssuesTable(gatingIssues, {
+      gatingIssuesTable = renderSuiteGatingTable(gatingIssues, {
         title: formatUniqueRulesHeading('Gating structural issues', gatingIssues.length),
         emptyMessage: 'No gating issues detected.',
-        variant: 'gating',
         viewportLabel,
         includeWcagColumn: true,
       });
@@ -8285,13 +8401,12 @@ const renderStructureGroupHtml = (group) => {
         }
       ).filter((issue) => issue.pageCount > 0);
 
-      advisoryIssuesTable = renderUnifiedIssuesTable(combinedDedupe, {
+      advisoryIssuesTable = renderSuiteAdvisoryTable(combinedDedupe, {
         title: formatUniqueRulesHeading(
           'Structural advisories and warnings',
           combinedDedupe.length
         ),
         emptyMessage: 'No advisories detected.',
-        variant: 'advisory',
         viewportLabel,
         includeWcagColumn: true,
       });
@@ -8578,21 +8693,21 @@ const renderWcagPageCard = (summary, { viewportLabel, failThreshold } = {}) => {
     : '';
 
   const gatingSection = violations.length
-    ? renderWcagPageIssueTable(
+    ? renderPerPageIssuesTable(
         violations,
         `Gating WCAG violations (${formatCount(violations.length)})`
       )
     : '<p class="details">No gating violations detected.</p>';
 
   const advisorySection = advisories.length
-    ? renderWcagPageIssueTable(
+    ? renderPerPageIssuesTable(
         advisories,
         `WCAG advisory findings (${formatCount(advisories.length)})`
       )
     : '';
 
   const bestPracticeSection = bestPractices.length
-    ? renderWcagPageIssueTable(
+    ? renderPerPageIssuesTable(
         bestPractices,
         `Best-practice advisories (${formatCount(bestPractices.length)})`,
         { headingClass: 'summary-heading-best-practice' }
@@ -9400,6 +9515,9 @@ const imageViewerScript = `
 
 module.exports.__test__ = {
   renderIssueSectionPair,
+  renderSuiteGatingTable,
+  renderSuiteAdvisoryTable,
+  renderPerPageIssuesTable,
   renderAvailabilityPageCard,
   renderHttpPageCard,
   renderPerformancePageCard,
