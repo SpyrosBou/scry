@@ -40,14 +40,16 @@ node run-tests.js --site example-site --pages 5 --responsive
 - **Multiple sites:** repeat `--site` or append additional site names after the options.
 - **Custom specs:** `node run-tests.js --site <name> --pages <n|all> --test tests/a11y.audit.wcag.spec.js`
 - **Projects:** select Playwright projects with `--browsers=chrome,firefox` or `--browsers=all`.
+- **Worker pool:** tune concurrency with `--workers=<count|auto>` (defaults to `auto`, which exposes all logical cores via `PWTEST_WORKERS`).
 - **Discovery:** append `--discover` to refresh sitemap-backed manifests before execution. You can also run the standalone discovery command to scaffold or refresh a site config.
   - Requirement: the base URL must include the protocol (http:// or https://).
   - Interactive (positional URL): `npm run discover -- https://woodworking.ddev.site [--local]`
   - Non-interactive (flags): `npm run discover -- --base-url=https://woodworking.ddev.site --yes --site-name=woodworking-ddev [--name "Woodworking Ddev"] [--allow-duplicate] [--local]`
   - Reuse by name (refresh sitemap-backed pages only): `npm run discover -- woodworking-ddev`
   - Flags supported: `--base-url|--baseUrl`, `--site-name|--config-name`, `--name|--display`, `--yes|-y`, `--no|-n`, `--allow-duplicate`, `--local`, `--help`.
-  - Behavior: if a config for the base URL already exists, it will be reused unless `--allow-duplicate` is passed. In interactive mode you’ll be prompted; in non-interactive mode pair `--yes` with the necessary flags.
+  - Behavior: if a config for the base URL already exists, it will be reused unless `--allow-duplicate` is passed. In interactive mode you’ll be prompted; in non-interactive mode pair `--yes` with the necessary flags. When a sitemap strategy is missing, `--discover` seeds one that points to `<baseUrl>/sitemap.xml` and persists new pages back to `sites/<name>.json`.
 - **Debugging:** use `--debug` for Playwright trace mode or `--output <path>` to persist manifest JSON.
+- **Baseline refresh:** append `--update-baselines` alongside `--site` to regenerate visual baselines (skips functional runs and exits after Playwright completes).
 - **Page cap:** omit `--pages` to use the default of 5, pass a positive integer to override, or use `--pages all` to test every available page.
 
 ### Examples
@@ -70,7 +72,10 @@ Helpful environment variables:
 
 ## Reports and Artifacts
 - Run outputs live under `reports/run-*/` with HTML in `report.html` and structured data in `data/run.json`.
+- Large manifests are written to `reports/run-manifests/`; trim that folder with `npm run clean:manifests [days]` (default 15 days) when it grows.
+- Capture run manifests and summaries programmatically with `--output ./reports/run-summary.json` — the file contains one entry per site with manifest metadata and report status.
 - Use `npm run reports:dev` to start a preview server with live reload at http://127.0.0.1:4173/ (default). It watches `reports/run-*`, `reports/latest-run.json`, plus the template and SCSS sources in `utils/` and `docs/mocks/`, auto-refreshing immediately when report data, styling, or helper code changes.
+- Override the preview port with `--port` or `REPORT_PORT`, and lock the viewer to a specific run via `--run run-YYYYMMDD-HHMMSS`.
 - Use `npm run reports:read [count]` to open the most recent report(s) without hunting filenames.
 - Regenerate an interactive report from stored data via `npm run reports:regenerate`.
 - Clean up old artifacts with `npm run clean:reports`, `npm run clean:manifests`, or `npm run clean:test-results`.
@@ -109,11 +114,11 @@ Helpful environment variables:
 ## Configuration Workflow
 1. Run `node run-tests.js --list-sites` to see available configurations.
 2. Update or add site manifests in `sites/*.json`; keep `testPages` current with the production sitemap.
-3. For WordPress instances served through DDEV, use `--local` to perform the preflight check automatically.
+3. For WordPress instances served through DDEV (Docker-based development environment), pass `--local` so the runner attempts a preflight. Set `ENABLE_DDEV=true` and `DDEV_PROJECT_PATH=/absolute/path/to/project` if you want the suite to auto-run `ddev start`; when unset, the runner tries to infer the project directory from the site name and base URL.
 4. When visual differences are intentional, refresh baselines:
-   ```bash
-   npm run baselines:update -- <site-name>
-   ```
+  ```bash
+  npm run baselines:update -- <site-name>
+  ```
 
 ## Linting and Tests
 - Lint JavaScript with `npm run lint` (or `npm run lint:fix` to auto-format where possible).

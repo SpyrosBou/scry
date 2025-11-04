@@ -35,10 +35,12 @@ This note captures the remaining tasks to harden our Playwright-based visual reg
 
 ## Docs to Keep Current
 - README: how to update baselines, how thresholds/masks/overrides work, reminder about keeping `testPages` current.
-- tests/CLAUDE.md: note that visual regression and responsive structure specs also attach report summaries.
+- AGENTS.md: reinforce runner flags (`--workers`, `--update-baselines`, `--discover`) so contributors have the latest workflow reference.
 
 ## Quick Commands
 - Update visual baselines for a site (visuals only):
   - `npm run baselines:update -- <name>`
+- Regenerate baselines without leaving the runner:
+  - `node run-tests.js --site=<name> --update-baselines`
 - Run visual regression only (defaults to Chrome desktop; use `--pages all` for full coverage):
   - `node run-tests.js --site=<name> --pages=5 --visual`
