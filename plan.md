@@ -61,7 +61,7 @@ This plan tracks the four-section report layout rollout and documents the exact 
 ## Checklist for future contributors
 1. **Update templates:** Modify the relevant `render<Spec>GroupHtml` function to emit the four sections in order: run summary, gating table, advisory table, per-page accordion.
 2. **Normalise findings:** Create or reuse a `normalize<Spec>Message` helper that trims noise, standardises IDs (`#n`), and shortens URLs with `simplifyUrlForDisplay`. Pass it to `collectIssueMessages`.
-3. **Tag accordion items:** When building the per-page array, set `_summaryClass` to one of `summary-page--fail|--warn|--advisory|--ok` so the shared CSS (Cascading Style Sheets) applies the correct background.
-4. **Regenerate reports:** Use `npm run reports:regenerate -- run-<id>` for the latest affected run(s) and verify the DOM matches the WCAG panel (classes, headings, badge legend).
-5. **Document the change:** After code lands, mark the spec as “Complete” in the table above and summarise the migration details in `docs/reporting-redesign-roadmap.md`.
-
+3. **Reuse shared helpers:** Pull formatting and layout utilities from `utils/report-template-helpers.js` and `utils/report-components/layout.js` instead of inlining summary cards, project wrappers, or count helpers.
+4. **Tag accordion items:** When building the per-page array, set `_summaryClass` to one of `summary-page--fail|--warn|--advisory|--ok` so the shared CSS (Cascading Style Sheets) applies the correct background.
+5. **Regenerate reports:** Use `npm run reports:regenerate -- run-<id>` for the latest affected run(s) and verify the DOM matches the WCAG panel (classes, headings, badge legend).
+6. **Document the change:** After code lands, mark the spec as “Complete” in the table above and summarise the migration details in `docs/reporting-redesign-roadmap.md`.
