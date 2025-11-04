@@ -12,26 +12,25 @@ The mock HTML report remains our source of truth. This roadmap captures what is 
 ### Spec migration status (2025-10-28)
 | Spec | Template entry point | Status | Notes |
 | --- | --- | --- | --- |
-| `tests/a11y.audit.wcag.spec.js` | `renderAccessibilityGroupHtml` | Complete | Baseline for four-section layout; tables produced via `renderAccessibilityRuleTable`, per-page accordion via `renderWcagPerPageSection`. |
-| `tests/a11y.keyboard.navigation.spec.js` | `renderKeyboardGroupHtml` | Complete | Run summary pulls metrics from `overview`, issues funneled through `renderUnifiedIssuesTable`; `renderKeyboardPageCard` maps `gating`, execution failures (warnings), and advisories with `renderKeyboardPageIssuesTable`. |
+| `tests/a11y.audit.wcag.spec.js` | `renderAccessibilityGroupHtml` | Complete | Baseline for shared gating/advisory/per-page layout; tables produced via `renderAccessibilityRuleTable`, per-page accordion via `renderWcagPerPageSection`. |
+| `tests/a11y.keyboard.navigation.spec.js` | `renderKeyboardGroupHtml` | Complete | Unified gating + execution failure tables via `renderUnifiedIssuesTable`; `renderKeyboardPageCard` maps focus metrics and advisories with `renderKeyboardPageIssuesTable`. |
 | `tests/a11y.structure.landmarks.spec.js` | `renderStructureGroupHtml` | Complete | Combines `gatingIssues`, `headingSkips`, `warnings`, and `advisories` into shared tables, normalising copy with helper lambdas before dedupe; per-page accordion uses `renderStructurePageCard`. |
 | `tests/functionality.links.internal.spec.js` | `renderInternalLinksGroupHtml` | Complete | Uses `collectIssueMessages` with default normalisation to collapse duplicate link failures; per-page cards (`renderInternalLinksPageCard`) surface meta counts and sample lists. |
 | `tests/functionality.interactive.smoke.spec.js` | `renderInteractiveGroupHtml` | Complete | Console/API stability now relies on `normalizeInteractiveMessage` (trims ANSI, condenses retries, simplifies URLs) before passing data to `renderUnifiedIssuesTable` and `renderInteractivePageCard`. |
-| `tests/functionality.infrastructure.health.spec.js` | `renderAvailabilityGroupHtml` | Complete | Run summary now surfaces uptime status pills with normalised availability messaging and enriched page cards (status line + insight tiles). |
-| `renderHttpGroupHtml` (HTTP response validation) | — | Complete | Status summary highlights errors/redirects, failed checks feed the gating table, and page cards expose status/redirect metadata with deduped findings. |
-| `renderPerformanceGroupHtml` (performance budgets) | — | Complete | Budget breaches aggregate by metric, run summary shows over-budget counts, and page cards combine timing tiles with normalised advisory tables. |
+| `tests/functionality.infrastructure.health.spec.js` | `renderAvailabilityGroupHtml` | Complete | Gating/advisory tables use normalised availability messaging and page cards expose status tiles plus insight notes. |
+| `renderHttpGroupHtml` (HTTP response validation) | — | Complete | Failed checks feed the gating table and page cards expose status/redirect metadata with deduped findings; no standalone run summary block. |
+| `renderPerformanceGroupHtml` (performance budgets) | — | Complete | Budget breaches aggregate by metric and page cards combine timing tiles with normalised advisory tables. |
 | Responsive suites (`renderResponsive*` helpers) | — | Complete | Responsive structure and WordPress features panels now use shared status summaries, responsive normaliser, and WCAG-style per-viewport accordions. |
 | Visual regression (`renderVisualGroupHtml`) | — | Complete | Hero includes diff status pills/threshold notes; gating/advisory tables reference diff artifacts and page cards expose attachment badges with normalised messages. |
 
 ### Implementation playbook for future migrations
 1. **Locate the renderer** in `utils/report-templates.js` for the target schema group (search for `render<Spec>GroupHtml`). Identify the existing data sources: `runPayload.overview`, `runPayload.details.pages`, and any custom fields.
-2. **Run summary:** Compose a `summary-report summary-a11y summary-a11y--run-summary` section. Always include the standard intro sentence (`Audited <strong>n</strong> page(s)...`) and feed status pills through `renderStatusSummaryList`. Add per-metric paragraphs with `<p class="details">`.
-3. **Layout helpers:** Reuse `assembleSuiteSections`, `renderProjectBlockSection`, and `renderSchemaGroupContainer` from `utils/report-components/layout.js` to wrap run summaries, issue tables, and per-page accordions instead of hand-writing `<article>` / project blocks.
-4. **Gating/advisory tables:** Use `collectIssueMessages` with a spec-specific normaliser so messages dedupe across pages. Pipe the arrays into `renderUnifiedIssuesTable` with `variant: 'gating'` or `'advisory'`. Keep table headings aligned with WCAG (Impact, Issue, Viewport(s), Pages, Nodes, WCAG level) and include the Help column when rule guidance is available.
-5. **Per-page accordion:** Transform the page array to include `_summaryClass` based on gating/warning/advisory presence, then feed it to `renderPerPageAccordion`. Extend or create `render<Spec>PageCard` to surface meta counts and call `renderWcagPageIssueTable` (or spec equivalents) for sub-sections.
-6. **Message normalisation:** If raw findings contain noisy stack traces or long URLs, create a helper similar to `normalizeInteractiveMessage`. Strip ANSI escape codes, collapse whitespace, coerce `#123` IDs to `#n`, and shorten URLs via `simplifyUrlForDisplay`.
-7. **Verification:** Regenerate the latest affected report (`npm run reports:regenerate -- run-<id>`) and confirm in DevTools that the DOM matches the WCAG panel’s ordering, classes, and accordion behaviour.
-8. **Documentation:** After landing code, update this roadmap table and `plan.md` with status + concrete instructions so the next contributor follows the same pattern.
+2. **Layout helpers:** Reuse `assembleSuiteSections`, `renderProjectBlockSection`, and `renderSchemaGroupContainer` from `utils/report-components/layout.js` so the gating/advisory tables and per-page accordion slot into the same wrappers across specs.
+3. **Gating/advisory tables:** Use `collectIssueMessages` with a spec-specific normaliser so messages dedupe across pages. Pipe the arrays into `renderUnifiedIssuesTable` with `variant: 'gating'` or `'advisory'`. Keep table headings aligned with WCAG (Impact, Issue, Viewport(s), Pages, Nodes, WCAG level) and include the Help column when rule guidance is available.
+4. **Per-page accordion:** Transform the page array to include `_summaryClass` based on gating/warning/advisory presence, then feed it to `renderPerPageAccordion`. Extend or create `render<Spec>PageCard` to surface meta counts and call `renderWcagPageIssueTable` (or spec equivalents) for sub-sections.
+5. **Message normalisation:** If raw findings contain noisy stack traces or long URLs, create a helper similar to `normalizeInteractiveMessage`. Strip ANSI escape codes, collapse whitespace, coerce `#123` IDs to `#n`, and shorten URLs via `simplifyUrlForDisplay`.
+6. **Verification:** Regenerate the latest affected report (`npm run reports:regenerate -- run-<id>`) and confirm in DevTools that the DOM matches the WCAG panel’s ordering, classes, and accordion behaviour.
+7. **Documentation:** After landing code, update this roadmap table and `plan.md` with status + concrete instructions so the next contributor follows the same pattern.
 
 ## Outstanding work
 

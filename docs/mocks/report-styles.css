@@ -1216,6 +1216,45 @@ body[data-theme=dark] .theme-toggle__icon--moon {
   color: var(--text-muted);
 }
 
+.summary-report .details-text {
+  display: inline-block;
+  max-width: 20rem;
+  color: var(--text-strong);
+  word-break: break-word;
+}
+
+.summary-report .details-link {
+  font-size: 0.85rem;
+  color: var(--accent);
+}
+
+.summary-report .culprit-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--accent);
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.summary-report .culprit-link:hover,
+.summary-report .culprit-link:focus-visible {
+  background: var(--accent-soft);
+  color: var(--text-inverse);
+  box-shadow: 0 0 0 1px var(--accent);
+  transform: translateY(-1px);
+}
+
+.summary-report .culprit-link code {
+  background: transparent;
+  border-color: transparent;
+  padding: 0;
+}
+
 .summary-report table {
   width: 100%;
   border-collapse: collapse;

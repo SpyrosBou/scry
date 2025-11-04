@@ -47,12 +47,8 @@ The content window renders different layouts depending on whether the Overview p
 ### When on a spec pane
 
 #### Spec overview
-- Top-of-pane narrative and key metrics tailored to the selected spec.
-- Explains what the test validated and highlights major outcomes before the detailed cards/tables.
-
-#### Run summary card
-- Compact card outlining the scope of the spec run (pages inspected, gating/advisory counts, thresholds, etc.).
-- Acts as the anchor reference before scrolling into detailed findings.
+- Optional top-of-pane narrative and quick metrics tailored to the selected spec.
+- Use it to set context before diving into the findings. When omitted, the report jumps straight into the tables described below.
 
 #### Unique Gating violations section
 - Section heading plus the unique gating table.
