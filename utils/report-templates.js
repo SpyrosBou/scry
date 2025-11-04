@@ -260,12 +260,14 @@ const renderUnifiedIssuesTable = (
     `;
   }
 
-  const hasWcagData = includeWcagColumn && issues.some((issue) => {
-    if (typeof issue?.wcagHtml === 'string' && issue.wcagHtml.trim()) return true;
-    if (issue?.wcagBadge != null && String(issue.wcagBadge).trim()) return true;
-    if (Array.isArray(issue?.wcagTags) && issue.wcagTags.length > 0) return true;
-    return false;
-  });
+  const hasWcagData =
+    includeWcagColumn &&
+    issues.some((issue) => {
+      if (typeof issue?.wcagHtml === 'string' && issue.wcagHtml.trim()) return true;
+      if (issue?.wcagBadge != null && String(issue.wcagBadge).trim()) return true;
+      if (Array.isArray(issue?.wcagTags) && issue.wcagTags.length > 0) return true;
+      return false;
+    });
   const hasHelpData = false; // Help column removed; WCAG badges become the link
 
   const rows = issues
@@ -294,7 +296,10 @@ const renderUnifiedIssuesTable = (
         const tags = []
           .concat(issue.wcagBadge ? [issue.wcagBadge] : [])
           .concat(Array.isArray(issue.wcagTags) ? issue.wcagTags : []);
-        return renderComplianceCell(tags, { ruleId: issue.rule || issue.id, category: issue.category });
+        return renderComplianceCell(tags, {
+          ruleId: issue.rule || issue.id,
+          category: issue.category,
+        });
       })();
 
       const cells = [
@@ -909,7 +914,8 @@ const renderWcagBadgesLinked = (tags) => {
 const renderComplianceBadgeFallback = ({ ruleId, category }) => {
   const id = String(ruleId || '').toLowerCase();
   const cat = String(category || '').toLowerCase();
-  const isAria = id.startsWith('aria-') || id.startsWith('landmark-') || id === 'region' || id.includes('aria');
+  const isAria =
+    id.startsWith('aria-') || id.startsWith('landmark-') || id === 'region' || id.includes('aria');
   if (isAria) return '<span class="badge badge-neutral">ARIA best practice</span>';
   if (cat === 'best-practice') return '<span class="badge badge-neutral">Best practice</span>';
   if (cat === 'advisory') return '<span class="badge badge-neutral">Advisory</span>';
@@ -944,9 +950,7 @@ const extractNodeTargets = (nodes, limit = 3) => {
   if (!targets.length) return null;
   const unique = Array.from(new Set(targets)).slice(0, limit);
   const byLabel = new Map(enrichments.map((e) => [e.label, e]));
-  return unique
-    .map((label) => `<code>${escapeHtml(label)}</code>`)
-    .join('<br />');
+  return unique.map((label) => `<code>${escapeHtml(label)}</code>`).join('<br />');
 };
 
 // Build a compact list of screenshot links for nodes that include
@@ -955,11 +959,15 @@ const extractNodeScreenshots = (nodes, limit = 3) => {
   if (!Array.isArray(nodes) || nodes.length === 0) return null;
   const hrefs = [];
   nodes.forEach((node) => {
-    const href = node?.screenshotDataUri || node?.screenshot || node?.image || node?.preview || null;
+    const href =
+      node?.screenshotDataUri || node?.screenshot || node?.image || node?.preview || null;
     if (!href) return;
-    const safeHref = String(href).startsWith('data:') || String(href).startsWith('http') || String(href).startsWith('/')
-      ? String(href)
-      : `./${String(href)}`;
+    const safeHref =
+      String(href).startsWith('data:') ||
+      String(href).startsWith('http') ||
+      String(href).startsWith('/')
+        ? String(href)
+        : `./${String(href)}`;
     hrefs.push(safeHref);
   });
   if (hrefs.length === 0) return null;
@@ -1135,7 +1143,10 @@ const renderAccessibilityRuleTable = (title, rules, { headingClass, sectionClass
       const helpLink = rule.helpUrl
         ? `<a href="${escapeHtml(rule.helpUrl)}" target="_blank" rel="noopener noreferrer">rule docs</a>`
         : '<span class="details">—</span>';
-      const wcagHtml = renderComplianceCell(wcagTags, { ruleId: rule.rule || rule.id, category: rule.category });
+      const wcagHtml = renderComplianceCell(wcagTags, {
+        ruleId: rule.rule || rule.id,
+        category: rule.category,
+      });
       return `
         <tr class="impact-${escapeHtml((rule.impact || rule.category || 'info').toLowerCase())}">
           <td>${escapeHtml(rule.impact || rule.category || 'info')}</td>
@@ -1685,10 +1696,16 @@ const deriveExpectedSummaryTypesFromTests = (tests = []) => {
     { match: /a11y\.forms\.validation\.spec\.js$/i, types: ['forms'] },
     { match: /a11y\.keyboard\.navigation\.spec\.js$/i, types: ['keyboard'] },
     { match: /a11y\.structure\.landmarks\.spec\.js$/i, types: ['structure'] },
-    { match: /responsive\.layout\.structure\.spec\.js$/i, types: ['responsive-structure', 'wp-features'] },
+    {
+      match: /responsive\.layout\.structure\.spec\.js$/i,
+      types: ['responsive-structure', 'wp-features'],
+    },
     { match: /functionality\.links\.internal\.spec\.js$/i, types: ['internal-links'] },
     { match: /functionality\.interactive\.smoke\.spec\.js$/i, types: ['interactive'] },
-    { match: /functionality\.infrastructure\.health\.spec\.js$/i, types: ['availability', 'http', 'performance'] },
+    {
+      match: /functionality\.infrastructure\.health\.spec\.js$/i,
+      types: ['availability', 'http', 'performance'],
+    },
     { match: /visual\.regression\.snapshots\.spec\.js$/i, types: ['visual'] },
   ];
 
@@ -1706,7 +1723,12 @@ const deriveExpectedSummaryTypesFromTests = (tests = []) => {
   return map; // Map<summaryType, { specs: Set<string> }>
 };
 
-const renderSummaryOverview = (run, schemaRecords, suitePanels = [], expectedByType = new Map()) => {
+const renderSummaryOverview = (
+  run,
+  schemaRecords,
+  suitePanels = [],
+  expectedByType = new Map()
+) => {
   const summaryMap = collectRunSummariesByType(schemaRecords);
   if (summaryMap.size === 0 && !run) return '';
 
@@ -1903,6 +1925,7 @@ const summaryTypeFromGroup = (group) => {
 const renderWcagPageIssueTable = (entries, heading, options = {}) => {
   if (!Array.isArray(entries) || entries.length === 0) return '';
   const headingClass = options.headingClass ? ` class="${escapeHtml(options.headingClass)}"` : '';
+  const includeWcagColumn = options.includeWcagColumn !== false;
   const rows = entries
     .map((entry) => {
       const impact = entry.impact || entry.category || 'info';
@@ -1928,7 +1951,7 @@ const renderWcagPageIssueTable = (entries, heading, options = {}) => {
           <td>${escapeHtml(impact || 'info')}</td>
           <td>${escapeHtml(entry.id || entry.rule || 'Unnamed rule')}</td>
           <td>${escapeHtml(formatCount(nodesCount))}</td>
-          <td>${wcagHtml}</td>
+          ${includeWcagColumn ? `<td>${wcagHtml}</td>` : ''}
           <td>${escapeHtml(detailsText)}</td>
           <td>${screenshotsHtml || '<span class="details">—</span>'}</td>
           <td>${targetsHtml || '<span class="details">—</span>'}</td>
@@ -1941,7 +1964,7 @@ const renderWcagPageIssueTable = (entries, heading, options = {}) => {
     <h4${headingClass}>${escapeHtml(heading)}</h4>
     <div class="page-card__table">
       <table>
-        <thead><tr><th>Impact</th><th>Rule</th><th>Nodes</th><th>WCAG level</th><th>Details</th><th>Screenshot</th><th>Culprit</th></tr></thead>
+        <thead><tr><th>Impact</th><th>Rule</th><th>Nodes</th>${includeWcagColumn ? '<th>WCAG level</th>' : ''}<th>Details</th><th>Screenshot</th><th>Culprit</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
     </div>
@@ -3308,7 +3331,7 @@ const renderVisualPageCard = (summary, { viewportLabel, thresholdsUsed = [] } = 
             nodesCount: entry.count,
           })),
           heading,
-          options
+          { ...options, includeWcagColumn: false }
         )
       : '';
 
@@ -4441,7 +4464,7 @@ const renderInternalLinksPageCard = (summary, { projectLabel } = {}) => {
             nodesCount: entry.count,
           })),
           heading,
-          options
+          { ...options, includeWcagColumn: false }
         )
       : '';
 
@@ -4608,7 +4631,7 @@ const renderInteractivePageCard = (summary, { projectLabel } = {}) => {
             nodesCount: entry.count,
           })),
           heading,
-          options
+          { ...options, includeWcagColumn: false }
         )
       : '';
 
@@ -4681,7 +4704,7 @@ const renderAvailabilityPageCard = (summary, { projectLabel } = {}) => {
   const elements = isPlainObject(summary.elements) ? summary.elements : null;
   const rawStatus = summary.status != null ? Number(summary.status) : Number.NaN;
 
-  const statusCode = Number.isFinite(rawStatus) ? rawStatus : summary.status ?? 'n/a';
+  const statusCode = Number.isFinite(rawStatus) ? rawStatus : (summary.status ?? 'n/a');
 
   const hasGating = gating.length > 0;
   const hasWarnings = warnings.length > 0;
@@ -4741,11 +4764,7 @@ const renderAvailabilityPageCard = (summary, { projectLabel } = {}) => {
     ? Math.max(totalLandmarks - presentLandmarks - missingLandmarks.length, 0)
     : totalLandmarks;
 
-  const structureTone = !elements
-    ? 'muted'
-    : missingLandmarks.length
-      ? 'danger'
-      : 'success';
+  const structureTone = !elements ? 'muted' : missingLandmarks.length ? 'danger' : 'success';
   const structureValue = !elements
     ? 'Not captured'
     : `${presentLandmarks}/${totalLandmarks} present`;
@@ -4893,7 +4912,9 @@ const renderAvailabilityPageCard = (summary, { projectLabel } = {}) => {
     const landmarkList = missingLandmarks
       .map((label) => label.replace(' landmark missing', ''))
       .join(', ');
-    narrativeParts.push(`Missing ${landmarkList} landmark${missingLandmarks.length > 1 ? 's' : ''}.`);
+    narrativeParts.push(
+      `Missing ${landmarkList} landmark${missingLandmarks.length > 1 ? 's' : ''}.`
+    );
   } else {
     narrativeParts.push('All critical landmarks were detected.');
   }
@@ -5000,7 +5021,7 @@ const renderHttpPageCard = (summary, { projectLabel, viewportLabel } = {}) => {
             nodesCount: entry.count,
           })),
           heading,
-          options
+          { ...options, includeWcagColumn: false }
         )
       : '';
 
@@ -5119,7 +5140,11 @@ const renderPerformancePageCard = (summary, { projectLabel } = {}) => {
     { key: 'loadtime', label: 'Load time', value: summary.loadTimeMs },
     { key: 'domcontentloaded', label: 'DOMContentLoaded', value: summary.domContentLoadedMs },
     { key: 'loadcomplete', label: 'Load complete', value: summary.loadCompleteMs },
-    { key: 'firstcontentfulpaint', label: 'First Contentful Paint', value: summary.firstContentfulPaintMs },
+    {
+      key: 'firstcontentfulpaint',
+      label: 'First Contentful Paint',
+      value: summary.firstContentfulPaintMs,
+    },
     { key: 'firstpaint', label: 'First Paint', value: summary.firstPaintMs },
   ];
 
@@ -5719,7 +5744,11 @@ const renderKeyboardGroupHtml = (group) => {
             const m = item.wcag.match(/(\d+\.\d+\.\d+)/);
             if (m) return m[1];
           }
-          const tags = Array.isArray(item.tags) ? item.tags : Array.isArray(item.wcagTags) ? item.wcagTags : [];
+          const tags = Array.isArray(item.tags)
+            ? item.tags
+            : Array.isArray(item.wcagTags)
+              ? item.wcagTags
+              : [];
           for (const t of tags) {
             const m = String(t || '').match(/(\d+\.\d+\.\d+)/);
             if (m) return m[1];
@@ -5864,12 +5893,9 @@ const renderKeyboardGroupHtml = (group) => {
       const executionFailureIssues = collectIssueMessages(pagesData, 'warnings', 'critical', {
         normalize: normalizeKeyboardAdvisory,
       }).filter((issue) => issue.pageCount > 0);
-      const gatingIssues = collectIssueMessages(
-        pagesData,
-        ['gating', 'gatingIssues'],
-        'critical',
-        { normalize: normalizeKeyboardGating }
-      ).filter((issue) => issue.pageCount > 0);
+      const gatingIssues = collectIssueMessages(pagesData, ['gating', 'gatingIssues'], 'critical', {
+        normalize: normalizeKeyboardGating,
+      }).filter((issue) => issue.pageCount > 0);
       const advisoryIssues = collectIssueMessages(pagesData, 'advisories', 'minor', {
         normalize: normalizeKeyboardAdvisory,
       });
@@ -7040,7 +7066,7 @@ const renderResponsiveStructurePageCard = (summary, { viewportLabel } = {}) => {
             nodesCount: entry.count,
           })),
           heading,
-          options
+          { ...options, includeWcagColumn: false }
         )
       : '';
 
@@ -7573,10 +7599,15 @@ const renderStructureGroupHtml = (group) => {
       // Dedupe advisory/warning entries by message regardless of differing impact
       // to avoid showing the same rule twice when a summarised advisory and a
       // per-occurrence warning share the same label.
-      const combinedDedupe = collectIssueMessages(pagesData, ['headingSkips', 'warnings', 'advisories'], 'minor', {
-        normalize: normalizeStructureAdvisory,
-        dedupeIgnoreImpact: true,
-      }).filter((issue) => issue.pageCount > 0);
+      const combinedDedupe = collectIssueMessages(
+        pagesData,
+        ['headingSkips', 'warnings', 'advisories'],
+        'minor',
+        {
+          normalize: normalizeStructureAdvisory,
+          dedupeIgnoreImpact: true,
+        }
+      ).filter((issue) => issue.pageCount > 0);
 
       advisoryIssuesTable = renderUnifiedIssuesTable(combinedDedupe, {
         title: formatUniqueRulesHeading(
@@ -8402,7 +8433,7 @@ const filterScript = `
     const isDark = theme === 'dark';
     themeToggle.setAttribute('aria-pressed', isDark ? 'true' : 'false');
     if (themeLabel) {
-      themeLabel.textContent = isDark ? 'Solarized Light' : 'Solarized Dark';
+      themeLabel.textContent = isDark ? 'Solarized Dark' : 'Solarized Light';
     }
   };
 
