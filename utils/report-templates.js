@@ -7787,7 +7787,7 @@ const renderResponsiveWpGroupHtml = (group) => {
       const statusSummary =
         statusItems.length > 0
           ? renderStatusSummaryList(statusItems, { className: 'status-summary' })
-          : '<p class="details">Responsive WordPress components detected across all audited viewports.</p>';
+          : '<p class="details">No responsive WordPress components were detected across the audited viewports.</p>';
 
       const summaryMetrics = renderSummaryMetrics([
         { label: 'Viewports audited', value: formatCount(viewportsAudited) },
