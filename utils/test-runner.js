@@ -543,6 +543,13 @@ class TestRunner {
       });
     }
 
+    // Support planning without executing tests
+    if (options.dryRun) {
+      console.log('🧪 Dry run enabled: printing manifest/spec selection only.');
+      console.log('No tests will be executed.');
+      return { code: 0, siteName };
+    }
+
     if (manifestInfo.manifestPath) {
       const relativePath = path.relative(process.cwd(), manifestInfo.manifestPath);
       console.log(`ℹ️  Run manifest saved to ${relativePath}`);

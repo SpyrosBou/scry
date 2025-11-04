@@ -6,7 +6,7 @@ const path = require('path');
 const TestRunner = require('./utils/test-runner');
 
 const argv = minimist(process.argv.slice(2), {
-  string: ['site', 'test', 'pages', 'browsers', 'workers', 'output'],
+  string: ['site', 'test', 'pages', 'browsers', 'workers', 'output', 'exclude'],
   boolean: [
     'help',
     'list-sites',
@@ -16,6 +16,8 @@ const argv = minimist(process.argv.slice(2), {
     'responsive',
     'functionality',
     'accessibility',
+    'all-suites',
+    'dry-run',
     'debug',
     'update-baselines',
   ],
@@ -84,6 +86,9 @@ function showUsage() {
     '  --responsive            Run only responsive structure specs',
     '  --functionality         Run only functionality specs',
     '  --accessibility         Run only accessibility specs',
+    '  --all-suites            Convenience: select all suites (can combine with --exclude)',
+    '  --exclude <list>        Comma/list of suites to exclude (e.g. "visual" or "visual,responsive")',
+    '  --dry-run               Plan only: print manifest/spec selection and exit',
     '  --workers               Worker count (number or "auto", default auto)',
     '  --discover              Refresh sitemap-backed pages before running',
     '  --local                 Attempt DDEV preflight for local ".ddev.site" hosts',
@@ -264,6 +269,25 @@ async function main() {
     functionality: coerceBoolean(argv.functionality),
     accessibility: coerceBoolean(argv.accessibility),
   };
+
+  // Expand --all-suites convenience into individual flags (before excludes)
+  if (coerceBoolean(argv['all-suites'])) {
+    suiteSelections.visual = true;
+    suiteSelections.responsive = true;
+    suiteSelections.functionality = true;
+    suiteSelections.accessibility = true;
+  }
+
+  // Apply --exclude filter if provided
+  const excludedSuites = new Set(
+    toStringArray(argv.exclude)
+      .map((s) => s.toLowerCase())
+      .filter((s) => ['visual', 'responsive', 'functionality', 'accessibility'].includes(s))
+  );
+  for (const key of excludedSuites) {
+    suiteSelections[key] = false;
+  }
+
   const hasSuiteSelection = Object.values(suiteSelections).some(Boolean);
   if (!hasSuiteSelection && specs.length === 0) {
     console.error(
@@ -293,6 +317,7 @@ async function main() {
     workers: argv.workers,
     envOverrides: {},
     outputWriter: null,
+    dryRun: coerceBoolean(argv['dry-run']),
   };
 
   if (argv.output) {

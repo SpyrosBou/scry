@@ -12,7 +12,7 @@ Whilst working on this repo you can assume we are concerned with the functionali
 ## Build, Test, and Development Commands
 
 - `npm run setup` installs all dependencies and Playwright browsers; use `npm run install-browsers` if you only need to refresh the browser binaries.
-- `node run-tests.js --site=<name> --functionality` executes the default Chrome desktop run (append `--pages=<n|all>` to override the 5-page default). Layer `--responsive`, `--functionality`, `--accessibility`, or `--visual` to target suite families, or pass one or more spec paths/Globs via `--test` / trailing arguments (for example `node run-tests.js --site=createarts-live --pages all tests/a11y.audit.wcag.spec.js`).
+- `node run-tests.js --site=<name> --functionality` executes the default Chrome desktop run (append `--pages=<n|all>` to override the 5-page default). Layer `--responsive`, `--functionality`, `--accessibility`, or `--visual` to target suite families (you can combine multiple suite flags), or pass one or more spec paths/Globs via `--test` / trailing arguments (for example `node run-tests.js --site=createarts-live --pages all tests/a11y.audit.wcag.spec.js`).
 - `--pages <n|all>` (optional, default 5) caps the resolved manifest to the first _n_ pages or removes the cap entirely (e.g. `node run-tests.js --site=createarts-live --pages all --functionality`); `A11Y_SAMPLE=<n>` remains available as an environment override for accessibility runs.
 - `--project=<name>` (or comma-separated list) lets you choose Playwright projects; omit for the Chrome desktop default.
 - `npm run reports:read [count]` opens the latest HTML report(s); set `REPORT_BROWSER`/`REPORT_BROWSER_ARGS` to force a specific viewer.
@@ -20,6 +20,8 @@ Whilst working on this repo you can assume we are concerned with the functionali
 - `npm run clean:test-results` resets Playwright's `test-results/` folder.
 - `npm run test:unit` runs the Node test suite in `tests/unit/`.
 - Suite shortcuts: `npm run test:visual -- --site=<name> [--pages=<n|all>]`, `npm run test:responsive -- --site=<name> [--pages=<n|all>]`, `npm run test:functionality -- --site=<name> [--pages=<n|all>]`, `npm run test:accessibility -- --site=<name> [--pages=<n|all>]`.
+  - Convenience: use `--all-suites` to select all suites, pair with `--exclude <list>` to omit any (e.g. `--exclude visual`).
+  - Use `--dry-run` to preview the manifest/spec selection without executing tests.
 - Suite flags and `--test` patterns are mutually exclusive—choose one style per invocation.
 - `npm run discover -- <site|https://base.url>` updates sitemap-backed pages and can scaffold new configs. The base URL must include `http://` or `https://`. Examples:
   - Interactive from URL: `npm run discover -- https://woodworking.ddev.site --local`

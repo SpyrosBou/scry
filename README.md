@@ -34,7 +34,9 @@ node run-tests.js --site example-site --pages 5 --responsive
 
 ## Running Test Suites
 - **General form:** `node run-tests.js --site <name> [--pages <n|all>] [suite flags]`
-- **Suite flags:** `--functionality`, `--responsive`, `--accessibility`, `--visual` (choose one style: flags or `--test` globs).
+- **Suite flags:** `--functionality`, `--responsive`, `--accessibility`, `--visual` (you can combine multiple suite flags; or use `--all-suites` with `--exclude`).
+- **Convenience flags:** `--all-suites` selects all suites; pair with `--exclude <list>` to omit specific ones (e.g. `--exclude visual`).
+- **Plan-only:** `--dry-run` prints the planned manifest and selected specs, without executing Playwright.
 - **Multiple sites:** repeat `--site` or append additional site names after the options.
 - **Custom specs:** `node run-tests.js --site <name> --pages <n|all> --test tests/a11y.audit.wcag.spec.js`
 - **Projects:** select Playwright projects with `--browsers=chrome,firefox` or `--browsers=all`.
@@ -47,6 +49,20 @@ node run-tests.js --site example-site --pages 5 --responsive
   - Behavior: if a config for the base URL already exists, it will be reused unless `--allow-duplicate` is passed. In interactive mode you’ll be prompted; in non-interactive mode pair `--yes` with the necessary flags.
 - **Debugging:** use `--debug` for Playwright trace mode or `--output <path>` to persist manifest JSON.
 - **Page cap:** omit `--pages` to use the default of 5, pass a positive integer to override, or use `--pages all` to test every available page.
+
+### Examples
+- All suites except visual on all pages:
+  ```bash
+  node run-tests.js --site nfsmediation-live --pages all --all-suites --exclude visual
+  ```
+- Equivalent using explicit flags (no visuals):
+  ```bash
+  node run-tests.js --site nfsmediation-live --pages all --responsive --functionality --accessibility
+  ```
+- Preview selection without running tests:
+  ```bash
+  node run-tests.js --site nfsmediation-live --pages all --responsive --functionality --accessibility --dry-run
+  ```
 
 Helpful environment variables:
 - `REPORT_BROWSER` and `REPORT_BROWSER_ARGS` force a specific viewer when opening reports.
