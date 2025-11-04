@@ -291,7 +291,7 @@ const renderUnifiedIssuesTable = (issues, { title, emptyMessage, variant, viewpo
         const tags = []
           .concat(issue.wcagBadge ? [issue.wcagBadge] : [])
           .concat(Array.isArray(issue.wcagTags) ? issue.wcagTags : []);
-        return renderWcagBadgesLinked(tags);
+        return renderComplianceCell(tags, { ruleId: issue.rule || issue.id, category: issue.category });
       })();
 
       const cells = [
@@ -898,6 +898,23 @@ const renderWcagBadgesLinked = (tags) => {
   return badges;
 };
 
+// When no WCAG tags are present, derive a meaningful classification badge
+// from the rule id or category so the UI never shows a bare "No WCAG tag".
+const renderComplianceBadgeFallback = ({ ruleId, category }) => {
+  const id = String(ruleId || '').toLowerCase();
+  const cat = String(category || '').toLowerCase();
+  const isAria = id.startsWith('aria-') || id.startsWith('landmark-') || id === 'region' || id.includes('aria');
+  if (isAria) return '<span class="badge badge-neutral">ARIA best practice</span>';
+  if (cat === 'best-practice') return '<span class="badge badge-neutral">Best practice</span>';
+  if (cat === 'advisory') return '<span class="badge badge-neutral">Advisory</span>';
+  return '<span class="badge badge-neutral">Unclassified</span>';
+};
+
+const renderComplianceCell = (tags, { ruleId, category } = {}) => {
+  if (Array.isArray(tags) && tags.length > 0) return renderWcagBadgesLinked(tags);
+  return renderComplianceBadgeFallback({ ruleId, category });
+};
+
 const extractNodeTargets = (nodes, limit = 3) => {
   if (!Array.isArray(nodes) || nodes.length === 0) return null;
   const targets = [];
@@ -1112,7 +1129,7 @@ const renderAccessibilityRuleTable = (title, rules, { headingClass, sectionClass
       const helpLink = rule.helpUrl
         ? `<a href="${escapeHtml(rule.helpUrl)}" target="_blank" rel="noopener noreferrer">rule docs</a>`
         : '<span class="details">—</span>';
-      const wcagHtml = wcagTags.length ? renderWcagBadgesLinked(wcagTags) : renderWcagTagBadges([]);
+      const wcagHtml = renderComplianceCell(wcagTags, { ruleId: rule.rule || rule.id, category: rule.category });
       return `
         <tr class="impact-${escapeHtml((rule.impact || rule.category || 'info').toLowerCase())}">
           <td>${escapeHtml(rule.impact || rule.category || 'info')}</td>
@@ -1887,7 +1904,10 @@ const renderWcagPageIssueTable = (entries, heading, options = {}) => {
       let helpUrl = entry.helpUrl || entry.help || null;
       const targetsHtml = extractNodeTargets(entry.nodes || []);
       const screenshotsHtml = extractNodeScreenshots(entry.nodes || []);
-      const wcagHtml = renderWcagBadgesLinked(entry.tags || entry.wcagTags || []);
+      const wcagHtml = renderComplianceCell(entry.tags || entry.wcagTags || [], {
+        ruleId: entry.id || entry.rule,
+        category: entry.category,
+      });
       // Derive Help link from WCAG tags if not explicitly provided
       if (!helpUrl) {
         const tags = (entry.tags || entry.wcagTags || []).filter(Boolean);
