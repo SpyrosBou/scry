@@ -26,37 +26,32 @@ This plan tracks the four-section report layout rollout and documents the exact 
   *Implementation highlights:*  
   1. Introduced `normalizeInteractiveMessage` (strips ANSI codes, trims Playwright call logs, simplifies URLs) so gating/advisory tables show one row per unique failure.  
   2. Extended `renderInteractivePageCard` to reuse `renderWcagPageIssueTable` for console/resource errors and to summarise counts in the page meta block.
+- **Service endpoint health (`tests/functionality.infrastructure.health.spec.js`)**  
+  *Template:* `renderAvailabilityGroupHtml`.  
+  *Implementation highlights:*  
+  1. Added uptime-focused status summaries and availability normaliser so HTTP errors, missing landmarks, and notes dedupe cleanly across pages.  
+  2. Reworked `renderAvailabilityPageCard` to surface a canonical “Status:” line, insight tiles, and grouped issue sections mirroring the four-column layout.
+- **HTTP response validation (`renderHttpGroupHtml`)**  
+  *Template:* `renderHttpGroupHtml`.  
+  *Implementation highlights:*  
+  1. Promoted success/error/redirect counts into the run summary and normalised failed checks into the gating table.  
+  2. `renderHttpPageCard` now shows status/redirect metadata, failed-check detail lists, and deduped issue tables powered by `normalizeHttpMessage`.
+- **Performance monitoring (`renderPerformanceGroupHtml`)**  
+  *Template:* `renderPerformanceGroupHtml`.  
+  *Implementation highlights:*  
+  1. Added status pills for pages over budget alongside summary metrics and breach detail notes.  
+  2. Normalised budget breaches so run-level tables group by metric, with page cards combining timing tiles and aggregated advisory lists.
+- **Responsive layout suites (`renderResponsiveStructureGroupHtml`, `renderResponsiveWpGroupHtml`)**  
+  *Implementation highlights:*  
+  1. Introduced responsive normaliser to collapse duplicate breakpoint copy and converted per-page cards to shared accordion sections with viewport metadata.  
+  2. Status summaries and badge-styled artifact links align the responsive panels with the WCAG layout conventions.
+- **Visual regression (`renderVisualGroupHtml`)**  
+  *Implementation highlights:*  
+  1. Run summary now calls out diff counts with status pills plus threshold detail notes, while gating/advisory tables include normalised diff samples.  
+  2. Per-page cards expose artifact badges, diff samples, and deduped issues via `normalizeVisualMessage`.
 
 ## Remaining conversions
-- **Service endpoint health (`renderAvailabilityGroupHtml`)**  
-  *Goal:* Replace bespoke availability table with four-section layout.  
-  *Steps:*  
-  1. Build run summary using uptime metrics (`overview` fields).  
-  2. Group failures via `collectIssueMessages` (create a normaliser that canonicalises status text).  
-  3. Author `renderAvailabilityPageCard` to surface status + failed checks inside the accordion.
-- **HTTP response validation (`renderHttpGroupHtml`)**  
-  *Goal:* Align status tables with WCAG layout.  
-  *Steps:*  
-  1. Promote status counts into `summary-report ... --run-summary`.  
-  2. Funnel failed checks into gating/advisory tables (`collectIssueMessages` across `failedChecks`).  
-  3. Craft per-page cards that list status, redirect, and failed checks via `renderWcagPageIssueTable`.
-- **Performance monitoring (`renderPerformanceGroupHtml`)**  
-  *Goal:* Treat budget breaches as gating/advisories while keeping timing metrics visible.  
-  *Steps:*  
-  1. Run summary: highlight pages over budget, average load times, and threshold copy.  
-  2. Aggregate breaches by label (normalise measurement keys) before calling `renderUnifiedIssuesTable`.  
-  3. Create `renderPerformancePageCard` with timing metrics + gating/advisory tables per page.
-- **Responsive layout suites (`renderResponsiveStructureGroupHtml`, `renderResponsiveFeaturesGroupHtml`)**  
-  *Goal:* Move away from interim tables.  
-  *Steps:*  
-  1. Determine gating vs advisory issue arrays in payloads; normalise text before aggregation.  
-  2. Build per-page cards mirroring WCAG structure with responsive-specific metadata (breakpoints, component notes).
-- **Visual regression (`renderVisualGroupHtml`)**  
-  *Goal:* Implement hero summary + gating/advisory tables + per-page diff deck per the mock.  
-  *Steps:*  
-  1. Run summary should call out gating diffs, advisory diffs, and artifact locations.  
-  2. Tables should point to diff image artifacts (use `<a>` with badge styling).  
-  3. Per-page card needs accordion with thumbnails and download links.
+None — backlog clear after accessibility + functionality panel parity work (2025-10-28).
 
 ## Checklist for future contributors
 1. **Update templates:** Modify the relevant `render<Spec>GroupHtml` function to emit the four sections in order: run summary, gating table, advisory table, per-page accordion.

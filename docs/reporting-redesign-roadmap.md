@@ -17,11 +17,11 @@ The mock HTML report remains our source of truth. This roadmap captures what is 
 | `tests/a11y.structure.landmarks.spec.js` | `renderStructureGroupHtml` | Complete | Combines `gatingIssues`, `headingSkips`, `warnings`, and `advisories` into shared tables, normalising copy with helper lambdas before dedupe; per-page accordion uses `renderStructurePageCard`. |
 | `tests/functionality.links.internal.spec.js` | `renderInternalLinksGroupHtml` | Complete | Uses `collectIssueMessages` with default normalisation to collapse duplicate link failures; per-page cards (`renderInternalLinksPageCard`) surface meta counts and sample lists. |
 | `tests/functionality.interactive.smoke.spec.js` | `renderInteractiveGroupHtml` | Complete | Console/API stability now relies on `normalizeInteractiveMessage` (trims ANSI, condenses retries, simplifies URLs) before passing data to `renderUnifiedIssuesTable` and `renderInteractivePageCard`. |
-| `tests/functionality.infrastructure.health.spec.js` | `renderAvailabilityGroupHtml` | In progress | Per-page cards now use insight tiles and grouped findings; run summary still needs shared four-section layout. |
-| `renderHttpGroupHtml` (HTTP response validation) | — | Pending | Convert to run summary + deduped gating/advisory tables; create per-page card. |
-| `renderPerformanceGroupHtml` (performance budgets) | — | In progress | Per-page cards now surface insight tiles plus grouped findings; run summary/per-page accordion still needs shared layout. |
-| Responsive suites (`renderResponsive*` helpers) | — | Pending | Reflow/reduced-motion done; layout/WordPress feature panels still need four-section conversion. |
-| Visual regression (`renderVisualGroupHtml`) | — | Pending | Must match mock hero, gating/advisory tables, and per-page diff deck. |
+| `tests/functionality.infrastructure.health.spec.js` | `renderAvailabilityGroupHtml` | Complete | Run summary now surfaces uptime status pills with normalised availability messaging and enriched page cards (status line + insight tiles). |
+| `renderHttpGroupHtml` (HTTP response validation) | — | Complete | Status summary highlights errors/redirects, failed checks feed the gating table, and page cards expose status/redirect metadata with deduped findings. |
+| `renderPerformanceGroupHtml` (performance budgets) | — | Complete | Budget breaches aggregate by metric, run summary shows over-budget counts, and page cards combine timing tiles with normalised advisory tables. |
+| Responsive suites (`renderResponsive*` helpers) | — | Complete | Responsive structure and WordPress features panels now use shared status summaries, responsive normaliser, and WCAG-style per-viewport accordions. |
+| Visual regression (`renderVisualGroupHtml`) | — | Complete | Hero includes diff status pills/threshold notes; gating/advisory tables reference diff artifacts and page cards expose attachment badges with normalised messages. |
 
 ### Implementation playbook for future migrations
 1. **Locate the renderer** in `utils/report-templates.js` for the target schema group (search for `render<Spec>GroupHtml`). Identify the existing data sources: `runPayload.overview`, `runPayload.details.pages`, and any custom fields.
@@ -37,9 +37,8 @@ The mock HTML report remains our source of truth. This roadmap captures what is 
 
 ### 1. Panel parity
 - Rebuild the Visual Regression panel to match the mock (hero summary, blocking/advisory tables, image preview deck, artifact links).
-- Rework responsive panels (responsive structure + WordPress features) so copy, status pills, and per-page accordions match the approved mock instead of the interim tables.
-- Finish migrating infrastructure/HTTP/performance functionality panels to the shared four-section layout and align copy with the mock.
-- Verify the shared layout utilities (`report-template-helpers.js`, `report-components/layout.js`) cover every panel as we continue polishing markup against the mocks.
+- Audit the newly migrated functionality/visual/responsive panels against the approved mock to confirm copy, status pills, and accordion structure match design expectations.
+- Verify the shared layout utilities (`report-template-helpers.js`, `report-components/layout.js`) support any edge cases uncovered during QA and raise follow-up issues if additional hooks are required.
 
 ### 2. Styling & theming
 - Finalise Solarized token values once all panels are migrated; ensure status colours, badges, and card shadows read correctly in both themes.

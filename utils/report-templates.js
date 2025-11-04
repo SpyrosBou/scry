@@ -2457,6 +2457,70 @@ const renderInteractiveGroupHtml = (group) => {
   });
 };
 
+const normalizeAvailabilityMessage = ({ message }) => {
+  if (message == null) return null;
+  const text = String(message).replace(/\s+/g, ' ').trim();
+  if (!text) return null;
+
+  const statusMatch = text.match(/(?:status|responded with)\s+(\d{3})/i);
+  if (statusMatch) {
+    const statusCode = statusMatch[1];
+    return {
+      key: `status:${statusCode}`,
+      label: `HTTP ${statusCode} response`,
+      sample: text,
+    };
+  }
+
+  if (/no http response/i.test(text)) {
+    return {
+      key: 'status:none',
+      label: 'No HTTP response captured',
+      sample: text,
+    };
+  }
+
+  const landmarkMatch = text.match(/([a-z0-9_-]+)\s+landmark missing/i);
+  if (landmarkMatch) {
+    const landmarkKey = landmarkMatch[1];
+    const landmarkLabel = humaniseKey(landmarkKey);
+    return {
+      key: `landmark:${landmarkKey.toLowerCase()}`,
+      label: `${landmarkLabel} landmark missing`,
+      sample: text,
+    };
+  }
+
+  return {
+    key: text.toLowerCase(),
+    label: text.charAt(0).toUpperCase() + text.slice(1),
+    sample: text,
+  };
+};
+
+const normalizeResponsiveMessage = ({ message }) => {
+  if (message == null) return null;
+  const text = String(message).replace(/\s+/g, ' ').trim();
+  if (!text) return null;
+
+  const landmarkMatch = text.match(/([a-z0-9_-]+)\s+landmark missing/i);
+  if (landmarkMatch) {
+    const landmarkKey = landmarkMatch[1];
+    return {
+      key: `landmark:${landmarkKey.toLowerCase()}`,
+      label: `${humaniseKey(landmarkKey)} landmark missing`,
+      sample: text,
+    };
+  }
+
+  const generalizedKey = text.replace(/\d+(\.\d+)?/g, '#').toLowerCase();
+  return {
+    key: generalizedKey,
+    label: text.charAt(0).toUpperCase() + text.slice(1),
+    sample: text,
+  };
+};
+
 const renderAvailabilityGroupHtml = (group) => {
   const buckets = collectSchemaProjects(group);
   if (buckets.length === 0) return '';
@@ -2490,6 +2554,9 @@ const renderAvailabilityGroupHtml = (group) => {
     const pagesWithWarnings =
       overview.pagesWithWarnings ??
       pagesData.filter((page) => Array.isArray(page.warnings) && page.warnings.length > 0).length;
+    const pagesWithErrors =
+      overview.pagesWithErrors ??
+      pagesData.filter((page) => Number(page.status) >= 400 || page.status === null).length;
     const missingLandmarks =
       overview.missingStructureElements != null
         ? overview.missingStructureElements
@@ -2498,30 +2565,69 @@ const renderAvailabilityGroupHtml = (group) => {
             const missing = Object.values(elements).filter((value) => value === false).length;
             return total + missing;
           }, 0);
+    const pagesWithoutStatus =
+      overview.pagesWithoutStatus ??
+      pagesData.filter((page) => page.status == null || Number.isNaN(Number(page.status))).length;
 
-    const summaryMetrics = renderSummaryMetrics([
-      { label: 'Pages checked', value: totalPages },
-      { label: 'Pages with blocking issues', value: pagesWithGating },
-      { label: 'Pages with warnings', value: pagesWithWarnings },
-      { label: 'Missing structure elements', value: missingLandmarks },
-    ]);
+    const statusItems = [
+      pagesWithGating
+        ? {
+            label: 'Blocking outages',
+            tone: 'status-error',
+            count: pagesWithGating,
+            suffix: 'page(s)',
+          }
+        : null,
+      pagesWithWarnings
+        ? {
+            label: 'Warnings logged',
+            tone: 'status-warning',
+            count: pagesWithWarnings,
+            suffix: 'page(s)',
+          }
+        : null,
+    ].filter(Boolean);
+
+    const statusSummary =
+      statusItems.length > 0
+        ? renderStatusSummaryList(statusItems, { className: 'status-summary' })
+        : '<p class="details">No outages or warnings detected across the monitored pages.</p>';
+
+    const detailNotes = [
+      `<p class="details">Error responses detected: ${escapeHtml(formatCount(pagesWithErrors))}</p>`,
+      pagesWithoutStatus
+        ? `<p class="details">No response recorded for ${escapeHtml(
+            formatCount(pagesWithoutStatus)
+          )} page(s).</p>`
+        : '',
+      `<p class="details">Missing critical landmarks: ${escapeHtml(
+        formatCount(missingLandmarks)
+      )}</p>`,
+    ]
+      .filter(Boolean)
+      .join('\n');
 
     const runSummaryHtml = `
       <section class="summary-report summary-a11y summary-a11y--run-summary">
         <h3>Availability &amp; uptime summary</h3>
         <p>Audited <strong>${escapeHtml(
           formatCount(totalPages)
-        )}</strong> page(s) for required landmarks and metadata across ${escapeHtml(
+        )}</strong> page(s) for required landmarks and HTTP uptime across ${escapeHtml(
           formatCount(viewportList.length || 1)
         )} viewport(s): ${escapeHtml(viewportLabel || 'Not recorded')}.</p>
-        ${summaryMetrics}
+        ${statusSummary}
+        ${detailNotes}
       </section>
     `;
 
-    const gatingIssues = collectIssueMessages(pagesData, 'gating', 'critical').filter(
-      (issue) => issue.pageCount > 0
-    );
-    const advisoryIssues = collectIssueMessages(pagesData, ['warnings', 'advisories'], 'moderate');
+    const gatingIssues = collectIssueMessages(pagesData, 'gating', 'critical', {
+      normalize: normalizeAvailabilityMessage,
+      dedupeIgnoreImpact: true,
+    }).filter((issue) => issue.pageCount > 0);
+    const advisoryIssues = collectIssueMessages(pagesData, ['warnings', 'advisories'], 'moderate', {
+      normalize: normalizeAvailabilityMessage,
+      dedupeIgnoreImpact: true,
+    });
 
     const issueSections = renderIssueSectionPair({
       gatingIssues,
@@ -2599,6 +2705,83 @@ const renderAvailabilityGroupHtml = (group) => {
   });
 };
 
+const normalizeHttpMessage = ({ message, raw }) => {
+  const source = raw && typeof raw === 'object' ? raw : {};
+  const textSource =
+    source.message ??
+    source.label ??
+    (message != null ? String(message) : '');
+  const baseText = String(textSource || '').replace(/\s+/g, ' ').trim();
+  const detailText =
+    typeof source.detail === 'string'
+      ? stripAnsiSequences(source.detail).replace(/\s+/g, ' ').trim()
+      : null;
+
+  if (!baseText && !detailText) return null;
+
+  if (source.type === 'failed-check') {
+    const label = source.label || baseText || 'Failed check';
+    return {
+      key: `failed-check:${label.toLowerCase()}`,
+      label: `Failed check: ${label}`,
+      sample: detailText || baseText || label,
+    };
+  }
+
+  const statusValue =
+    source.status != null && Number.isFinite(Number(source.status))
+      ? Number(source.status)
+      : (() => {
+          const match = baseText.match(/(?:^|\\b)(\\d{3})(?:\\b)/);
+          return match ? Number(match[1]) : null;
+        })();
+
+  if (Number.isFinite(statusValue)) {
+    let descriptor = 'Response';
+    if (statusValue >= 500) descriptor = 'Server error';
+    else if (statusValue >= 400) descriptor = 'Client error';
+    else if (statusValue >= 300) descriptor = 'Redirect';
+    else if (statusValue >= 200) descriptor = 'Successful response';
+    const statusText = source.statusText ? ` – ${source.statusText}` : '';
+    return {
+      key: `status:${statusValue}`,
+      label: `${descriptor}: HTTP ${statusValue}`,
+      sample: detailText || `${statusValue}${statusText}`.trim() || baseText || String(statusValue),
+    };
+  }
+
+  if (/timeout/i.test(baseText)) {
+    return {
+      key: 'timeout',
+      label: 'Request timeout',
+      sample: detailText || baseText,
+    };
+  }
+
+  if (/redirect/i.test(baseText)) {
+    return {
+      key: 'redirect',
+      label: 'Redirected response',
+      sample: detailText || baseText,
+    };
+  }
+
+  const label = baseText
+    ? baseText.charAt(0).toUpperCase() + baseText.slice(1)
+    : detailText || '';
+  const key = (label || '').toLowerCase();
+  if (!key) return null;
+  const sample =
+    detailText && detailText !== label
+      ? detailText
+      : baseText || detailText || label;
+  return {
+    key,
+    label,
+    sample,
+  };
+};
+
 const renderHttpGroupHtml = (group) => {
   const buckets = collectSchemaProjects(group);
   if (buckets.length === 0) return '';
@@ -2626,22 +2809,83 @@ const renderHttpGroupHtml = (group) => {
 
     const overview = runPayload.overview || {};
     const totalPages = overview.totalPages ?? pagesData.length;
+    const successResponses =
+      overview.success2xx ??
+      pagesData.filter((page) => {
+        const statusCode = Number(page.status);
+        return Number.isFinite(statusCode) && statusCode >= 200 && statusCode < 300;
+      }).length;
     const redirects =
-      overview.redirects ?? pagesData.filter((page) => page.redirectLocation).length;
+      overview.redirects ??
+      pagesData.filter((page) => {
+        const statusCode = Number(page.status);
+        return Number.isFinite(statusCode) && statusCode >= 300 && statusCode < 400;
+      }).length;
     const errors =
       overview.errors ??
+      pagesData.filter((page) => {
+        const statusCode = Number(page.status);
+        return Number.isFinite(statusCode) && statusCode >= 400;
+      }).length;
+    const pagesWithGating =
+      overview.pagesWithGatingIssues ??
       pagesData.filter((page) => Array.isArray(page.gating) && page.gating.length > 0).length;
     const pagesWithFailedChecks =
       overview.pagesWithFailedChecks ??
       pagesData.filter((page) => Array.isArray(page.failedChecks) && page.failedChecks.length > 0)
         .length;
 
-    const summaryMetrics = renderSummaryMetrics([
-      { label: 'Pages validated', value: totalPages },
-      { label: 'Redirects', value: redirects },
-      { label: 'Blocking HTTP issues', value: errors },
-      { label: 'Pages with failed checks', value: pagesWithFailedChecks },
-    ]);
+    const statusItems = [
+      errors
+        ? {
+            label: 'Error responses',
+            tone: 'status-error',
+            count: errors,
+            suffix: 'page(s)',
+          }
+        : null,
+      pagesWithFailedChecks
+        ? {
+            label: 'Failed checks',
+            tone: 'status-warning',
+            count: pagesWithFailedChecks,
+            suffix: 'page(s)',
+          }
+        : null,
+      redirects
+        ? {
+            label: 'Redirects',
+            tone: 'status-advisory',
+            count: redirects,
+            suffix: 'page(s)',
+          }
+        : null,
+      successResponses
+        ? {
+            label: '2xx responses',
+            tone: 'status-info',
+            count: successResponses,
+            suffix: 'page(s)',
+          }
+        : null,
+    ].filter(Boolean);
+
+    const statusSummary =
+      statusItems.length > 0
+        ? renderStatusSummaryList(statusItems, { className: 'status-summary' })
+        : '<p class="details">All monitored pages returned expected responses.</p>';
+
+    const detailNotes = [
+      `<p class="details">Total pages validated: ${escapeHtml(formatCount(totalPages))}</p>`,
+      `<p class="details">Blocking HTTP issues flagged: ${escapeHtml(
+        formatCount(pagesWithGating)
+      )}</p>`,
+      `<p class="details">Pages with failed checks: ${escapeHtml(
+        formatCount(pagesWithFailedChecks)
+      )}</p>`,
+    ]
+      .filter(Boolean)
+      .join('\n');
 
     const runSummaryHtml = `
       <section class="summary-report summary-a11y summary-a11y--run-summary">
@@ -2651,53 +2895,86 @@ const renderHttpGroupHtml = (group) => {
         )}</strong> page(s) for status expectations and redirects across ${escapeHtml(
           formatCount(viewportList.length || 1)
         )} viewport(s): ${escapeHtml(viewportLabel || 'Not recorded')}.</p>
-        ${summaryMetrics}
+        ${statusSummary}
+        ${detailNotes}
       </section>
     `;
 
-    const normalizeFailedCheck = ({ label, details }) => {
+    const normalizeFailedCheck = ({ label, details, status, statusText }) => {
       const message = label ? String(label).trim() : null;
       if (!message) return null;
       return {
+        type: 'failed-check',
+        label: message,
         message,
         detail: details ? stripAnsiSequences(details).trim() : null,
+        status,
+        statusText,
       };
     };
 
-    const pagesForIssues = pagesData.map((page) => {
+    const pagesWithHttpMetadata = pagesData.map((page) => {
       const failedChecks = Array.isArray(page.failedChecks) ? page.failedChecks : [];
-      if (failedChecks.length === 0) return page;
-      const normalized = failedChecks
+      const normalizedChecks = failedChecks
         .map((check) => normalizeFailedCheck(check))
         .filter(Boolean)
         .map((entry) => ({
-          message: entry.message,
-          detail: entry.detail,
+          ...entry,
+          status: entry.status ?? page.status,
+          statusText: entry.statusText ?? page.statusText,
         }));
+
+      const mapMessages = (items) =>
+        (Array.isArray(items) ? items : [])
+          .filter((item) => item != null)
+          .map((item) =>
+            typeof item === 'object'
+              ? {
+                  ...item,
+                  status: item.status ?? page.status,
+                  statusText: item.statusText ?? page.statusText,
+                }
+              : {
+                  message: item,
+                  status: page.status,
+                  statusText: page.statusText,
+                }
+          );
+
       return {
         ...page,
-        httpFailedChecks: normalized,
+        httpGating: mapMessages(page.gating),
+        httpFailedChecks: normalizedChecks,
+        httpWarnings: mapMessages(page.warnings),
+        httpAdvisories: mapMessages(page.advisories),
       };
     });
 
     const gatingIssues = collectIssueMessages(
-      pagesForIssues.map((page) => ({
+      pagesWithHttpMetadata.map((page) => ({
         ...page,
-        gatingCombined: [
-          ...(Array.isArray(page.gating) ? page.gating : []),
-          ...(Array.isArray(page.httpFailedChecks)
-            ? page.httpFailedChecks.map((item) => ({
-                message: item.message,
-                detail: item.detail,
-              }))
-            : []),
-        ],
+        gatingCombined: [...page.httpGating, ...page.httpFailedChecks],
       })),
       'gatingCombined',
-      'critical'
+      'critical',
+      {
+        normalize: normalizeHttpMessage,
+        dedupeIgnoreImpact: true,
+      }
     ).filter((issue) => issue.pageCount > 0);
 
-    const advisoryIssues = collectIssueMessages(pagesData, ['warnings', 'advisories'], 'moderate');
+    const advisoryIssues = collectIssueMessages(
+      pagesWithHttpMetadata.map((page) => ({
+        ...page,
+        advisoryCombined: [...page.httpWarnings, ...page.httpAdvisories],
+      })),
+      'advisoryCombined',
+      'moderate',
+      {
+        normalize: normalizeHttpMessage,
+        dedupeIgnoreImpact: true,
+      }
+    );
 
     const issueSections = renderIssueSectionPair({
       gatingIssues,
@@ -2780,6 +3057,66 @@ const renderHttpGroupHtml = (group) => {
   });
 };
 
+const normalizePerformanceMessage = ({ message, raw }) => {
+  const source = raw && typeof raw === 'object' ? raw : {};
+  const metricKey = source.metric ? String(source.metric).toLowerCase() : null;
+  const detailText =
+    source.detail != null ? String(source.detail).replace(/\s+/g, ' ').trim() : null;
+  if (metricKey) {
+    const label = `${humaniseKey(source.metric || metricKey)} budget exceeded`;
+    return {
+      key: `metric:${metricKey}`,
+      label,
+      sample: detailText || message || label,
+    };
+  }
+
+  const text = String(message ?? source.message ?? '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!text) return null;
+  return {
+    key: text.toLowerCase(),
+    label: text.charAt(0).toUpperCase() + text.slice(1),
+    sample: detailText || text,
+  };
+};
+
+const normalizeVisualMessage = ({ message, raw }) => {
+  const source = raw && typeof raw === 'object' ? raw : {};
+  const text = String(message ?? source.message ?? '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!text) return null;
+
+  const sample =
+    source.sample ||
+    source.artifact ||
+    (Array.isArray(source.samples) && source.samples.length > 0 ? source.samples[0] : null);
+
+  if (/visual diff detected/i.test(text)) {
+    return {
+      key: 'visual-diff-detected',
+      label: 'Visual diff detected',
+      sample: sample || text,
+    };
+  }
+
+  if (/rendering error|screenshot failed|diff error/i.test(text)) {
+    return {
+      key: 'visual-render-error',
+      label: 'Rendering error',
+      sample: sample || text,
+    };
+  }
+
+  return {
+    key: text.toLowerCase(),
+    label: text.charAt(0).toUpperCase() + text.slice(1),
+    sample: sample || text,
+  };
+};
+
 const renderPerformanceGroupHtml = (group) => {
   const buckets = collectSchemaProjects(group);
   if (buckets.length === 0) return '';
@@ -2818,12 +3155,38 @@ const renderPerformanceGroupHtml = (group) => {
       overview.pagesWithGatingIssues ??
       pagesData.filter((page) => Array.isArray(page.gating) && page.gating.length > 0).length;
 
+    const statusItems = [
+      pagesWithBreaches
+        ? {
+            label: 'Pages over budget',
+            tone: 'status-error',
+            count: pagesWithBreaches,
+            suffix: 'page(s)',
+          }
+        : null,
+      breaches
+        ? {
+            label: 'Budget breaches',
+            tone: 'status-warning',
+            count: breaches,
+            suffix: 'breach(es)',
+          }
+        : null,
+    ].filter(Boolean);
+
+    const statusSummary =
+      statusItems.length > 0
+        ? renderStatusSummaryList(statusItems, { className: 'status-summary' })
+        : '<p class="details">All monitored pages met the configured performance budgets.</p>';
+
     const summaryMetrics = renderSummaryMetrics([
       { label: 'Pages sampled', value: totalPages },
       { label: 'Average load (ms)', value: averageLoad },
-      { label: 'Budget breaches', value: breaches },
-      { label: 'Pages over budget', value: pagesWithBreaches },
     ]);
+
+    const detailNotes = [
+      `<p class="details">Budget breaches recorded: ${escapeHtml(formatCount(breaches))}</p>`,
+    ].join('\n');
 
     const runSummaryHtml = `
       <section class="summary-report summary-a11y summary-a11y--run-summary">
@@ -2831,33 +3194,70 @@ const renderPerformanceGroupHtml = (group) => {
         <p>Collected navigation timings across <strong>${escapeHtml(
           formatCount(totalPages)
         )}</strong> page(s) for ${escapeHtml(projectLabel)}.</p>
+        ${statusSummary}
         ${summaryMetrics}
+        ${detailNotes}
       </section>
     `;
 
     const normalizeBreaches = (page) => {
       const list = Array.isArray(page.budgetBreaches) ? page.budgetBreaches : [];
-      return list.map((breach) => ({
-        message: `${breach.metric} exceeded budget (${Math.round(breach.value)}ms > ${Math.round(
-          breach.budget
-        )}ms)`,
-      }));
+      return list.map((breach) => {
+        const metricKey = breach?.metric || 'metric';
+        const metricLabel = humaniseKey(metricKey);
+        const value = Number.isFinite(breach?.value) ? Math.round(breach.value) : null;
+        const budget = Number.isFinite(breach?.budget) ? Math.round(breach.budget) : null;
+        const detail = value != null && budget != null ? `${value}ms > ${budget}ms` : null;
+        return {
+          metric: metricKey,
+          message: `${metricLabel} budget exceeded`,
+          detail,
+        };
+      });
     };
 
-    const pagesForIssues = pagesData.map((page) => ({
-      ...page,
-      performanceGating: [
-        ...(Array.isArray(page.gating) ? page.gating : []),
-        ...normalizeBreaches(page),
-      ],
-    }));
+    const pagesForIssues = pagesData.map((page) => {
+      const gatingList = Array.isArray(page.gating) ? page.gating : [];
+      const normalizedGating = gatingList.map((entry) =>
+        typeof entry === 'object' ? entry : { message: entry }
+      );
+      return {
+        ...page,
+        performanceGating: [...normalizedGating, ...normalizeBreaches(page)],
+      };
+    });
+
+    const pagesForAdvisories = pagesData.map((page) => {
+      const combined = []
+        .concat(Array.isArray(page.warnings) ? page.warnings : [])
+        .concat(Array.isArray(page.advisories) ? page.advisories : []);
+      const normalisedCombined = combined
+        .filter((entry) => entry != null)
+        .map((entry) => (typeof entry === 'object' ? entry : { message: entry }));
+      return {
+        ...page,
+        performanceAdvisories: normalisedCombined,
+      };
+    });
 
     const gatingIssues = collectIssueMessages(
       pagesForIssues,
       'performanceGating',
-      'critical'
+      'critical',
+      {
+        normalize: normalizePerformanceMessage,
+        dedupeIgnoreImpact: true,
+      }
     ).filter((issue) => issue.pageCount > 0);
-    const advisoryIssues = collectIssueMessages(pagesData, ['warnings', 'advisories'], 'moderate');
+    const advisoryIssues = collectIssueMessages(
+      pagesForAdvisories,
+      'performanceAdvisories',
+      'moderate',
+      {
+        normalize: normalizePerformanceMessage,
+        dedupeIgnoreImpact: true,
+      }
+    );
 
     const issueSections = renderIssueSectionPair({
       gatingIssues,
@@ -3039,53 +3439,109 @@ const renderVisualGroupHtml = (group) => {
       const maxPixelRatio =
         overview.maxPixelRatio ?? overview.maxDeltaPercent ?? overview.maxDeltaPercentRatio ?? null;
 
+      const statusItems = [
+        diffCount
+          ? {
+              label: 'Diff pages',
+              tone: 'status-error',
+              count: diffCount,
+              suffix: 'page(s)',
+            }
+          : null,
+        passesCount
+          ? {
+              label: 'Passing pages',
+              tone: 'status-info',
+              count: passesCount,
+              suffix: 'page(s)',
+            }
+          : null,
+      ].filter(Boolean);
+
+      const statusSummary =
+        statusItems.length > 0
+          ? renderStatusSummaryList(statusItems, { className: 'status-summary' })
+          : '<p class="details">No diffs detected for this viewport.</p>';
+
+      const summaryMetrics = renderSummaryMetrics([
+        { label: 'Passing pages', value: passesCount },
+        { label: 'Diff pages', value: diffCount },
+        {
+          label: 'Max pixel diff',
+          value: maxPixelDiff != null ? maxPixelDiff.toLocaleString() : '—',
+        },
+        {
+          label: 'Max delta percent',
+          value: maxPixelRatio != null ? formatPercentage(maxPixelRatio * 100) : '—',
+        },
+      ]);
+
+      const thresholdNote =
+        thresholdsUsed.length > 0
+          ? `<p class="details">Thresholds used: ${escapeHtml(
+              thresholdsUsed.map((value) => formatPercentage(value * 100)).join(', ')
+            )}</p>`
+          : '';
+
       const runSummaryHtml = `
         <section class="summary-report summary-a11y summary-a11y--run-summary">
           <h3>Visual regression summary (${escapeHtml(viewportLabel)})</h3>
           <p>Captured <strong>${escapeHtml(
             formatCount(totalPages)
           )}</strong> screenshot(s) for ${escapeHtml(viewportLabel)}.</p>
-          ${renderSummaryMetrics([
-            { label: 'Passing pages', value: passesCount },
-            { label: 'Diff pages', value: diffCount },
-            {
-              label: 'Max pixel diff',
-              value: maxPixelDiff != null ? maxPixelDiff.toLocaleString() : '—',
-            },
-            {
-              label: 'Max delta percent',
-              value: maxPixelRatio != null ? formatPercentage(maxPixelRatio * 100) : '—',
-            },
-            {
-              label: 'Thresholds used',
-              value:
-                thresholdsUsed.length > 0
-                  ? thresholdsUsed.map((value) => formatPercentage(value * 100)).join(', ')
-                  : '—',
-            },
-          ])}
+          ${statusSummary}
+          ${summaryMetrics}
+          ${thresholdNote}
         </section>
       `;
 
       const pagesForIssues = perPageEntries.map((entry) => {
+        const artifacts = entry.artifacts || {};
+        const diffSample = artifacts.diff ? `attachment://${artifacts.diff}` : null;
         const gatingList = []
-          .concat(Array.isArray(entry.gating) ? entry.gating : [])
+          .concat(
+            (Array.isArray(entry.gating) ? entry.gating : []).map((item) =>
+              typeof item === 'object' ? item : { message: item }
+            )
+          )
           .filter(Boolean);
-        if (entry.error) gatingList.push(entry.error);
-        if (entry._result === 'diff') gatingList.push('Visual diff detected');
+        if (entry.error) gatingList.push({ message: entry.error });
+        if (entry._result === 'diff') {
+          gatingList.push({
+            message: 'Visual diff detected',
+            sample: diffSample || artifacts.actual || artifacts.baseline || null,
+          });
+        }
+        const advisoryList = []
+          .concat(Array.isArray(entry.warnings) ? entry.warnings : [])
+          .concat(Array.isArray(entry.advisories) ? entry.advisories : [])
+          .filter(Boolean)
+          .map((item) => (typeof item === 'object' ? item : { message: item }));
         return {
           ...entry,
           visualGating: gatingList,
-          visualAdvisories: []
-            .concat(Array.isArray(entry.warnings) ? entry.warnings : [])
-            .concat(Array.isArray(entry.advisories) ? entry.advisories : []),
+          visualAdvisories: advisoryList,
         };
       });
 
-      const gatingIssues = collectIssueMessages(pagesForIssues, 'visualGating', 'critical').filter(
-        (issue) => issue.pageCount > 0
+      const gatingIssues = collectIssueMessages(
+        pagesForIssues,
+        'visualGating',
+        'critical',
+        {
+          normalize: normalizeVisualMessage,
+          dedupeIgnoreImpact: true,
+        }
+      ).filter((issue) => issue.pageCount > 0);
+      const advisoryIssues = collectIssueMessages(
+        pagesForIssues,
+        'visualAdvisories',
+        'moderate',
+        {
+          normalize: normalizeVisualMessage,
+          dedupeIgnoreImpact: true,
+        }
       );
-      const advisoryIssues = collectIssueMessages(pagesForIssues, 'visualAdvisories', 'moderate');
 
       const issueSections = renderIssueSectionPair({
         gatingIssues,
@@ -3193,14 +3649,35 @@ const renderVisualPageCard = (summary, { viewportLabel, thresholdsUsed = [] } = 
 
   const aggregateMessages = (items, impact) => {
     const map = new Map();
-    items.forEach((raw) => {
+    (Array.isArray(items) ? items : []).forEach((raw) => {
       if (!raw) return;
-      const message = String(raw).replace(/\s+/g, ' ').trim();
-      if (!message) return;
-      if (!map.has(message)) map.set(message, { impact, message, count: 0 });
-      map.get(message).count += 1;
+      const candidate = typeof raw === 'object' ? raw : { message: raw };
+      const normalised = normalizeVisualMessage({
+        message: candidate.message ?? candidate.id ?? candidate,
+        raw: candidate,
+      });
+      if (!normalised) return;
+      const label = normalised.label || candidate.message || String(candidate).trim();
+      const key = normalised.key || label.toLowerCase();
+      if (!key || !label) return;
+      if (!map.has(key)) {
+        map.set(key, { impact, label, count: 0, samples: new Set() });
+      }
+      const entry = map.get(key);
+      entry.count += 1;
+      const sampleValue = normalised.sample || candidate.sample;
+      if (sampleValue) entry.samples.add(String(sampleValue).trim());
     });
-    return Array.from(map.values());
+    return Array.from(map.values()).map((entry) => {
+      const samples = Array.from(entry.samples || []);
+      const message =
+        samples.length > 0 ? `${entry.label} – ${samples[0]}` : entry.label;
+      return {
+        impact: entry.impact,
+        message,
+        count: entry.count,
+      };
+    });
   };
 
   const gatingEntries = aggregateMessages(gating, 'critical');
@@ -3242,11 +3719,15 @@ const renderVisualPageCard = (summary, { viewportLabel, thresholdsUsed = [] } = 
     .map((key) => {
       if (!artifactLinks[key]) return null;
       const label = key.charAt(0).toUpperCase() + key.slice(1);
-      return `<li><a href="attachment://${escapeHtml(artifactLinks[key])}">${label}</a></li>`;
+      return `<li><a class="badge badge-attachment" href="attachment://${escapeHtml(
+        artifactLinks[key]
+      )}">${label}</a></li>`;
     })
     .filter(Boolean);
   const artifactsHtml = artifactItems.length
-    ? `<details><summary>Artifacts (${artifactItems.length})</summary><ul class="details">${artifactItems.join('')}</ul></details>`
+    ? `<details class="summary-note"><summary>Artifacts (${artifactItems.length})</summary><ul class="details badge-list">${artifactItems.join(
+        ''
+      )}</ul></details>`
     : '';
 
   const notesHtml = notes.length
@@ -4219,9 +4700,32 @@ const renderFormsPageCard = (summary, { projectLabel } = {}) => {
     { label: 'Required fields', value: formatCount(requiredFields) },
   ]);
 
-  const gatingEntries = aggregatePageIssueEntries(gating, { defaultImpact: 'critical' });
-  const warningEntries = aggregatePageIssueEntries(warnings, { defaultImpact: 'moderate' });
-  const advisoryEntries = aggregatePageIssueEntries(advisories, { defaultImpact: 'minor' });
+  const normaliseResponsiveEntry = (value) => {
+    const messageText =
+      typeof value === 'object'
+        ? String(value.message ?? value.id ?? value.description ?? '').trim()
+        : String(value).trim();
+    if (!messageText) return null;
+    const normalised = normalizeResponsiveMessage({ message: messageText });
+    if (!normalised) return null;
+    return {
+      label: normalised.label,
+      key: normalised.key,
+    };
+  };
+
+  const gatingEntries = aggregatePageIssueEntries(gating, {
+    defaultImpact: 'critical',
+    normalise: normaliseResponsiveEntry,
+  });
+  const warningEntries = aggregatePageIssueEntries(warnings, {
+    defaultImpact: 'moderate',
+    normalise: normaliseResponsiveEntry,
+  });
+  const advisoryEntries = aggregatePageIssueEntries(advisories, {
+    defaultImpact: 'minor',
+    normalise: normaliseResponsiveEntry,
+  });
 
   const gatingSection =
     gatingEntries.length > 0
@@ -4603,21 +5107,45 @@ const renderAvailabilityPageCard = (summary, { projectLabel } = {}) => {
         ? { className: 'status-info', label: 'Advisories present' }
         : { className: 'status-ok', label: 'Pass' };
 
-  const aggregateMessages = (items, impact) => {
+  const buildEntries = (items, impact) => {
     const map = new Map();
-    items.forEach((raw) => {
+    (Array.isArray(items) ? items : []).forEach((raw) => {
       if (!raw) return;
-      const message = String(raw).replace(/\s+/g, ' ').trim();
-      if (!message) return;
-      if (!map.has(message)) map.set(message, { impact, message, count: 0 });
-      map.get(message).count += 1;
+      const messageText =
+        typeof raw === 'object'
+          ? String(raw.message ?? raw.id ?? raw.label ?? '').trim()
+          : String(raw).trim();
+      if (!messageText) return;
+      const normalised = normalizeResponsiveMessage({ message: messageText });
+      if (!normalised) return;
+      const label = normalised.label || messageText;
+      const key = normalised.key || label.toLowerCase();
+      if (!key) return;
+      if (!map.has(key)) {
+        map.set(key, { impact, label, samples: new Set(), count: 0 });
+      }
+      const entry = map.get(key);
+      entry.count += 1;
+      if (normalised.sample && normalised.sample !== label) {
+        entry.samples.add(normalised.sample);
+      }
     });
-    return Array.from(map.values());
+
+    return Array.from(map.values()).map((entry) => {
+      const samples = Array.from(entry.samples || []);
+      const message =
+        samples.length > 0 ? `${entry.label} – ${samples[0]}` : entry.label;
+      return {
+        impact,
+        message,
+        count: entry.count,
+      };
+    });
   };
 
-  const gatingEntries = aggregateMessages(gating, 'critical');
-  const warningEntries = aggregateMessages(warnings, 'moderate');
-  const advisoryEntries = aggregateMessages(advisories, 'minor');
+  const gatingEntries = buildEntries(gating, 'critical');
+  const warningEntries = buildEntries(warnings, 'moderate');
+  const advisoryEntries = buildEntries(advisories, 'minor');
 
   const statusTone = Number.isFinite(rawStatus)
     ? rawStatus >= 500
@@ -4638,6 +5166,14 @@ const renderAvailabilityPageCard = (summary, { projectLabel } = {}) => {
           ? 'Redirected response'
           : 'Successful response'
     : 'Status not recorded';
+  const statusDisplay =
+    summary.statusText && Number.isFinite(rawStatus)
+      ? `${rawStatus} ${summary.statusText}`
+      : Number.isFinite(rawStatus)
+        ? String(rawStatus)
+        : summary.status != null
+          ? String(summary.status)
+          : 'n/a';
 
   const landmarkKeys = ['header', 'navigation', 'content', 'footer'];
   const totalLandmarks = landmarkKeys.length;
@@ -4821,6 +5357,9 @@ const renderAvailabilityPageCard = (summary, { projectLabel } = {}) => {
   const summaryNarrative = narrativeParts.length
     ? `<p class="page-card__lede">${escapeHtml(narrativeParts.join(' '))}</p>`
     : '';
+  const statusDetailLine = `<p class="details"><strong>Status:</strong> ${escapeHtml(
+    statusDisplay
+  )}</p>`;
 
   const insightSections = [
     statusTiles ? { title: 'Run overview', content: statusTiles } : null,
@@ -4846,6 +5385,7 @@ const renderAvailabilityPageCard = (summary, { projectLabel } = {}) => {
         <span class="status-pill ${statusMeta.className}">${escapeHtml(statusMeta.label)}</span>
       </div>
       ${summaryNarrative}
+      ${statusDetailLine}
       ${insightsHtml}
       <div class="page-card__sections">
         ${sectionsHtml}
@@ -4861,6 +5401,7 @@ const renderHttpPageCard = (summary, { projectLabel, viewportLabel } = {}) => {
   const warnings = Array.isArray(summary.warnings) ? summary.warnings : [];
   const advisories = Array.isArray(summary.advisories) ? summary.advisories : [];
   const failedChecks = Array.isArray(summary.failedChecks) ? summary.failedChecks : [];
+  const notes = Array.isArray(summary.notes) ? summary.notes.filter(Boolean) : [];
 
   const hasGating = gating.length > 0 || failedChecks.length > 0;
   const hasWarnings = warnings.length > 0;
@@ -4874,28 +5415,82 @@ const renderHttpPageCard = (summary, { projectLabel, viewportLabel } = {}) => {
         ? { className: 'status-info', label: 'Advisories present' }
         : { className: 'status-ok', label: 'Pass' };
 
-  const aggregateMessages = (items, impact, normalizer) => {
+  const mapMessages = (items) =>
+    (Array.isArray(items) ? items : [])
+      .filter((item) => item != null)
+      .map((item) =>
+        typeof item === 'object'
+          ? {
+              ...item,
+              status: item.status ?? summary.status,
+              statusText: item.statusText ?? summary.statusText,
+            }
+          : {
+              message: item,
+              status: summary.status,
+              statusText: summary.statusText,
+            }
+      );
+
+  const buildEntries = (items, impact) => {
     const map = new Map();
     items.forEach((raw) => {
       if (!raw) return;
-      const normalized = normalizer ? normalizer(raw) : { label: String(raw) };
-      if (!normalized) return;
-      const message = String(normalized.label || '').trim();
-      if (!message) return;
-      if (!map.has(message)) map.set(message, { message, impact, count: 0 });
-      map.get(message).count += 1;
+      const candidate =
+        typeof raw === 'object'
+          ? { ...raw }
+          : {
+              message: raw,
+              status: summary.status,
+              statusText: summary.statusText,
+            };
+      const normalised = normalizeHttpMessage({
+        message: candidate.message ?? candidate.label ?? candidate,
+        raw: candidate,
+      });
+      if (!normalised) return;
+      const label = normalised.label || normalised.sample;
+      const key = normalised.key || (label ? label.toLowerCase() : null);
+      if (!label || !key) return;
+      if (!map.has(key)) {
+        map.set(key, { impact, label, samples: new Set(), count: 0 });
+      }
+      const entry = map.get(key);
+      entry.count += 1;
+      if (normalised.sample && normalised.sample !== label) {
+        entry.samples.add(normalised.sample);
+      }
     });
-    return Array.from(map.values());
+
+    return Array.from(map.values()).map((entry) => {
+      const samples = Array.from(entry.samples || []);
+      const message =
+        samples.length > 0 ? `${entry.label} – ${samples[0]}` : entry.label;
+      return {
+        impact,
+        message,
+        count: entry.count,
+      };
+    });
   };
 
-  const gatingEntries = aggregateMessages(gating, 'critical').concat(
-    aggregateMessages(failedChecks, 'critical', (check) => ({
-      label: check?.label || '',
-      detail: check?.details,
-    }))
-  );
-  const warningEntries = aggregateMessages(warnings, 'moderate');
-  const advisoryEntries = aggregateMessages(advisories, 'minor');
+  const gatingSources = [
+    ...mapMessages(gating),
+    ...failedChecks.map((check) => ({
+      type: 'failed-check',
+      label: check?.label ? String(check.label).trim() : 'HTTP check failed',
+      message: check?.label ? String(check.label).trim() : 'HTTP check failed',
+      detail: check?.details ? stripAnsiSequences(check.details).trim() : null,
+      status: summary.status,
+      statusText: summary.statusText,
+    })),
+  ];
+  const warningSources = mapMessages(warnings);
+  const advisorySources = mapMessages(advisories);
+
+  const gatingEntries = buildEntries(gatingSources, 'critical');
+  const warningEntries = buildEntries(warningSources, 'moderate');
+  const advisoryEntries = buildEntries(advisorySources, 'minor');
 
   const renderEntriesTable = (entries, heading, options = {}) =>
     entries.length
@@ -4922,14 +5517,26 @@ const renderHttpPageCard = (summary, { projectLabel, viewportLabel } = {}) => {
         .join('')}</ul></details>`
     : '';
 
+  const notesHtml = notes.length
+    ? `<details class="summary-note"><summary>Notes (${notes.length})</summary><ul class="details">${notes
+        .map((note) => `<li>${escapeHtml(String(note))}</li>`)
+        .join('')}</ul></details>`
+    : '';
+
+  const redirectDisplay = summary.redirectLocation
+    ? `<code>${escapeHtml(simplifyUrlForDisplay(summary.redirectLocation))}</code>`
+    : '—';
+
+  const statusDisplay =
+    summary.status != null
+      ? summary.statusText
+        ? `${summary.status} ${summary.statusText}`
+        : String(summary.status)
+      : 'n/a';
+
   const metaLines = [
-    `<p class="details"><strong>Status:</strong> ${escapeHtml(
-      summary.status != null ? String(summary.status) : 'n/a'
-    )}</p>`,
-    `<p class="details"><strong>Status text:</strong> ${escapeHtml(summary.statusText || '—')}</p>`,
-    `<p class="details"><strong>Redirects:</strong> ${
-      summary.redirectLocation ? `<code>${escapeHtml(summary.redirectLocation)}</code>` : '—'
-    }</p>`,
+    `<p class="details"><strong>HTTP status:</strong> ${escapeHtml(statusDisplay)}</p>`,
+    `<p class="details"><strong>Redirect target:</strong> ${redirectDisplay}</p>`,
     `<p class="details"><strong>Viewport:</strong> ${escapeHtml(
       viewportLabel || projectLabel || 'Not recorded'
     )}</p>`,
@@ -4959,10 +5566,11 @@ const renderHttpPageCard = (summary, { projectLabel, viewportLabel } = {}) => {
       <div class="page-card__meta">
         ${metaLines}
       </div>
+      ${failedCheckDetails}
+      ${notesHtml}
       ${gatingSection}
       ${warningSection}
       ${advisorySection}
-      ${failedCheckDetails}
     </section>
   `;
 };
@@ -6787,6 +7395,49 @@ const renderResponsiveStructureGroupHtml = (group) => {
         (overview.contentMissing ?? 0) +
         (overview.footerMissing ?? 0);
 
+      const statusItems = [
+        pagesWithGating
+          ? {
+              label: 'Blocking issues',
+              tone: 'status-error',
+              count: pagesWithGating,
+              suffix: 'page(s)',
+            }
+          : null,
+        pagesWithWarnings
+          ? {
+              label: 'Warnings',
+              tone: 'status-warning',
+              count: pagesWithWarnings,
+              suffix: 'page(s)',
+            }
+          : null,
+        loadBreaches
+          ? {
+              label: 'Load budget breaches',
+              tone: 'status-advisory',
+              count: loadBreaches,
+              suffix: 'page(s)',
+            }
+          : null,
+      ].filter(Boolean);
+
+      const statusSummary =
+        statusItems.length > 0
+          ? renderStatusSummaryList(statusItems, { className: 'status-summary' })
+          : '<p class="details">Responsive structure checks passed for all audited pages.</p>';
+
+      const summaryMetrics = renderSummaryMetrics([
+        { label: 'Pages audited', value: totalPages },
+        { label: 'Missing structure elements', value: missingStructure },
+      ]);
+
+      const detailNotes = loadBreaches
+        ? `<p class="details">Load budget breaches recorded on ${escapeHtml(
+            formatCount(loadBreaches)
+          )} page(s).</p>`
+        : '';
+
       const runSummaryHtml = `
         <section class="summary-report summary-a11y summary-a11y--run-summary">
           <h3>Responsive structure summary</h3>
@@ -6795,44 +7446,57 @@ const renderResponsiveStructureGroupHtml = (group) => {
           )}</strong> page(s) across ${escapeHtml(
             viewportList.length ? formatCount(viewportList.length) : '1'
           )} viewport(s): ${escapeHtml(viewportLabel || 'Not recorded')}.</p>
-          ${renderSummaryMetrics([
-            { label: 'Pages with blocking issues', value: pagesWithGating },
-            { label: 'Pages with warnings', value: pagesWithWarnings },
-            { label: 'Load budget breaches', value: loadBreaches },
-            { label: 'Missing structure elements', value: missingStructure },
-          ])}
+          ${statusSummary}
+          ${summaryMetrics}
+          ${detailNotes}
         </section>
       `;
 
-      const pagesForGating = pagesData.map((page) => ({
-        ...page,
-        responsiveGating: []
+      const pagesForGating = pagesData.map((page) => {
+        const combined = []
           .concat(
             Array.isArray(page.gatingIssues) ? page.gatingIssues : [],
             Array.isArray(page.gating) ? page.gating : [],
             Array.isArray(page.errors) ? page.errors : []
           )
-          .filter(Boolean),
-      }));
+          .filter(Boolean)
+          .map((entry) => (typeof entry === 'object' ? entry : { message: entry }));
+        return {
+          ...page,
+          responsiveGating: combined,
+        };
+      });
       const gatingIssues = collectIssueMessages(
         pagesForGating,
         'responsiveGating',
-        'critical'
+        'critical',
+        {
+          normalize: normalizeResponsiveMessage,
+          dedupeIgnoreImpact: true,
+        }
       ).filter((issue) => issue.pageCount > 0);
 
-      const pagesForAdvisories = pagesData.map((page) => ({
-        ...page,
-        responsiveAdvisories: []
+      const pagesForAdvisories = pagesData.map((page) => {
+        const combined = []
           .concat(
             Array.isArray(page.warnings) ? page.warnings : [],
             Array.isArray(page.advisories) ? page.advisories : []
           )
-          .filter(Boolean),
-      }));
+          .filter(Boolean)
+          .map((entry) => (typeof entry === 'object' ? entry : { message: entry }));
+        return {
+          ...page,
+          responsiveAdvisories: combined,
+        };
+      });
       const advisoryIssues = collectIssueMessages(
         pagesForAdvisories,
         'responsiveAdvisories',
-        'moderate'
+        'moderate',
+        {
+          normalize: normalizeResponsiveMessage,
+          dedupeIgnoreImpact: true,
+        }
       );
 
       const issueSections = renderIssueSectionPair({
@@ -7093,18 +7757,47 @@ const renderResponsiveWpGroupHtml = (group) => {
               pagesData.length
             : 0;
 
+      const statusItems = [
+        blockingViewports
+          ? {
+              label: 'Blocking issues',
+              tone: 'status-error',
+              count: blockingViewports,
+              suffix: 'viewport(s)',
+            }
+          : null,
+        warningViewports
+          ? {
+              label: 'Warnings',
+              tone: 'status-warning',
+              count: warningViewports,
+              suffix: 'viewport(s)',
+            }
+          : null,
+        responsiveViewports
+          ? {
+              label: 'Responsive viewports',
+              tone: 'status-info',
+              count: responsiveViewports,
+              suffix: 'viewport(s)',
+            }
+          : null,
+      ].filter(Boolean);
+
+      const statusSummary =
+        statusItems.length > 0
+          ? renderStatusSummaryList(statusItems, { className: 'status-summary' })
+          : '<p class="details">Responsive WordPress components detected across all audited viewports.</p>';
+
       const summaryMetrics = renderSummaryMetrics([
         { label: 'Viewports audited', value: formatCount(viewportsAudited) },
-        { label: 'Responsive viewports', value: formatCount(responsiveViewports) },
-        { label: 'Viewports with widgets', value: formatCount(widgetViewports) },
-        { label: 'Blocking issues', value: formatCount(blockingViewports) },
-        { label: 'Warnings', value: formatCount(warningViewports) },
         {
           label: 'Avg. WP block count',
           value: Number.isFinite(averageBlocks)
             ? averageBlocks.toFixed(1)
             : formatCount(averageBlocks),
         },
+        { label: 'Viewports with widgets', value: formatCount(widgetViewports) },
       ]);
 
       const viewportSummary = viewportLabel ? ` across ${escapeHtml(viewportLabel)}.` : '.';
@@ -7113,18 +7806,61 @@ const renderResponsiveWpGroupHtml = (group) => {
         <section class="summary-report summary-a11y summary-a11y--run-summary">
           <h3>WordPress responsive features summary</h3>
           <p>Audited <strong>${escapeHtml(formatCount(viewportsAudited))}</strong> viewport(s)${viewportSummary}</p>
+          ${statusSummary}
           ${summaryMetrics}
         </section>
       `;
 
-      const issueSource = pagesData.map((page) => ({
-        ...page,
-        page: `${page.viewport || 'Viewport'} › ${page.page || '/'}`,
-      }));
+      const issueSource = pagesData.map((page) => {
+        const gatingList = []
+          .concat(
+            Array.isArray(page.gating) ? page.gating : [],
+            Array.isArray(page.gatingIssues) ? page.gatingIssues : []
+          )
+          .filter(Boolean)
+          .map((entry) => (typeof entry === 'object' ? entry : { message: entry }));
+        const warningsList = (Array.isArray(page.warnings) ? page.warnings : [])
+          .filter(Boolean)
+          .map((entry) => (typeof entry === 'object' ? entry : { message: entry }));
+        const advisoriesList = (Array.isArray(page.advisories) ? page.advisories : [])
+          .filter(Boolean)
+          .map((entry) => (typeof entry === 'object' ? entry : { message: entry }));
+        return {
+          ...page,
+          page: `${page.viewport || 'Viewport'} › ${page.page || '/'}`,
+          gatingNormalized: gatingList,
+          warningsNormalized: warningsList,
+          advisoriesNormalized: advisoriesList,
+        };
+      });
 
-      const gatingIssues = collectIssueMessages(issueSource, 'gating', 'critical');
-      const warningIssues = collectIssueMessages(issueSource, 'warnings', 'moderate');
-      const advisoryIssues = collectIssueMessages(issueSource, 'advisories', 'minor');
+      const gatingIssues = collectIssueMessages(
+        issueSource,
+        'gatingNormalized',
+        'critical',
+        {
+          normalize: normalizeResponsiveMessage,
+          dedupeIgnoreImpact: true,
+        }
+      );
+      const warningIssues = collectIssueMessages(
+        issueSource,
+        'warningsNormalized',
+        'moderate',
+        {
+          normalize: normalizeResponsiveMessage,
+          dedupeIgnoreImpact: true,
+        }
+      );
+      const advisoryIssues = collectIssueMessages(
+        issueSource,
+        'advisoriesNormalized',
+        'minor',
+        {
+          normalize: normalizeResponsiveMessage,
+          dedupeIgnoreImpact: true,
+        }
+      );
       const combinedAdvisories = warningIssues.concat(advisoryIssues);
 
       const issueSections = renderIssueSectionPair({
