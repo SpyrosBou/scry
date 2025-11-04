@@ -2143,33 +2143,25 @@ const renderAccessibilityGroupHtml = (group) => {
         failThreshold: details.failThreshold || overview.failThreshold || metadata.failOn,
       });
 
-      const content = [runSummaryHtml, ruleSections, perPageHtml].filter(Boolean).join('\n');
-      if (!content.trim()) return '';
+      const content = assembleSuiteSections([runSummaryHtml, ruleSections, perPageHtml]);
+      if (!content) return '';
 
       if (multiBucket) {
-        return `
-          <section class="schema-group__project-block">
-            <header class="schema-group__project"><h3>${escapeHtml(projectLabel)}</h3></header>
-            ${content}
-          </section>
-        `;
+        return renderProjectBlockSection({
+          projectLabel,
+          content,
+        });
       }
 
       return content;
     })
-    .filter(Boolean)
-    .join('\n');
+    .filter(Boolean);
 
-  if (!sections.trim()) return '';
-
-  const headline =
-    multiBucket && group.title ? `<header><h2>${escapeHtml(group.title)}</h2></header>` : '';
-  return `
-    <section class="schema-group">
-      ${headline}
-      ${sections}
-    </section>
-  `;
+  return renderSchemaGroupContainer({
+    sections,
+    heading: multiBucket && group.title ? group.title : null,
+    element: 'section',
+  });
 };
 
 const firstRunPayload = (bucket) =>
@@ -2302,7 +2294,7 @@ const renderInternalLinksGroupHtml = (group) => {
       });
     }
     return sectionContent;
-  });
+  }).filter(Boolean);
 
   return renderSchemaGroupContainer({
     sections,
@@ -2314,6 +2306,8 @@ const renderInternalLinksGroupHtml = (group) => {
 const renderInteractiveGroupHtml = (group) => {
   const buckets = collectSchemaProjects(group);
   if (buckets.length === 0) return '';
+
+  const multiBucket = buckets.length > 1;
 
   const sections = buckets.map((bucket) => {
     const runPayload = firstRunPayload(bucket);
@@ -2441,19 +2435,31 @@ const renderInteractiveGroupHtml = (group) => {
       formatSummaryLabel: (entrySummary) => formatPageLabel(entrySummary?.page || 'Page'),
     });
 
-    return [runSummaryHtml, issueSections, perPageHtml].filter(Boolean).join('\n');
+    const sectionContent = assembleSuiteSections([runSummaryHtml, issueSections, perPageHtml]);
+    if (!sectionContent) return '';
+
+    if (multiBucket) {
+      return renderProjectBlockSection({
+        projectLabel,
+        content: sectionContent,
+      });
+    }
+
+    return sectionContent;
   });
 
-  return `
-    <article class="schema-group">
-      ${sections.join('\n')}
-    </article>
-  `;
+  return renderSchemaGroupContainer({
+    sections,
+    heading: multiBucket && group.title ? group.title : null,
+    element: 'article',
+  });
 };
 
 const renderAvailabilityGroupHtml = (group) => {
   const buckets = collectSchemaProjects(group);
   if (buckets.length === 0) return '';
+
+  const multiBucket = buckets.length > 1;
 
   const sections = buckets.map((bucket) => {
     const runPayload = firstRunPayload(bucket) || {};
@@ -2571,19 +2577,31 @@ const renderAvailabilityGroupHtml = (group) => {
       formatSummaryLabel: (entrySummary) => formatPageLabel(entrySummary?.page || 'Page'),
     });
 
-    return [runSummaryHtml, issueSections, perPageHtml].filter(Boolean).join('\n');
-  });
+    const sectionContent = assembleSuiteSections([runSummaryHtml, issueSections, perPageHtml]);
+    if (!sectionContent) return '';
 
-  return `
-    <article class="schema-group">
-      ${sections.join('\n')}
-    </article>
-  `;
+    if (multiBucket) {
+      return renderProjectBlockSection({
+        projectLabel,
+        content: sectionContent,
+      });
+    }
+
+    return sectionContent;
+  }).filter(Boolean);
+
+  return renderSchemaGroupContainer({
+    sections,
+    heading: multiBucket && group.title ? group.title : null,
+    element: 'article',
+  });
 };
 
 const renderHttpGroupHtml = (group) => {
   const buckets = collectSchemaProjects(group);
   if (buckets.length === 0) return '';
+
+  const multiBucket = buckets.length > 1;
 
   const sections = buckets.map((bucket) => {
     const runPayload = firstRunPayload(bucket) || {};
@@ -2740,19 +2758,31 @@ const renderHttpGroupHtml = (group) => {
       formatSummaryLabel: (entrySummary) => formatPageLabel(entrySummary?.page || 'Page'),
     });
 
-    return [runSummaryHtml, issueSections, perPageHtml].filter(Boolean).join('\n');
-  });
+    const sectionContent = assembleSuiteSections([runSummaryHtml, issueSections, perPageHtml]);
+    if (!sectionContent) return '';
 
-  return `
-    <article class="schema-group">
-      ${sections.join('\n')}
-    </article>
-  `;
+    if (multiBucket) {
+      return renderProjectBlockSection({
+        projectLabel,
+        content: sectionContent,
+      });
+    }
+
+    return sectionContent;
+  }).filter(Boolean);
+
+  return renderSchemaGroupContainer({
+    sections,
+    heading: multiBucket && group.title ? group.title : null,
+    element: 'article',
+  });
 };
 
 const renderPerformanceGroupHtml = (group) => {
   const buckets = collectSchemaProjects(group);
   if (buckets.length === 0) return '';
+
+  const multiBucket = buckets.length > 1;
 
   const sections = buckets.map((bucket) => {
     const runPayload = firstRunPayload(bucket) || {};
@@ -2887,19 +2917,31 @@ const renderPerformanceGroupHtml = (group) => {
       formatSummaryLabel: (entrySummary) => formatPageLabel(entrySummary?.page || 'Page'),
     });
 
-    return [runSummaryHtml, issueSections, perPageHtml].filter(Boolean).join('\n');
-  });
+    const sectionContent = assembleSuiteSections([runSummaryHtml, issueSections, perPageHtml]);
+    if (!sectionContent) return '';
 
-  return `
-    <article class="schema-group">
-      ${sections.join('\n')}
-    </article>
-  `;
+    if (multiBucket) {
+      return renderProjectBlockSection({
+        projectLabel,
+        content: sectionContent,
+      });
+    }
+
+    return sectionContent;
+  }).filter(Boolean);
+
+  return renderSchemaGroupContainer({
+    sections,
+    heading: multiBucket && group.title ? group.title : null,
+    element: 'article',
+  });
 };
 
 const renderVisualGroupHtml = (group) => {
   const buckets = collectSchemaProjects(group);
   if (buckets.length === 0) return '';
+
+  const multiBucket = buckets.length > 1;
 
   const sections = buckets
     .map((bucket) => {
@@ -2911,6 +2953,7 @@ const renderVisualGroupHtml = (group) => {
         metadata.projectName ||
         bucket.projectName ||
         'Visual regression';
+      const projectLabel = metadata.projectName || bucket.projectName || viewportLabel;
 
       const detailPages = Array.isArray(runPayload?.details?.pages) ? runPayload.details.pages : [];
       const pageEntryPayloads = (bucket.pageEntries || [])
@@ -3064,17 +3107,25 @@ const renderVisualGroupHtml = (group) => {
         formatSummaryLabel: (entrySummary) => formatPageLabel(entrySummary?.page || 'Page'),
       });
 
-      return [runSummaryHtml, issueSections, perPageHtml].filter(Boolean).join('\n');
+      const sectionContent = assembleSuiteSections([runSummaryHtml, issueSections, perPageHtml]);
+      if (!sectionContent) return '';
+
+      if (multiBucket) {
+        return renderProjectBlockSection({
+          projectLabel,
+          content: sectionContent,
+        });
+      }
+
+      return sectionContent;
     })
     .filter(Boolean);
 
-  if (sections.length === 0) return '';
-
-  return `
-    <article class="schema-group">
-      ${sections.join('\n')}
-    </article>
-  `;
+  return renderSchemaGroupContainer({
+    sections,
+    heading: multiBucket && group.title ? group.title : null,
+    element: 'article',
+  });
 };
 
 const renderVisualPageCard = (summary, { viewportLabel, thresholdsUsed = [] } = {}) => {
@@ -5547,6 +5598,8 @@ const renderKeyboardGroupHtml = (group) => {
   const buckets = collectSchemaProjects(group);
   if (buckets.length === 0) return '';
 
+  const multiBucket = buckets.length > 1;
+
   const sections = buckets
     .map((bucket) => {
       const runPayload = firstRunPayload(bucket);
@@ -5789,31 +5842,25 @@ const renderKeyboardGroupHtml = (group) => {
         formatSummaryLabel: (entrySummary) => formatPageLabel(entrySummary?.page || 'Page'),
       });
 
-      const contentParts = [runSummaryHtml, issueSections, perPageHtml].filter(Boolean).join('\n');
+      const sectionContent = assembleSuiteSections([runSummaryHtml, issueSections, perPageHtml]);
+      if (!sectionContent) return '';
 
-      if (!contentParts.trim()) return '';
-
-      if (buckets.length > 1) {
-        return `
-          <section class="schema-group__project-block">
-            <header class="schema-group__project"><h3>${escapeHtml(projectLabel)}</h3></header>
-            ${contentParts}
-          </section>
-        `;
+      if (multiBucket) {
+        return renderProjectBlockSection({
+          projectLabel,
+          content: sectionContent,
+        });
       }
 
-      return contentParts;
+      return sectionContent;
     })
-    .filter(Boolean)
-    .join('\n');
+    .filter(Boolean);
 
-  if (!sections.trim()) return '';
-
-  return `
-    <section class="schema-group">
-      ${sections}
-    </section>
-  `;
+  return renderSchemaGroupContainer({
+    sections,
+    heading: multiBucket && group.title ? group.title : null,
+    element: 'section',
+  });
 };
 
 const renderReducedMotionPageCard = (summary) => {
@@ -5937,6 +5984,8 @@ const renderReducedMotionPageCard = (summary) => {
 const renderReducedMotionGroupHtml = (group) => {
   const buckets = collectSchemaProjects(group);
   if (buckets.length === 0) return '';
+
+  const multiBucket = buckets.length > 1;
 
   const sections = buckets
     .map((bucket) => {
@@ -6068,15 +6117,25 @@ const renderReducedMotionGroupHtml = (group) => {
         formatSummaryLabel: (entrySummary) => formatPageLabel(entrySummary?.page || 'Page'),
       });
 
-      return [runSummaryHtml, issueSections, perPageHtml].filter(Boolean).join('\n');
+      const sectionContent = assembleSuiteSections([runSummaryHtml, issueSections, perPageHtml]);
+      if (!sectionContent) return '';
+
+      if (multiBucket) {
+        return renderProjectBlockSection({
+          projectLabel,
+          content: sectionContent,
+        });
+      }
+
+      return sectionContent;
     })
     .filter(Boolean);
 
-  return `
-    <article class="schema-group">
-      ${sections.join('\n')}
-    </article>
-  `;
+  return renderSchemaGroupContainer({
+    sections,
+    heading: multiBucket && group.title ? group.title : null,
+    element: 'article',
+  });
 };
 
 const renderReflowPageCard = (summary) => {
@@ -6202,6 +6261,8 @@ const renderReflowGroupHtml = (group) => {
   const buckets = collectSchemaProjects(group);
   if (buckets.length === 0) return '';
 
+  const multiBucket = buckets.length > 1;
+
   const sections = buckets.map((bucket) => {
     const runPayload = firstRunPayload(bucket) || {};
     const pagesData = Array.isArray(runPayload?.details?.pages) ? runPayload.details.pages : [];
@@ -6301,14 +6362,25 @@ const renderReflowGroupHtml = (group) => {
       formatSummaryLabel: (entrySummary) => formatPageLabel(entrySummary?.page || 'Page'),
     });
 
-    return [runSummaryHtml, issueSections, perPageHtml].filter(Boolean).join('\n');
-  });
+    const sectionContent = assembleSuiteSections([runSummaryHtml, issueSections, perPageHtml]);
+    if (!sectionContent) return '';
 
-  return `
-    <article class="schema-group">
-      ${sections.join('\n')}
-    </article>
-  `;
+    if (multiBucket) {
+      const projectLabel = runPayload?.metadata?.projectName || bucket.projectName || 'default';
+      return renderProjectBlockSection({
+        projectLabel,
+        content: sectionContent,
+      });
+    }
+
+    return sectionContent;
+  }).filter(Boolean);
+
+  return renderSchemaGroupContainer({
+    sections,
+    heading: multiBucket && group.title ? group.title : null,
+    element: 'article',
+  });
 };
 
 const renderIframePageCard = (summary) => {
@@ -6425,6 +6497,8 @@ const renderIframeGroupHtml = (group) => {
   const buckets = collectSchemaProjects(group);
   if (buckets.length === 0) return '';
 
+  const multiBucket = buckets.length > 1;
+
   const sections = buckets
     .map((bucket) => {
       const runPayload = firstRunPayload(bucket) || {};
@@ -6528,15 +6602,26 @@ const renderIframeGroupHtml = (group) => {
         formatSummaryLabel: (entrySummary) => formatPageLabel(entrySummary?.page || 'Page'),
       });
 
-      return [runSummaryHtml, issueSections, perPageHtml].filter(Boolean).join('\n');
+      const sectionContent = assembleSuiteSections([runSummaryHtml, issueSections, perPageHtml]);
+      if (!sectionContent) return '';
+
+      if (multiBucket) {
+        const projectLabel = runPayload?.metadata?.projectName || bucket.projectName || 'Iframes';
+        return renderProjectBlockSection({
+          projectLabel,
+          content: sectionContent,
+        });
+      }
+
+      return sectionContent;
     })
     .filter(Boolean);
 
-  return `
-    <article class="schema-group">
-      ${sections.join('\n')}
-    </article>
-  `;
+  return renderSchemaGroupContainer({
+    sections,
+    heading: multiBucket && group.title ? group.title : null,
+    element: 'article',
+  });
 };
 
 const renderStructurePageCard = (summary) => {
@@ -6647,16 +6732,17 @@ const renderResponsiveStructureGroupHtml = (group) => {
   const buckets = collectSchemaProjects(group);
   if (buckets.length === 0) return '';
 
+  const multiBucket = buckets.length > 1;
+
   const sections = buckets
     .map((bucket) => {
       const runPayload = firstRunPayload(bucket) || {};
       const metadata = runPayload.metadata || {};
       const viewportList = Array.isArray(metadata.viewports) ? metadata.viewports : [];
+      const projectLabel =
+        metadata.projectName || bucket.projectName || 'Responsive structure audit';
       const viewportLabel =
-        (viewportList.length ? viewportList.join(', ') : null) ||
-        metadata.projectName ||
-        bucket.projectName ||
-        null;
+        (viewportList.length ? viewportList.join(', ') : null) || projectLabel;
 
       const detailPages = Array.isArray(runPayload?.details?.pages) ? runPayload.details.pages : [];
       const pageEntryPayloads = (bucket.pageEntries || [])
@@ -6823,17 +6909,25 @@ const renderResponsiveStructureGroupHtml = (group) => {
         formatSummaryLabel: (entrySummary) => formatPageLabel(entrySummary?.page || 'Page'),
       });
 
-      return [runSummaryHtml, issueSections, perPageHtml].filter(Boolean).join('\n');
+      const sectionContent = assembleSuiteSections([runSummaryHtml, issueSections, perPageHtml]);
+      if (!sectionContent) return '';
+
+      if (multiBucket) {
+        return renderProjectBlockSection({
+          projectLabel,
+          content: sectionContent,
+        });
+      }
+
+      return sectionContent;
     })
     .filter(Boolean);
 
-  if (sections.length === 0) return '';
-
-  return `
-    <article class="schema-group">
-      ${sections.join('\n')}
-    </article>
-  `;
+  return renderSchemaGroupContainer({
+    sections,
+    heading: multiBucket && group.title ? group.title : null,
+    element: 'article',
+  });
 };
 
 const renderResponsiveStructurePageCard = (summary, { viewportLabel } = {}) => {
@@ -6952,6 +7046,8 @@ const renderResponsiveStructurePageCard = (summary, { viewportLabel } = {}) => {
 const renderResponsiveWpGroupHtml = (group) => {
   const buckets = collectSchemaProjects(group);
   if (buckets.length === 0) return '';
+
+  const multiBucket = buckets.length > 1;
 
   const sections = buckets
     .map((bucket) => {
@@ -7097,17 +7193,25 @@ const renderResponsiveWpGroupHtml = (group) => {
           `${entrySummary?.viewport || 'Viewport'} — ${formatPageLabel(entrySummary?.page || '/')}`,
       });
 
-      return [runSummaryHtml, issueSections, perPageHtml].filter(Boolean).join('\n');
+      const sectionContent = assembleSuiteSections([runSummaryHtml, issueSections, perPageHtml]);
+      if (!sectionContent) return '';
+
+      if (multiBucket) {
+        return renderProjectBlockSection({
+          projectLabel,
+          content: sectionContent,
+        });
+      }
+
+      return sectionContent;
     })
     .filter(Boolean);
 
-  if (sections.length === 0) return '';
-
-  return `
-    <article class="schema-group">
-      ${sections.join('\n')}
-    </article>
-  `;
+  return renderSchemaGroupContainer({
+    sections,
+    heading: multiBucket && group.title ? group.title : null,
+    element: 'article',
+  });
 };
 
 const renderResponsiveWpPageCard = (summary, { projectLabel } = {}) => {
@@ -7216,6 +7320,8 @@ const renderStructureGroupHtml = (group) => {
   }
   const buckets = collectSchemaProjects(group);
   if (buckets.length === 0) return '';
+
+  const multiBucket = buckets.length > 1;
 
   const sections = buckets.map((bucket) => {
     const runPayload = firstRunPayload(bucket);
@@ -7496,20 +7602,36 @@ const renderStructureGroupHtml = (group) => {
       formatSummaryLabel: (entrySummary) => entrySummary?.page || 'Unknown page',
     });
 
-    return [runSummaryBlock, gatingIssuesTable, advisoryIssuesTable, accordionHtml]
-      .filter(Boolean)
-      .join('\n');
-  });
+    const sectionContent = assembleSuiteSections([
+      runSummaryBlock,
+      gatingIssuesTable,
+      advisoryIssuesTable,
+      accordionHtml,
+    ]);
+    if (!sectionContent) return '';
 
-  return `
-    <article class="schema-group">
-      ${sections.join('\n')}
-    </article>
-  `;
+    if (multiBucket) {
+      const projectLabel = runPayload?.metadata?.projectName || bucket.projectName || 'Project';
+      return renderProjectBlockSection({
+        projectLabel,
+        content: sectionContent,
+      });
+    }
+
+    return sectionContent;
+  }).filter(Boolean);
+
+  return renderSchemaGroupContainer({
+    sections,
+    heading: multiBucket && group.title ? group.title : null,
+    element: 'article',
+  });
 };
 const renderFormsGroupHtml = (group) => {
   const buckets = collectSchemaProjects(group);
   if (buckets.length === 0) return '';
+
+  const multiBucket = buckets.length > 1;
 
   const sections = buckets.map((bucket) => {
     const runPayload = firstRunPayload(bucket);
@@ -7646,14 +7768,24 @@ const renderFormsGroupHtml = (group) => {
       },
     });
 
-    return [runSummaryHtml, issueSections, accordionHtml].filter(Boolean).join('\n');
-  });
+    const sectionContent = assembleSuiteSections([runSummaryHtml, issueSections, accordionHtml]);
+    if (!sectionContent) return '';
 
-  return `
-    <article class="schema-group">
-      ${sections.join('\n')}
-    </article>
-  `;
+    if (multiBucket) {
+      return renderProjectBlockSection({
+        projectLabel,
+        content: sectionContent,
+      });
+    }
+
+    return sectionContent;
+  }).filter(Boolean);
+
+  return renderSchemaGroupContainer({
+    sections,
+    heading: multiBucket && group.title ? group.title : null,
+    element: 'article',
+  });
 };
 
 const renderWcagPageCard = (summary, { viewportLabel, failThreshold } = {}) => {

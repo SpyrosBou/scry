@@ -39,6 +39,7 @@ The mock HTML report remains our source of truth. This roadmap captures what is 
 - Rebuild the Visual Regression panel to match the mock (hero summary, blocking/advisory tables, image preview deck, artifact links).
 - Rework responsive panels (responsive structure + WordPress features) so copy, status pills, and per-page accordions match the approved mock instead of the interim tables.
 - Finish migrating infrastructure/HTTP/performance functionality panels to the shared four-section layout and align copy with the mock.
+- Verify the shared layout utilities (`report-template-helpers.js`, `report-components/layout.js`) cover every panel as we continue polishing markup against the mocks.
 
 ### 2. Styling & theming
 - Finalise Solarized token values once all panels are migrated; ensure status colours, badges, and card shadows read correctly in both themes.
