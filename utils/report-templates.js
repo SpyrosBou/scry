@@ -2171,6 +2171,8 @@ const renderInternalLinksGroupHtml = (group) => {
   const buckets = collectSchemaProjects(group);
   if (buckets.length === 0) return '';
 
+  const multiBucket = buckets.length > 1;
+
   const sections = buckets.map((bucket) => {
     const runPayload = firstRunPayload(bucket);
     if (!runPayload || !Array.isArray(runPayload.details?.pages)) return '';
