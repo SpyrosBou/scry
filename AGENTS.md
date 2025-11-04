@@ -45,6 +45,7 @@ Whilst working on this repo you can assume we are concerned with the functionali
 - Accessibility sampling honors `A11Y_SAMPLE` env vars and `a11yResponsiveSampleSize` config entries.
 - Accessibility specs now attach schema-backed run and page summaries via `attachSchemaSummary` with helpers in `utils/reporting-utils.js` / `utils/report-schema.js`; extend those utilities instead of hand-rolled HTML so run-level cards stay consistent.
 - Reporter behavior: if a suite executes but emits no summaries (e.g., all pages 4xx), the HTML report force‑renders a placeholder panel for that suite. This keeps the UI consistent with the selected flags; check the “Test details” panel for logs.
+- WCAG column only appears in accessibility suites (WCAG audit, keyboard, structure, reflow, reduced‑motion, iframe). Non‑a11y suites never display a WCAG column.
 
 ## Commit & Pull Request Guidelines
 

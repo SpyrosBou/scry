@@ -75,6 +75,7 @@ Helpful environment variables:
 - Regenerate an interactive report from stored data via `npm run reports:regenerate`.
 - Clean up old artifacts with `npm run clean:reports`, `npm run clean:manifests`, or `npm run clean:test-results`.
 - If a suite ran but didn’t emit schema summaries (for example, all pages returned non‑200), the report now force‑renders a placeholder panel for that suite so it’s still visible in the sidebar and “Suites at a glance”. The “Test details” panel will contain logs to diagnose why the suite produced no data.
+- WCAG column scoping: the “WCAG level” column appears only in accessibility tables (WCAG audit, keyboard, reflow, reduced‑motion, iframe, and structural a11y). Other suites (links, interactive, availability, performance, responsive) don’t render this column.
 - Per‑page a11y tables now include “Screenshot”, “Culprit”, and “Details”.
   - Screenshot: one or more “View” links open a modal with the image.
   - Culprit: the element(s) where the violation occurs (e.g., `h2: "Section title"`).

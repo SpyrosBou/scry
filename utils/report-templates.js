@@ -240,7 +240,10 @@ const formatIssueImpactLabel = (impact) => {
   return `${label.charAt(0).toUpperCase()}${label.slice(1)}`;
 };
 
-const renderUnifiedIssuesTable = (issues, { title, emptyMessage, variant, viewportLabel } = {}) => {
+const renderUnifiedIssuesTable = (
+  issues,
+  { title, emptyMessage, variant, viewportLabel, includeWcagColumn = false } = {}
+) => {
   if (!title) return '';
 
   const baseClass = [
@@ -257,7 +260,7 @@ const renderUnifiedIssuesTable = (issues, { title, emptyMessage, variant, viewpo
     `;
   }
 
-  const hasWcagData = issues.some((issue) => {
+  const hasWcagData = includeWcagColumn && issues.some((issue) => {
     if (typeof issue?.wcagHtml === 'string' && issue.wcagHtml.trim()) return true;
     if (issue?.wcagBadge != null && String(issue.wcagBadge).trim()) return true;
     if (Array.isArray(issue?.wcagTags) && issue.wcagTags.length > 0) return true;
@@ -302,7 +305,7 @@ const renderUnifiedIssuesTable = (issues, { title, emptyMessage, variant, viewpo
         `<td>${escapeHtml(formatCount(nodeCount))}</td>`,
       ];
 
-      if (hasWcagData) {
+      if (includeWcagColumn && hasWcagData) {
         cells.push(`<td>${wcagHtml}</td>`);
       }
       // No Help column; WCAG badges act as link
@@ -312,7 +315,7 @@ const renderUnifiedIssuesTable = (issues, { title, emptyMessage, variant, viewpo
     .join('');
 
   const headers = ['Impact', 'Issue', 'Viewport(s)', 'Pages', 'Nodes'];
-  if (hasWcagData) headers.push('WCAG level');
+  if (includeWcagColumn && hasWcagData) headers.push('WCAG level');
 
   return `
     <section class="${baseClass}">
@@ -333,6 +336,7 @@ const renderIssueSectionPair = ({
   gatingEmptyMessage = 'No gating issues detected.',
   advisoryEmptyMessage = 'No advisories detected.',
   viewportLabel = null,
+  includeWcagColumn = false,
 } = {}) => {
   const gatingCount = Array.isArray(gatingIssues) ? gatingIssues.length : 0;
   const advisoryCount = Array.isArray(advisoryIssues) ? advisoryIssues.length : 0;
@@ -342,12 +346,14 @@ const renderIssueSectionPair = ({
       emptyMessage: gatingEmptyMessage,
       variant: 'gating',
       viewportLabel,
+      includeWcagColumn,
     }),
     renderUnifiedIssuesTable(advisoryIssues, {
       title: formatUniqueRulesHeading(advisoryTitle, advisoryCount),
       emptyMessage: advisoryEmptyMessage,
       variant: 'advisory',
       viewportLabel,
+      includeWcagColumn,
     }),
   ].filter(Boolean);
 
@@ -2407,6 +2413,7 @@ const renderInternalLinksGroupHtml = (group) => {
       advisoryTitle: 'Link advisories',
       advisoryEmptyMessage: 'No advisories detected.',
       viewportLabel,
+      includeWcagColumn: false,
     });
 
     const perPageEntries = pagesData.map((summary) => {
@@ -5876,6 +5883,7 @@ const renderKeyboardGroupHtml = (group) => {
               emptyMessage: 'Execution failures recorded during this run.',
               variant: 'gating',
               viewportLabel,
+              includeWcagColumn: true,
             })
           : '',
         renderIssueSectionPair({
@@ -5886,6 +5894,7 @@ const renderKeyboardGroupHtml = (group) => {
           advisoryTitle: 'Keyboard advisories',
           advisoryEmptyMessage: 'No advisories detected.',
           viewportLabel,
+          includeWcagColumn: true,
         }),
       ]
         .filter(Boolean)
@@ -6403,6 +6412,7 @@ const renderReflowGroupHtml = (group) => {
       gatingEmptyMessage: 'No blocking reflow issues detected.',
       advisoryTitle: 'Reflow advisories',
       advisoryEmptyMessage: 'No advisories detected.',
+      includeWcagColumn: true,
     });
 
     const perPageEntries = (bucket.pageEntries || []).map((entry) => {
@@ -6625,6 +6635,7 @@ const renderIframeGroupHtml = (group) => {
         gatingEmptyMessage: 'No blocking iframe issues detected.',
         advisoryTitle: 'Iframe advisories',
         advisoryEmptyMessage: 'No advisories detected.',
+        includeWcagColumn: true,
       });
 
       const perPageEntries = (bucket.pageEntries || []).map((entry) => {
@@ -7556,6 +7567,7 @@ const renderStructureGroupHtml = (group) => {
         emptyMessage: 'No gating issues detected.',
         variant: 'gating',
         viewportLabel,
+        includeWcagColumn: true,
       });
 
       // Dedupe advisory/warning entries by message regardless of differing impact
@@ -7574,6 +7586,7 @@ const renderStructureGroupHtml = (group) => {
         emptyMessage: 'No advisories detected.',
         variant: 'advisory',
         viewportLabel,
+        includeWcagColumn: true,
       });
     }
 
