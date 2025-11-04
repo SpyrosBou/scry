@@ -1445,13 +1445,34 @@ const resolvePagesTested = (summaryMap) => {
   return fallback || null;
 };
 
-const buildSuiteCards = (summaryMap) =>
+const buildSuiteCards = (summaryMap, expectedByType = new Map()) =>
   SUITE_GROUP_DEFINITIONS.map((group) => {
     const entries = group.summaryTypes
       .map((type) => summaryMap.get(type))
       .filter((entry) => Boolean(entry));
 
-    if (entries.length === 0) return null;
+    if (entries.length === 0) {
+      // If no summaries, but tests for this suite ran, render a neutral card
+      const expected = group.summaryTypes.some((t) => expectedByType.has(t));
+      if (!expected) return null;
+
+      const specIds = new Set();
+      group.summaryTypes.forEach((t) => {
+        const exp = expectedByType.get(t);
+        if (exp?.specs) exp.specs.forEach((s) => specIds.add(s));
+      });
+      const specsText = specIds.size ? Array.from(specIds).join(', ') : 'Executed';
+      return {
+        id: group.id,
+        label: group.label,
+        heading: group.heading,
+        statusClass: 'status-info',
+        specsText,
+        blockingFindings: 0,
+        blockingPages: 0,
+        summaryText: 'Suite ran but did not produce summaries. Check Test details.',
+      };
+    }
 
     const metrics = deriveSuiteMetrics(entries);
     const specIds = new Set();
@@ -1623,11 +1644,50 @@ const renderSummaryStatCards = (run, summaryMap, suiteCards, schemaRecords, suit
     : '';
 };
 
-const renderSummaryOverview = (run, schemaRecords, suitePanels = []) => {
+// Infer which summary types we expected based on which spec files actually ran.
+const deriveExpectedSummaryTypesFromTests = (tests = []) => {
+  const map = new Map(); // summaryType -> { specs: Set<string> }
+  const ensure = (type) => {
+    if (!map.has(type)) map.set(type, { specs: new Set() });
+    return map.get(type);
+  };
+
+  const add = (type, specName) => {
+    if (!type) return;
+    ensure(type).specs.add(specName);
+  };
+
+  const FILE_TO_TYPES = [
+    { match: /a11y\.audit\.wcag\.spec\.js$/i, types: ['wcag'] },
+    { match: /a11y\.forms\.validation\.spec\.js$/i, types: ['forms'] },
+    { match: /a11y\.keyboard\.navigation\.spec\.js$/i, types: ['keyboard'] },
+    { match: /a11y\.structure\.landmarks\.spec\.js$/i, types: ['structure'] },
+    { match: /responsive\.layout\.structure\.spec\.js$/i, types: ['responsive-structure', 'wp-features'] },
+    { match: /functionality\.links\.internal\.spec\.js$/i, types: ['internal-links'] },
+    { match: /functionality\.interactive\.smoke\.spec\.js$/i, types: ['interactive'] },
+    { match: /functionality\.infrastructure\.health\.spec\.js$/i, types: ['availability', 'http', 'performance'] },
+    { match: /visual\.regression\.snapshots\.spec\.js$/i, types: ['visual'] },
+  ];
+
+  (tests || []).forEach((test) => {
+    const filePath = test?.location?.file || '';
+    const fileName = filePath.split(/[/\\]/).pop();
+    if (!fileName) return;
+    for (const entry of FILE_TO_TYPES) {
+      if (entry.match.test(fileName)) {
+        entry.types.forEach((t) => add(t, fileName));
+      }
+    }
+  });
+
+  return map; // Map<summaryType, { specs: Set<string> }>
+};
+
+const renderSummaryOverview = (run, schemaRecords, suitePanels = [], expectedByType = new Map()) => {
   const summaryMap = collectRunSummariesByType(schemaRecords);
   if (summaryMap.size === 0 && !run) return '';
 
-  const suiteCards = buildSuiteCards(summaryMap);
+  const suiteCards = buildSuiteCards(summaryMap, expectedByType);
   const statCards = renderSummaryStatCards(
     run,
     summaryMap,
@@ -3936,7 +3996,7 @@ const renderRunSummaries = (summaries) => {
   `;
 };
 
-const buildSuitePanels = (schemaGroups, summaryMap) => {
+const buildSuitePanels = (schemaGroups, summaryMap, options = {}) => {
   const groupsByType = new Map();
   schemaGroups.forEach((group) => {
     const type = summaryTypeFromGroup(group);
@@ -3947,14 +4007,17 @@ const buildSuitePanels = (schemaGroups, summaryMap) => {
 
   const baseNamesUsed = new Set();
   const panels = [];
+  const expectedByType = options.expectedByType || new Map();
 
   for (const definition of SUITE_PANEL_DEFINITIONS) {
     const groups = groupsByType.get(definition.summaryType);
-    if (!groups || groups.length === 0) continue;
+    const hasGroups = groups && groups.length > 0;
+    const expected = expectedByType.get(definition.summaryType);
+    if (!hasGroups && !expected) continue;
 
     const specNames = new Set();
-    const filteredGroups =
-      definition.summaryType === 'wcag'
+    const filteredGroups = hasGroups
+      ? definition.summaryType === 'wcag'
         ? groups.filter((group) => {
             const runEntries = group.runEntries || [];
             if (runEntries.length === 0) return false;
@@ -3962,8 +4025,46 @@ const buildSuitePanels = (schemaGroups, summaryMap) => {
           })
         : ['structure', 'internal-links', 'interactive'].includes(definition.summaryType)
           ? groups.filter((group) => (group.runEntries || []).length > 0)
-          : groups;
+          : groups
+      : [];
 
+    if (filteredGroups.length === 0 && expected) {
+      // Force-render an empty panel to reflect that the suite ran but emitted no summaries
+      (expected.specs || []).forEach?.((spec) => specNames.add(spec));
+
+      const statusMeta = PANEL_STATUS_META.warn || PANEL_STATUS_META.info;
+      const specList = Array.from(specNames).sort();
+      const specLabelSuffix = specList.length ? ` - ${specList.join(', ')}` : '';
+      const specLabel = `${definition.specLabel}${specLabelSuffix}`;
+
+      panels.push({
+        id: definition.id,
+        navGroup: definition.navGroup,
+        label: definition.navLabel,
+        specLabel,
+        title: definition.title,
+        description: definition.description,
+        status: 'warn',
+        statusMeta,
+        content: `
+          <header class="panel-header">
+            <div class="panel-info">
+              <span class="spec-label">${escapeHtml(specLabel)}</span>
+              <h2>${escapeHtml(definition.title)}</h2>
+              ${definition.description ? `<p class=\"panel-description\">${escapeHtml(definition.description)}</p>` : ''}
+            </div>
+            <span class="spec-status ${statusMeta.specClass}">${escapeHtml(statusMeta.label)}</span>
+          </header>
+          <div class="panel-body">
+            <section class="summary-report summary-a11y">
+              <h3>No data recorded for this suite</h3>
+              <p class="details">The suite executed but did not emit run summaries. This can occur if navigation failed on all pages or if the suite aborted early. Review the "Test details" panel for logs.</p>
+            </section>
+          </div>
+        `,
+      });
+      continue;
+    }
     if (filteredGroups.length === 0) continue;
 
     const groupHtml = filteredGroups
@@ -8309,7 +8410,10 @@ function renderReportHtml(run) {
   const navigationHtml = renderTestNavigation(groupedTests);
   const summaryMap = collectRunSummariesByType(run.schemaSummaries || []);
   const schemaGroups = buildSchemaGroups(run.schemaSummaries || []);
-  const { panels: suitePanels, baseNamesUsed } = buildSuitePanels(schemaGroups, summaryMap);
+  const expectedByType = deriveExpectedSummaryTypesFromTests(run.tests || []);
+  const { panels: suitePanels, baseNamesUsed } = buildSuitePanels(schemaGroups, summaryMap, {
+    expectedByType,
+  });
   const filteredRunSummaries = (run.runSummaries || []).filter((summary) =>
     summary?.baseName ? !baseNamesUsed.has(summary.baseName) : true
   );
@@ -8322,7 +8426,12 @@ function renderReportHtml(run) {
     </button>
   `;
 
-  const summaryOverviewHtml = renderSummaryOverview(run, run.schemaSummaries || [], suitePanels);
+  const summaryOverviewHtml = renderSummaryOverview(
+    run,
+    run.schemaSummaries || [],
+    suitePanels,
+    expectedByType
+  );
   const runSummariesHtml = renderRunSummaries(filteredRunSummaries);
 
   const testsHtml = groupedTests
