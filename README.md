@@ -2,7 +2,7 @@
 
 Automated Playwright-powered testing harness for auditing WordPress websites across functionality, responsiveness, accessibility, and visual regression criteria. The suite standardises how sites are exercised, captures rich HTML (HyperText Markup Language) reports, and keeps a historical record of findings for ongoing quality assurance.
 
-> Last updated for commit 1c4d67a.
+> Last updated for commit f00b53a.
 
 ## Key Capabilities
 - Generates Solarized-themed HTML reports with parity to the approved reporting mocks.
@@ -80,6 +80,7 @@ Helpful environment variables:
 - Override the preview port with `--port` or `REPORT_PORT`, and lock the viewer to a specific run via `--run run-YYYYMMDD-HHMMSS`.
 - Use `npm run reports:read [count]` to open the most recent report(s) without hunting filenames.
 - Regenerate an interactive report from stored data via `npm run reports:regenerate`.
+- When tweaking `docs/mocks/report-styles.scss`, run `npm run styles:build` to refresh the precompiled CSS that the runtime embeds—Sass no longer compiles on import.
 - Clean up old artifacts with `npm run clean:reports`, `npm run clean:manifests`, or `npm run clean:test-results`.
 - If a suite ran but didn’t emit schema summaries (for example, all pages returned non‑200), the report now force‑renders a placeholder panel for that suite so it’s still visible in the sidebar and “Suites at a glance”. The “Test details” panel will contain logs to diagnose why the suite produced no data.
 - WCAG column scoping: the “WCAG level” column appears only in accessibility tables (WCAG audit, keyboard, reflow, reduced‑motion, iframe, and structural a11y). Other suites (links, interactive, availability, performance, responsive) don’t render this column.

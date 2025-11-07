@@ -40,15 +40,15 @@ This document breaks the follow-up work into four discrete steps, each with a co
 
 ## Step 3 – Remove runtime Sass compilation side effects
 
-**Status:** ⏱ Pending – work starts after the suite refactor lands.
+**Status:** ✅ Completed – Sass now compiles via `npm run styles:build` (powered by `scripts/build-report-styles.js`), `utils/report-templates.js` just reads `docs/mocks/report-styles.css`, and the README documents the workflow.
 
 - **Goal:** Decouple template rendering from build tooling by eliminating `sass.compile` and `fs.writeFileSync` calls that run on every import.
 - **Preparation:**
   - Identify who consumes `baseStyles` today (HTML exports? CLI reporter?). Confirm whether precompiled CSS can be embedded or referenced separately.
 - **Execution:**
-  1. Move Sass compilation into the existing build/test commands (e.g., npm script or documentation step) so CSS artifacts are generated ahead of runtime.
-  2. Replace `compileReportStyles()` with a simple loader: read a prebuilt CSS file or accept CSS as an injected dependency via function parameters.
-  3. Update documentation/README so contributors know how to refresh the CSS.
+  1. Move Sass compilation into the existing build/test commands (e.g., npm script or documentation step) so CSS artifacts are generated ahead of runtime. ✅
+  2. Replace `compileReportStyles()` with a simple loader: read a prebuilt CSS file or accept CSS as an injected dependency via function parameters. ✅
+  3. Update documentation/README so contributors know how to refresh the CSS. ✅
 - **Verification:** Run the report generator in an environment without write access to ensure it no longer attempts filesystem writes.
 - **Deliverable:** Side-effect-free runtime module plus an updated build step that produces the styles.
 

@@ -7527,27 +7527,22 @@ const renderTestCard = (test, options = {}) => {
   `;
 };
 
-const sass = require('sass');
+const styleOutputPath = path.join(__dirname, '..', 'docs', 'mocks', 'report-styles.css');
 
-const styleSourcePath = path.join(__dirname, '..', 'docs', 'mocks', 'report-styles.scss');
-
-function compileReportStyles() {
+function loadReportStyles() {
   try {
-    const result = sass.compile(styleSourcePath, { style: 'expanded' });
-    const css = `${result.css.trim()}\n`;
-    const legacyPath = styleSourcePath.replace(/\.scss$/, '.css');
-    try {
-      fs.writeFileSync(legacyPath, css);
-    } catch (writeError) {
-      console.warn(`⚠️  Unable to write compiled CSS to ${legacyPath}: ${writeError.message}`);
-    }
-    return css;
+    const css = fs.readFileSync(styleOutputPath, 'utf8');
+    return css.endsWith('\n') ? css : `${css}\n`;
   } catch (error) {
-    throw new Error(`Failed to compile report styles from ${styleSourcePath}: ${error.message}`);
+    throw new Error(
+      `Failed to load precompiled report styles from ${styleOutputPath}. ` +
+        'Run "npm run styles:build" to regenerate them. ' +
+        `Original error: ${error.message}`
+    );
   }
 }
 
-const baseStyles = compileReportStyles();
+const baseStyles = loadReportStyles();
 
 const filterScript = `
 (function () {
