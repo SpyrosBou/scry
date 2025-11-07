@@ -169,15 +169,7 @@ const defaultHydrateSuiteIssue = (issue) => {
   };
 };
 
-const renderUnifiedIssuesTable = (issues, options = {}) => {
-  const { variant = 'gating' } = options;
-  if (variant === 'per-page') {
-    return renderPerPageIssuesTableContent(issues, options);
-  }
-  return renderRunIssuesTable(issues, { ...options, variant });
-};
-
-const renderRunIssuesTable = (
+const renderUnifiedIssuesTable = (
   issues,
   {
     title,
@@ -2174,29 +2166,15 @@ const renderWcagPageIssueTable = (entries, heading, options = {}) => {
 
 const defaultHydratePageIssue = (entry) => entry;
 
-const renderPerPageIssuesTableContent = (entries, options = {}) => {
-  const heading = options.title || options.heading;
-  if (!heading) return '';
-  const { hydrate, headingClass, viewportLabel } = options;
-  const includeWcagColumn = options.includeWcagColumn ?? true;
+const renderPerPageIssuesTable = (entries, heading, options = {}) => {
+  const { hydrate, ...rest } = options;
   const hydrator = typeof hydrate === 'function' ? hydrate : defaultHydratePageIssue;
   const normalisedEntries = (Array.isArray(entries) ? entries : [])
     .map((entry) => hydrator(entry, { heading }))
     .filter(Boolean);
   if (normalisedEntries.length === 0) return '';
-  return renderWcagPageIssueTable(normalisedEntries, heading, {
-    headingClass,
-    includeWcagColumn,
-    viewportLabel,
-  });
+  return renderWcagPageIssueTable(normalisedEntries, heading, rest);
 };
-
-const renderPerPageIssuesTable = (entries, heading, options = {}) =>
-  renderUnifiedIssuesTable(entries, {
-    ...options,
-    title: heading,
-    variant: 'per-page',
-  });
 
 const renderWcagRunSummary = () => '';
 
@@ -5047,6 +5025,50 @@ const renderAvailabilityPageCard = (summary, { projectLabel } = {}) => {
     ].filter(Boolean)
   );
 
+  const perPageIssueHydrator = (entry) => ({
+    impact: entry.impact || 'info',
+    id: entry.id || slugify(entry.rule || entry.label || entry.message || 'issue'),
+    rule: entry.rule || entry.label || entry.message || 'Issue',
+    details: entry.details || entry.message || entry.label || 'Details not captured',
+    nodesCount: Number.isFinite(entry.nodesCount) ? entry.nodesCount : entry.count || 1,
+    pages: [summary.page || 'Unknown page'],
+    viewports: projectLabel ? [projectLabel] : [],
+  });
+
+  const buildTableEntries = (entries) =>
+    entries.map((entry) => ({
+      impact: entry.impact,
+      rule: entry.label,
+      details: entry.message,
+      nodesCount: entry.count,
+    }));
+
+  const gatingTable = gatingEntries.length
+    ? renderPerPageIssuesTable(
+        buildTableEntries(gatingEntries),
+        formatUniqueRulesHeading('Blocking availability issues', gatingEntries.length),
+        { includeWcagColumn: false, hydrate: perPageIssueHydrator }
+      )
+    : '<p class="details">No blocking availability issues detected.</p>';
+
+  const warningTable = warningEntries.length
+    ? renderPerPageIssuesTable(
+        buildTableEntries(warningEntries),
+        `Warnings (${formatCount(warningEntries.length)})`,
+        { includeWcagColumn: false, hydrate: perPageIssueHydrator }
+      )
+    : hasWarnings
+      ? ''
+      : '<p class="details">No warnings recorded.</p>';
+
+  const advisoryTable = advisoryEntries.length
+    ? renderPerPageIssuesTable(
+        buildTableEntries(advisoryEntries),
+        formatUniqueRulesHeading('Advisories', advisoryEntries.length),
+        { includeWcagColumn: false, hydrate: perPageIssueHydrator }
+      )
+    : '';
+
   const structureGroup = renderIssueGroup({
     title: 'Critical landmark check',
     items: missingLandmarks,
@@ -5054,27 +5076,6 @@ const renderAvailabilityPageCard = (summary, { projectLabel } = {}) => {
     emptyMessage: !elements
       ? 'Structure scan not recorded for this page.'
       : 'All tracked landmarks confirmed.',
-  });
-
-  const gatingGroup = renderIssueGroup({
-    title: formatUniqueRulesHeading('Blocking issues', gatingEntries.length),
-    items: summariseIssueEntries(gatingEntries),
-    tone: gatingEntries.length ? 'danger' : 'success',
-    emptyMessage: 'No blocking availability issues detected.',
-  });
-
-  const warningGroup = renderIssueGroup({
-    title: `Warnings (${formatCount(warningEntries.length)})`,
-    items: summariseIssueEntries(warningEntries),
-    tone: warningEntries.length ? 'warning' : 'muted',
-    emptyMessage: hasWarnings ? null : 'No warnings recorded.',
-  });
-
-  const advisoryGroup = renderIssueGroup({
-    title: formatUniqueRulesHeading('Advisories', advisoryEntries.length),
-    items: summariseIssueEntries(advisoryEntries),
-    tone: advisoryEntries.length ? 'info' : 'muted',
-    emptyMessage: null,
   });
 
   const notesGroup = renderIssueGroup({
@@ -5093,9 +5094,9 @@ const renderAvailabilityPageCard = (summary, { projectLabel } = {}) => {
 
   const sectionsHtml = [
     structureGroup,
-    gatingGroup,
-    warningGroup,
-    advisoryGroup,
+    gatingTable,
+    warningTable,
+    advisoryTable,
     notesGroup,
     infoGroup,
   ]
