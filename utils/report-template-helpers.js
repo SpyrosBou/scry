@@ -179,17 +179,21 @@ const formatPercentage = (value) => {
 const renderStatusSummaryList = (items, { className = 'status-summary' } = {}) => {
   if (!Array.isArray(items) || items.length === 0) return '';
   const entries = items
-    .filter((item) => item && Number(item.count) > 0)
-    .map(
-      (item) => `
+    .filter((item) => item && item.count != null && item.count !== '')
+    .map((item) => {
+      const tone = item.tone || 'status-info';
+      const count = Number(item.count);
+      const countLabel = Number.isFinite(count) ? formatCount(count) : String(item.count);
+      const suffix = item.suffix ? ` ${escapeHtml(item.suffix)}` : '';
+      return `
         <li>
-          <span class="status-pill ${escapeHtml(item.tone || 'status-info')}">${escapeHtml(item.label)}</span>
-          <span>${escapeHtml(formatCount(item.count))}${item.suffix ? ` ${escapeHtml(item.suffix)}` : ''}</span>
+          <span class="status-pill ${escapeHtml(tone)}">${escapeHtml(item.label)}</span>
+          <span>${escapeHtml(countLabel)}${suffix}</span>
         </li>
-      `
-    )
+      `;
+    })
     .join('');
-  if (!entries) return '';
+  if (!entries.trim()) return '';
   return `<ul class="${escapeHtml(className)}">${entries}</ul>`;
 };
 

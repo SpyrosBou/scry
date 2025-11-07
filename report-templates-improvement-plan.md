@@ -56,14 +56,14 @@ This document breaks the follow-up work into four discrete steps, each with a co
 
 ## Step 4 – Preserve zero-value status entries
 
-**Status:** ⏱ Pending – blocked behind Steps 2 and 3.
+**Status:** ✅ Completed – `renderStatusSummaryList` now keeps zero counts, only skips null/undefined entries, and has a dedicated unit test covering the behaviour.
 
 - **Goal:** Ensure `renderStatusSummaryList` surfaces zero counts so report readers can distinguish “0 blockers” from “data missing”.
 - **Preparation:** Capture current HTML output for a run with zero blockers and non-zero warnings as a fixture.
 - **Execution:**
-  1. Update `renderStatusSummaryList` to keep entries with numeric `0`, only discarding `null/undefined`.
-  2. Add a targeted unit test (or snapshot) that verifies both zero and non-zero counts render.
-  3. Check other call sites to ensure no consumer relied on the old filtering behaviour.
+  1. Update `renderStatusSummaryList` to keep entries with numeric `0`, only discarding `null/undefined`. ✅
+  2. Add a targeted unit test (or snapshot) that verifies both zero and non-zero counts render. ✅
+  3. Check other call sites to ensure no consumer relied on the old filtering behaviour. ✅
 - **Verification:** Re-run the report summary generation to confirm the UI shows zero-valued pills with an appropriate tone/style.
 - **Deliverable:** Helper adjustment + tests, with documentation of the expected UI change in the relevant changelog or README section.
 
