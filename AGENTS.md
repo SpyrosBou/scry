@@ -12,6 +12,7 @@ Whilst working on this repo you can assume we are concerned with the functionali
 ## Build, Test, and Development Commands
 
 - `npm run setup` installs all dependencies and Playwright browsers; use `npm run install-browsers` if you only need to refresh the browser binaries.
+- Run `npm run styles:build` whenever you edit `docs/mocks/report-styles.scss` so the precompiled CSS that powers the HTML reporter stays in sync (runtime modules now only read the generated CSS).
 - `node run-tests.js --site=<name> --functionality` executes the default Chrome desktop run (append `--pages=<n|all>` to override the 5-page default). Layer `--responsive`, `--functionality`, `--accessibility`, or `--visual` to target suite families (you can combine multiple suite flags), or pass one or more spec paths/Globs via `--test` / trailing arguments (for example `node run-tests.js --site=createarts-live --pages all tests/a11y.audit.wcag.spec.js`).
 - `--pages <n|all>` (optional, default 5) caps the resolved manifest to the first _n_ pages or removes the cap entirely (e.g. `node run-tests.js --site=createarts-live --pages all --functionality`); `A11Y_SAMPLE=<n>` remains available as an environment override for accessibility runs.
 - `--project=<name>` (or comma-separated list) lets you choose Playwright projects; omit for the Chrome desktop default.

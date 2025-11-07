@@ -2,7 +2,7 @@
 
 Automated Playwright-powered testing harness for auditing WordPress websites across functionality, responsiveness, accessibility, and visual regression criteria. The suite standardises how sites are exercised, captures rich HTML (HyperText Markup Language) reports, and keeps a historical record of findings for ongoing quality assurance.
 
-> Last updated for commit f00b53a.
+> Last updated for commit 41cb029.
 
 ## Key Capabilities
 - Generates Solarized-themed HTML reports with parity to the approved reporting mocks.
@@ -80,6 +80,7 @@ Helpful environment variables:
 - Override the preview port with `--port` or `REPORT_PORT`, and lock the viewer to a specific run via `--run run-YYYYMMDD-HHMMSS`.
 - Use `npm run reports:read [count]` to open the most recent report(s) without hunting filenames.
 - Regenerate an interactive report from stored data via `npm run reports:regenerate`.
+- Status summary pills in the HTML report now display zero counts (e.g., “0 blockers”) so stakeholders can distinguish a clean run from missing data.
 - When tweaking `docs/mocks/report-styles.scss`, run `npm run styles:build` to refresh the precompiled CSS that the runtime embeds—Sass no longer compiles on import.
 - Clean up old artifacts with `npm run clean:reports`, `npm run clean:manifests`, or `npm run clean:test-results`.
 - If a suite ran but didn’t emit schema summaries (for example, all pages returned non‑200), the report now force‑renders a placeholder panel for that suite so it’s still visible in the sidebar and “Suites at a glance”. The “Test details” panel will contain logs to diagnose why the suite produced no data.
