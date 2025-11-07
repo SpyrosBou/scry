@@ -333,6 +333,22 @@ const renderSuiteAdvisoryTable = (issues, options = {}) =>
     variant: 'advisory',
   });
 
+const renderSuiteFindingsBlock = ({
+  gatingIssues = [],
+  advisoryIssues = [],
+  perPageEntries = [],
+  gatingOptions = {},
+  advisoryOptions = {},
+  perPageOptions = {},
+} = {}) => {
+  const gatingSection = renderSuiteGatingTable(gatingIssues, gatingOptions);
+  const advisorySection = renderSuiteAdvisoryTable(advisoryIssues, advisoryOptions);
+  const perPageSection = Array.isArray(perPageEntries) && perPageEntries.length > 0
+    ? renderPerPageAccordion(perPageEntries, perPageOptions)
+    : '';
+  return assembleSuiteSections([gatingSection, advisorySection, perPageSection]);
+};
+
 const renderIssueSectionPair = ({
   gatingIssues = [],
   advisoryIssues = [],
@@ -2614,16 +2630,6 @@ const renderAvailabilityGroupHtml = (group) => {
       dedupeIgnoreImpact: true,
     });
 
-    const issueSections = renderIssueSectionPair({
-      gatingIssues,
-      advisoryIssues,
-      gatingTitle: 'Blocking availability issues',
-      gatingEmptyMessage: 'No blocking availability issues detected.',
-      advisoryTitle: 'Availability advisories',
-      advisoryEmptyMessage: 'No advisories detected.',
-      viewportLabel,
-    });
-
     const perPageEntries =
       pageEntryPayloads.length > 0
         ? pageEntryPayloads.map((payload) => {
@@ -2662,15 +2668,28 @@ const renderAvailabilityGroupHtml = (group) => {
             };
           });
 
-    const perPageHtml = renderPerPageAccordion(perPageEntries, {
-      heading: 'Per-page availability findings',
-      summaryClass: 'summary-page--availability',
-      containerClass: 'summary-report summary-a11y summary-a11y--per-page',
-      renderCard: (entrySummary) => renderAvailabilityPageCard(entrySummary, { projectLabel }),
-      formatSummaryLabel: (entrySummary) => formatPageLabel(entrySummary?.page || 'Page'),
+    const sectionContent = renderSuiteFindingsBlock({
+      gatingIssues,
+      advisoryIssues,
+      perPageEntries,
+      gatingOptions: {
+        title: 'Blocking availability issues',
+        emptyMessage: 'No blocking availability issues detected.',
+        viewportLabel,
+      },
+      advisoryOptions: {
+        title: 'Availability advisories',
+        emptyMessage: 'No advisories detected.',
+        viewportLabel,
+      },
+      perPageOptions: {
+        heading: 'Per-page availability findings',
+        summaryClass: 'summary-page--availability',
+        containerClass: 'summary-report summary-a11y summary-a11y--per-page',
+        renderCard: (entrySummary) => renderAvailabilityPageCard(entrySummary, { projectLabel }),
+        formatSummaryLabel: (entrySummary) => formatPageLabel(entrySummary?.page || 'Page'),
+      },
     });
-
-    const sectionContent = assembleSuiteSections([issueSections, perPageHtml]);
     if (!sectionContent) return '';
 
     if (multiBucket) {
@@ -2868,16 +2887,6 @@ const renderHttpGroupHtml = (group) => {
       }
     );
 
-    const issueSections = renderIssueSectionPair({
-      gatingIssues,
-      advisoryIssues,
-      gatingTitle: 'Blocking HTTP issues',
-      gatingEmptyMessage: 'No blocking HTTP issues detected.',
-      advisoryTitle: 'HTTP response advisories',
-      advisoryEmptyMessage: 'No advisories detected.',
-      viewportLabel,
-    });
-
     const perPageEntries =
       pageEntryPayloads.length > 0
         ? pageEntryPayloads.map((payload) => {
@@ -2920,16 +2929,29 @@ const renderHttpGroupHtml = (group) => {
             };
           });
 
-    const perPageHtml = renderPerPageAccordion(perPageEntries, {
-      heading: 'Per-page HTTP findings',
-      summaryClass: 'summary-page--http',
-      containerClass: 'summary-report summary-a11y summary-a11y--per-page',
-      renderCard: (entrySummary) =>
-        renderHttpPageCard(entrySummary, { projectLabel, viewportLabel }),
-      formatSummaryLabel: (entrySummary) => formatPageLabel(entrySummary?.page || 'Page'),
+    const sectionContent = renderSuiteFindingsBlock({
+      gatingIssues,
+      advisoryIssues,
+      perPageEntries,
+      gatingOptions: {
+        title: 'Blocking HTTP issues',
+        emptyMessage: 'No blocking HTTP issues detected.',
+        viewportLabel,
+      },
+      advisoryOptions: {
+        title: 'HTTP response advisories',
+        emptyMessage: 'No advisories detected.',
+        viewportLabel,
+      },
+      perPageOptions: {
+        heading: 'Per-page HTTP findings',
+        summaryClass: 'summary-page--http',
+        containerClass: 'summary-report summary-a11y summary-a11y--per-page',
+        renderCard: (entrySummary) =>
+          renderHttpPageCard(entrySummary, { projectLabel, viewportLabel }),
+        formatSummaryLabel: (entrySummary) => formatPageLabel(entrySummary?.page || 'Page'),
+      },
     });
-
-    const sectionContent = assembleSuiteSections([issueSections, perPageHtml]);
     if (!sectionContent) return '';
 
     if (multiBucket) {
@@ -3092,15 +3114,6 @@ const renderPerformanceGroupHtml = (group) => {
       }
     );
 
-    const issueSections = renderIssueSectionPair({
-      gatingIssues,
-      advisoryIssues,
-      gatingTitle: 'Blocking performance issues',
-      gatingEmptyMessage: 'No performance budget breaches detected.',
-      advisoryTitle: 'Performance advisories',
-      advisoryEmptyMessage: 'No advisories detected.',
-    });
-
     const perPageEntries =
       pageEntryPayloads.length > 0
         ? pageEntryPayloads.map((payload) => {
@@ -3144,15 +3157,26 @@ const renderPerformanceGroupHtml = (group) => {
             };
           });
 
-    const perPageHtml = renderPerPageAccordion(perPageEntries, {
-      heading: 'Per-page performance findings',
-      summaryClass: 'summary-page--performance',
-      containerClass: 'summary-report summary-a11y summary-a11y--per-page',
-      renderCard: (entrySummary) => renderPerformancePageCard(entrySummary, { projectLabel }),
-      formatSummaryLabel: (entrySummary) => formatPageLabel(entrySummary?.page || 'Page'),
+    const sectionContent = renderSuiteFindingsBlock({
+      gatingIssues,
+      advisoryIssues,
+      perPageEntries,
+      gatingOptions: {
+        title: 'Blocking performance issues',
+        emptyMessage: 'No performance budget breaches detected.',
+      },
+      advisoryOptions: {
+        title: 'Performance advisories',
+        emptyMessage: 'No advisories detected.',
+      },
+      perPageOptions: {
+        heading: 'Per-page performance findings',
+        summaryClass: 'summary-page--performance',
+        containerClass: 'summary-report summary-a11y summary-a11y--per-page',
+        renderCard: (entrySummary) => renderPerformancePageCard(entrySummary, { projectLabel }),
+        formatSummaryLabel: (entrySummary) => formatPageLabel(entrySummary?.page || 'Page'),
+      },
     });
-
-    const sectionContent = assembleSuiteSections([issueSections, perPageHtml]);
     if (!sectionContent) return '';
 
     if (multiBucket) {
@@ -8708,6 +8732,7 @@ module.exports.__test__ = {
   renderIssueSectionPair,
   renderSuiteGatingTable,
   renderSuiteAdvisoryTable,
+  renderSuiteFindingsBlock,
   renderPerPageIssuesTable,
   renderAvailabilityPageCard,
   renderHttpPageCard,

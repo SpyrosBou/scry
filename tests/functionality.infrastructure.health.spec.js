@@ -92,7 +92,7 @@ const buildAvailabilitySchemaPayloads = (results, projectName) => {
 
   const pagePayloads = enrichedResults.map((entry) =>
     createPageSummaryPayload({
-      baseName: `${runBaseName}-${slugify(entry.page)}`,
+      baseName: runBaseName,
       title: `Availability – ${entry.page}`,
       page: entry.page,
       viewport: projectName,
@@ -197,7 +197,7 @@ const buildHttpSchemaPayloads = (results, projectName) => {
 
   const pagePayloads = enrichedResults.map((entry) =>
     createPageSummaryPayload({
-      baseName: `${runBaseName}-${slugify(entry.page)}`,
+      baseName: runBaseName,
       title: `HTTP validation – ${entry.page}`,
       page: entry.page,
       viewport: projectName,
@@ -304,7 +304,7 @@ const buildPerformanceSchemaPayloads = (data, breaches, projectName) => {
 
   const pagePayloads = pageSummaries.map((entry) =>
     createPageSummaryPayload({
-      baseName: `${runBaseName}-${slugify(entry.page)}`,
+      baseName: runBaseName,
       title: `Performance – ${entry.page}`,
       page: entry.page,
       viewport: projectName,
