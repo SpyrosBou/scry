@@ -92,7 +92,7 @@ const buildAvailabilitySchemaPayloads = (results, projectName) => {
 
   const pagePayloads = enrichedResults.map((entry) =>
     createPageSummaryPayload({
-      baseName: runBaseName,
+      baseName: `${runBaseName}-${slugify(entry.page)}`,
       title: `Availability – ${entry.page}`,
       page: entry.page,
       viewport: projectName,
@@ -197,7 +197,7 @@ const buildHttpSchemaPayloads = (results, projectName) => {
 
   const pagePayloads = enrichedResults.map((entry) =>
     createPageSummaryPayload({
-      baseName: runBaseName,
+      baseName: `${runBaseName}-${slugify(entry.page)}`,
       title: `HTTP validation – ${entry.page}`,
       page: entry.page,
       viewport: projectName,
@@ -304,7 +304,7 @@ const buildPerformanceSchemaPayloads = (data, breaches, projectName) => {
 
   const pagePayloads = pageSummaries.map((entry) =>
     createPageSummaryPayload({
-      baseName: runBaseName,
+      baseName: `${runBaseName}-${slugify(entry.page)}`,
       title: `Performance – ${entry.page}`,
       page: entry.page,
       viewport: projectName,
@@ -327,18 +327,6 @@ const buildPerformanceSchemaPayloads = (data, breaches, projectName) => {
       },
     })
   );
-
-  runPayload.details = {
-    pages: data.map((entry) => ({
-      page: entry.page,
-      loadTimeMs: roundMetric(entry.loadTime),
-      domContentLoadedMs: roundMetric(entry.domContentLoaded),
-      loadCompleteMs: roundMetric(entry.loadComplete),
-      firstPaintMs: roundMetric(entry.firstPaint),
-      firstContentfulPaintMs: roundMetric(entry.firstContentfulPaint),
-      budgetBreaches: breachMap.get(entry.page) || [],
-    })),
-  };
 
   return { runPayload, pagePayloads };
 };

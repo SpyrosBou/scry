@@ -169,12 +169,20 @@ const defaultHydrateSuiteIssue = (issue) => {
   };
 };
 
-const renderUnifiedIssuesTable = (
+const renderUnifiedIssuesTable = (issues, options = {}) => {
+  const { variant = 'gating' } = options;
+  if (variant === 'per-page') {
+    return renderPerPageIssuesTableContent(issues, options);
+  }
+  return renderRunIssuesTable(issues, { ...options, variant });
+};
+
+const renderRunIssuesTable = (
   issues,
   {
     title,
     emptyMessage,
-    variant,
+    variant = 'gating',
     viewportLabel,
     includeWcagColumn = false,
     hydrate,
@@ -2150,15 +2158,29 @@ const renderWcagPageIssueTable = (entries, heading, options = {}) => {
 
 const defaultHydratePageIssue = (entry) => entry;
 
-const renderPerPageIssuesTable = (entries, heading, options = {}) => {
-  const { hydrate, ...rest } = options;
+const renderPerPageIssuesTableContent = (entries, options = {}) => {
+  const heading = options.title || options.heading;
+  if (!heading) return '';
+  const { hydrate, headingClass, viewportLabel } = options;
+  const includeWcagColumn = options.includeWcagColumn ?? true;
   const hydrator = typeof hydrate === 'function' ? hydrate : defaultHydratePageIssue;
   const normalisedEntries = (Array.isArray(entries) ? entries : [])
     .map((entry) => hydrator(entry, { heading }))
     .filter(Boolean);
   if (normalisedEntries.length === 0) return '';
-  return renderWcagPageIssueTable(normalisedEntries, heading, rest);
+  return renderWcagPageIssueTable(normalisedEntries, heading, {
+    headingClass,
+    includeWcagColumn,
+    viewportLabel,
+  });
 };
+
+const renderPerPageIssuesTable = (entries, heading, options = {}) =>
+  renderUnifiedIssuesTable(entries, {
+    ...options,
+    title: heading,
+    variant: 'per-page',
+  });
 
 const renderWcagRunSummary = () => '';
 
