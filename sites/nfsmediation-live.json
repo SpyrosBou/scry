@@ -1,6 +1,6 @@
 {
   "name": "NFS Mediation (Live)",
-  "baseUrl": "https://nfs.atelierdev.uk",
+  "baseUrl": "https://www.nfsmediation.org.uk",
   "testPages": [
     "/",
     "/about-us/",
@@ -9,23 +9,26 @@
     "/get-involved/",
     "/meet-the-team/",
     "/notices/",
+    "/notices/news/advanced-training-certification-milestone-achieved/",
+    "/notices/news/nfs-achieves-rsqm-award/",
+    "/notices/news/october-2017-nfsm-celebrate-20-years-of-success/",
+    "/notices/news/restorative-justice-training/",
     "/our-services/",
     "/our-services/asb-assessment-service/",
     "/our-services/coaching-plus-service/",
     "/our-services/cpd-accredited-training-services/",
     "/our-services/hoarding-psychological-support-service/",
     "/our-services/mediation-services/",
-    "/our-services/test-service/",
     "/our-services/workplace-mediation-services/",
-    "/privacy-policy-2/",
-    "/sample-page/",
+    "/privacy-policy/",
+    "/sitemap/",
     "/terms-of-use/",
     "/the-team/",
     "/working-with-us/"
   ],
   "discover": {
     "strategy": "sitemap",
-    "sitemapUrl": "https://nfs.atelierdev.uk/wp-sitemap.xml",
+    "sitemapUrl": "https://www.nfsmediation.org.uk/sitemap_index.xml",
     "maxPages": 60,
     "maxDepth": 3,
     "include": [
