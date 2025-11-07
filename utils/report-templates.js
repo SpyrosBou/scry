@@ -31,6 +31,8 @@ const {
   renderSchemaGroupContainer,
 } = require('./report-components/layout');
 const { KIND_RUN_SUMMARY, KIND_PAGE_SUMMARY } = require('./report-schema');
+const createSiteQualityRenderers = require('./report-templates/groups/site-quality');
+const createAccessibilityRenderers = require('./report-templates/groups/accessibility');
 
 const renderRuleSnapshotsTable = (snapshots, { projectName, viewports } = {}) => {
   if (!Array.isArray(snapshots) || snapshots.length === 0) return '';
@@ -2181,6 +2183,12 @@ const renderPerPageIssuesTable = (entries, heading, options = {}) => {
   return renderWcagPageIssueTable(normalisedEntries, heading, rest);
 };
 
+const { renderWcagPageCard } = createAccessibilityRenderers({
+  deriveWcagPageStatus,
+  formatWcagStability,
+  renderPerPageIssuesTable,
+});
+
 const renderWcagRunSummary = () => '';
 
 const renderKeyboardRunSummary = () => '';
@@ -2337,190 +2345,9 @@ const renderAccessibilityGroupHtml = (group) => {
 const firstRunPayload = (bucket) =>
   bucket.runEntries.find((entry) => Boolean(entry?.payload))?.payload || null;
 
-const renderInternalLinksGroupHtml = (group) => {
-  const buckets = collectSchemaProjects(group);
-  if (buckets.length === 0) return '';
+;
 
-  const multiBucket = buckets.length > 1;
-
-  const sections = buckets.map((bucket) => {
-    const runPayload = firstRunPayload(bucket);
-    if (!runPayload || !Array.isArray(runPayload.details?.pages)) return '';
-
-    const pagesData = runPayload.details.pages;
-    const metadata = runPayload.metadata || {};
-    const projectLabel = metadata.projectName || bucket.projectName || 'Chrome';
-
-    const viewportList = Array.isArray(metadata.viewports) ? metadata.viewports : [];
-    const viewportLabel = viewportList.length ? viewportList.join(', ') : projectLabel;
-
-    const gatingIssues = collectIssueMessages(
-      pagesData,
-      ['gating', 'gatingIssues'],
-      'critical'
-    ).filter((issue) => issue.pageCount > 0);
-    const warningIssues = collectIssueMessages(pagesData, 'warnings', 'moderate').filter(
-      (issue) => issue.pageCount > 0
-    );
-    const advisoryIssues = collectIssueMessages(pagesData, 'advisories', 'minor').filter(
-      (issue) => issue.pageCount > 0
-    );
-
-    const perPageEntries = pagesData.map((summary) => {
-      const brokenCount = summary.brokenCount ?? 0;
-      const hasGating =
-        brokenCount > 0 ||
-        (Array.isArray(summary.gating) && summary.gating.length > 0) ||
-        (Array.isArray(summary.brokenSample) && summary.brokenSample.length > 0);
-      const hasWarnings = Array.isArray(summary.warnings) && summary.warnings.length > 0;
-      const hasAdvisories = Array.isArray(summary.advisories) && summary.advisories.length > 0;
-      const summaryClass = hasGating
-        ? 'summary-page--fail'
-        : hasWarnings
-          ? 'summary-page--warn'
-          : hasAdvisories
-            ? 'summary-page--advisory'
-            : 'summary-page--ok';
-      return {
-        ...summary,
-        page: summary.page,
-        _summaryClass: summaryClass,
-      };
-    });
-
-    const sectionContent = renderSuiteFindingsBlock({
-      gatingIssues,
-      advisoryIssues: [...warningIssues, ...advisoryIssues],
-      perPageEntries,
-      gatingOptions: {
-        title: 'Blocking link issues',
-        emptyMessage: 'No blocking link issues detected.',
-        viewportLabel,
-        includeWcagColumn: false,
-      },
-      advisoryOptions: {
-        title: 'Link advisories',
-        emptyMessage: 'No advisories detected.',
-        viewportLabel,
-        includeWcagColumn: false,
-      },
-      perPageOptions: {
-        heading: 'Per-page findings',
-        summaryClass: 'summary-page--internal-links',
-        containerClass: 'summary-report summary-a11y summary-a11y--per-page',
-        renderCard: (entrySummary) => renderInternalLinksPageCard(entrySummary, { projectLabel }),
-        formatSummaryLabel: (entrySummary) => formatPageLabel(entrySummary?.page || 'Page'),
-      },
-    });
-    if (!sectionContent) return '';
-    if (multiBucket) {
-      return renderProjectBlockSection({
-        projectLabel,
-        content: sectionContent,
-      });
-    }
-    return sectionContent;
-  }).filter(Boolean);
-
-  return renderSchemaGroupContainer({
-    sections,
-    heading: multiBucket && group.title ? group.title : null,
-    element: 'article',
-  });
-};
-
-const renderInteractiveGroupHtml = (group) => {
-  const buckets = collectSchemaProjects(group);
-  if (buckets.length === 0) return '';
-
-  const multiBucket = buckets.length > 1;
-
-  const sections = buckets.map((bucket) => {
-    const runPayload = firstRunPayload(bucket);
-    if (!runPayload || !Array.isArray(runPayload.details?.pages)) return '';
-
-    const overview = runPayload.overview || {};
-    const pagesData = runPayload.details.pages;
-    const metadata = runPayload.metadata || {};
-    const projectLabel = metadata.projectName || bucket.projectName || 'Chrome';
-    const viewportList = Array.isArray(metadata.viewports) ? metadata.viewports : [];
-    const viewportLabel = viewportList.length ? viewportList.join(', ') : projectLabel;
-
-    const gatingIssues = collectIssueMessages(pagesData, 'gating', 'critical', {
-      normalize: normalizeInteractiveMessage,
-    }).filter((issue) => issue.pageCount > 0);
-
-    const warningIssues = collectIssueMessages(pagesData, 'warnings', 'moderate', {
-      normalize: normalizeInteractiveMessage,
-    }).filter((issue) => issue.pageCount > 0);
-
-    const advisoryIssues = collectIssueMessages(pagesData, 'advisories', 'minor', {
-      normalize: normalizeInteractiveMessage,
-    }).filter((issue) => issue.pageCount > 0);
-
-    const perPageEntries = pagesData.map((summary) => {
-      const consoleErrors = summary.consoleErrors ?? 0;
-      const resourceErrors = summary.resourceErrors ?? 0;
-      const hasGating =
-        consoleErrors > 0 ||
-        resourceErrors > 0 ||
-        (Array.isArray(summary.gating) && summary.gating.length > 0);
-      const hasWarnings = Array.isArray(summary.warnings) && summary.warnings.length > 0;
-      const hasAdvisories = Array.isArray(summary.advisories) && summary.advisories.length > 0;
-      const summaryClass = hasGating
-        ? 'summary-page--fail'
-        : hasWarnings
-          ? 'summary-page--warn'
-          : hasAdvisories
-            ? 'summary-page--advisory'
-            : 'summary-page--ok';
-      return {
-        ...summary,
-        page: summary.page,
-        _summaryClass: summaryClass,
-      };
-    });
-
-    const sectionContent = renderSuiteFindingsBlock({
-      gatingIssues,
-      advisoryIssues: [...warningIssues, ...advisoryIssues],
-      perPageEntries,
-      gatingOptions: {
-        title: 'Blocking console issues',
-        emptyMessage: 'No console or resource errors detected.',
-        viewportLabel,
-      },
-      advisoryOptions: {
-        title: 'Console advisories',
-        emptyMessage: 'No advisories detected.',
-        viewportLabel,
-      },
-      perPageOptions: {
-        heading: 'Per-page findings',
-        summaryClass: 'summary-page--interactive',
-        containerClass: 'summary-report summary-a11y summary-a11y--per-page',
-        renderCard: (entrySummary) => renderInteractivePageCard(entrySummary, { projectLabel }),
-        formatSummaryLabel: (entrySummary) => formatPageLabel(entrySummary?.page || 'Page'),
-      },
-    });
-    if (!sectionContent) return '';
-
-    if (multiBucket) {
-      return renderProjectBlockSection({
-        projectLabel,
-        content: sectionContent,
-      });
-    }
-
-    return sectionContent;
-  });
-
-  return renderSchemaGroupContainer({
-    sections,
-    heading: multiBucket && group.title ? group.title : null,
-    element: 'article',
-  });
-};
+;
 
 const normalizeAvailabilityMessage = ({ message }) => {
   if (message == null) return null;
@@ -2586,118 +2413,7 @@ const normalizeResponsiveMessage = ({ message }) => {
   };
 };
 
-const renderAvailabilityGroupHtml = (group) => {
-  const buckets = collectSchemaProjects(group);
-  if (buckets.length === 0) return '';
-
-  const multiBucket = buckets.length > 1;
-
-  const sections = buckets.map((bucket) => {
-    const runPayload = firstRunPayload(bucket) || {};
-    const metadata = runPayload.metadata || {};
-    const projectLabel = metadata.projectName || bucket.projectName || 'default';
-    const viewportList = Array.isArray(metadata.viewports) ? metadata.viewports : [];
-    const viewportLabel = viewportList.length ? viewportList.join(', ') : projectLabel;
-
-    const detailPages = Array.isArray(runPayload?.details?.pages) ? runPayload.details.pages : [];
-    const pageEntryPayloads = (bucket.pageEntries || [])
-      .map((entry) => entry.payload || {})
-      .filter((payload) => payload.kind === KIND_PAGE_SUMMARY || payload.summary);
-
-    const pagesData = (detailPages.length ? detailPages : pageEntryPayloads).map((payload) => {
-      if (payload.summary) return payload.summary;
-      return payload;
-    });
-
-    if (pagesData.length === 0) return '';
-
-    const gatingIssues = collectIssueMessages(pagesData, 'gating', 'critical', {
-      normalize: normalizeAvailabilityMessage,
-      dedupeIgnoreImpact: true,
-    }).filter((issue) => issue.pageCount > 0);
-    const advisoryIssues = collectIssueMessages(pagesData, ['warnings', 'advisories'], 'moderate', {
-      normalize: normalizeAvailabilityMessage,
-      dedupeIgnoreImpact: true,
-    });
-
-    const perPageEntries =
-      pageEntryPayloads.length > 0
-        ? pageEntryPayloads.map((payload) => {
-            const summary = payload.summary || {};
-            const gating = Array.isArray(summary.gating) ? summary.gating : [];
-            const warnings = Array.isArray(summary.warnings) ? summary.warnings : [];
-            const advisories = Array.isArray(summary.advisories) ? summary.advisories : [];
-            const summaryClass = gating.length
-              ? 'summary-page--fail'
-              : warnings.length
-                ? 'summary-page--warn'
-                : advisories.length
-                  ? 'summary-page--advisory'
-                  : 'summary-page--ok';
-            return {
-              ...summary,
-              page: payload.page || summary.page,
-              _summaryClass: summaryClass,
-            };
-          })
-        : pagesData.map((summary) => {
-            const gating = Array.isArray(summary.gating) ? summary.gating : [];
-            const warnings = Array.isArray(summary.warnings) ? summary.warnings : [];
-            const advisories = Array.isArray(summary.advisories) ? summary.advisories : [];
-            const summaryClass = gating.length
-              ? 'summary-page--fail'
-              : warnings.length
-                ? 'summary-page--warn'
-                : advisories.length
-                  ? 'summary-page--advisory'
-                  : 'summary-page--ok';
-            return {
-              ...summary,
-              page: summary.page,
-              _summaryClass: summaryClass,
-            };
-          });
-
-    const sectionContent = renderSuiteFindingsBlock({
-      gatingIssues,
-      advisoryIssues,
-      perPageEntries,
-      gatingOptions: {
-        title: 'Blocking availability issues',
-        emptyMessage: 'No blocking availability issues detected.',
-        viewportLabel,
-      },
-      advisoryOptions: {
-        title: 'Availability advisories',
-        emptyMessage: 'No advisories detected.',
-        viewportLabel,
-      },
-      perPageOptions: {
-        heading: 'Per-page availability findings',
-        summaryClass: 'summary-page--availability',
-        containerClass: 'summary-report summary-a11y summary-a11y--per-page',
-        renderCard: (entrySummary) => renderAvailabilityPageCard(entrySummary, { projectLabel }),
-        formatSummaryLabel: (entrySummary) => formatPageLabel(entrySummary?.page || 'Page'),
-      },
-    });
-    if (!sectionContent) return '';
-
-    if (multiBucket) {
-      return renderProjectBlockSection({
-        projectLabel,
-        content: sectionContent,
-      });
-    }
-
-    return sectionContent;
-  }).filter(Boolean);
-
-  return renderSchemaGroupContainer({
-    sections,
-    heading: multiBucket && group.title ? group.title : null,
-    element: 'article',
-  });
-};
+;
 
 const normalizeHttpMessage = ({ message, raw }) => {
   const source = raw && typeof raw === 'object' ? raw : {};
@@ -2776,190 +2492,7 @@ const normalizeHttpMessage = ({ message, raw }) => {
   };
 };
 
-const renderHttpGroupHtml = (group) => {
-  const buckets = collectSchemaProjects(group);
-  if (buckets.length === 0) return '';
-
-  const multiBucket = buckets.length > 1;
-
-  const sections = buckets.map((bucket) => {
-    const runPayload = firstRunPayload(bucket) || {};
-    const metadata = runPayload.metadata || {};
-    const projectLabel = metadata.projectName || bucket.projectName || 'default';
-    const viewportList = Array.isArray(metadata.viewports) ? metadata.viewports : [];
-    const viewportLabel = viewportList.length ? viewportList.join(', ') : projectLabel;
-
-    const detailPages = Array.isArray(runPayload?.details?.pages) ? runPayload.details.pages : [];
-    const pageEntryPayloads = (bucket.pageEntries || [])
-      .map((entry) => entry.payload || {})
-      .filter((payload) => payload.kind === KIND_PAGE_SUMMARY || payload.summary);
-
-    const pagesData = (detailPages.length ? detailPages : pageEntryPayloads).map((payload) => {
-      if (payload.summary) return payload.summary;
-      return payload;
-    });
-
-    if (pagesData.length === 0) return '';
-
-    const normalizeFailedCheck = ({ label, details, status, statusText }) => {
-      const message = label ? String(label).trim() : null;
-      if (!message) return null;
-      return {
-        type: 'failed-check',
-        label: message,
-        message,
-        detail: details ? stripAnsiSequences(details).trim() : null,
-        status,
-        statusText,
-      };
-    };
-
-    const pagesWithHttpMetadata = pagesData.map((page) => {
-      const failedChecks = Array.isArray(page.failedChecks) ? page.failedChecks : [];
-      const normalizedChecks = failedChecks
-        .map((check) => normalizeFailedCheck(check))
-        .filter(Boolean)
-        .map((entry) => ({
-          ...entry,
-          status: entry.status ?? page.status,
-          statusText: entry.statusText ?? page.statusText,
-        }));
-
-      const mapMessages = (items) =>
-        (Array.isArray(items) ? items : [])
-          .filter((item) => item != null)
-          .map((item) =>
-            typeof item === 'object'
-              ? {
-                  ...item,
-                  status: item.status ?? page.status,
-                  statusText: item.statusText ?? page.statusText,
-                }
-              : {
-                  message: item,
-                  status: page.status,
-                  statusText: page.statusText,
-                }
-          );
-
-      return {
-        ...page,
-        httpGating: mapMessages(page.gating),
-        httpFailedChecks: normalizedChecks,
-        httpWarnings: mapMessages(page.warnings),
-        httpAdvisories: mapMessages(page.advisories),
-      };
-    });
-
-    const gatingIssues = collectIssueMessages(
-      pagesWithHttpMetadata.map((page) => ({
-        ...page,
-        gatingCombined: [...page.httpGating, ...page.httpFailedChecks],
-      })),
-      'gatingCombined',
-      'critical',
-      {
-        normalize: normalizeHttpMessage,
-        dedupeIgnoreImpact: true,
-      }
-    ).filter((issue) => issue.pageCount > 0);
-
-    const advisoryIssues = collectIssueMessages(
-      pagesWithHttpMetadata.map((page) => ({
-        ...page,
-        advisoryCombined: [...page.httpWarnings, ...page.httpAdvisories],
-      })),
-      'advisoryCombined',
-      'moderate',
-      {
-        normalize: normalizeHttpMessage,
-        dedupeIgnoreImpact: true,
-      }
-    );
-
-    const perPageEntries =
-      pageEntryPayloads.length > 0
-        ? pageEntryPayloads.map((payload) => {
-            const summary = payload.summary || {};
-            const gating = Array.isArray(summary.gating) ? summary.gating : [];
-            const failedChecks = Array.isArray(summary.failedChecks) ? summary.failedChecks : [];
-            const warnings = Array.isArray(summary.warnings) ? summary.warnings : [];
-            const advisories = Array.isArray(summary.advisories) ? summary.advisories : [];
-            const summaryClass =
-              gating.length > 0 || failedChecks.length > 0
-                ? 'summary-page--fail'
-                : warnings.length
-                  ? 'summary-page--warn'
-                  : advisories.length
-                    ? 'summary-page--advisory'
-                    : 'summary-page--ok';
-            return {
-              ...summary,
-              page: payload.page || summary.page,
-              _summaryClass: summaryClass,
-            };
-          })
-        : pagesData.map((summary) => {
-            const gating = Array.isArray(summary.gating) ? summary.gating : [];
-            const failedChecks = Array.isArray(summary.failedChecks) ? summary.failedChecks : [];
-            const warnings = Array.isArray(summary.warnings) ? summary.warnings : [];
-            const advisories = Array.isArray(summary.advisories) ? summary.advisories : [];
-            const summaryClass =
-              gating.length > 0 || failedChecks.length > 0
-                ? 'summary-page--fail'
-                : warnings.length
-                  ? 'summary-page--warn'
-                  : advisories.length
-                    ? 'summary-page--advisory'
-                    : 'summary-page--ok';
-            return {
-              ...summary,
-              page: summary.page,
-              _summaryClass: summaryClass,
-            };
-          });
-
-    const sectionContent = renderSuiteFindingsBlock({
-      gatingIssues,
-      advisoryIssues,
-      perPageEntries,
-      gatingOptions: {
-        title: 'Blocking HTTP issues',
-        emptyMessage: 'No blocking HTTP issues detected.',
-        viewportLabel,
-      },
-      advisoryOptions: {
-        title: 'HTTP response advisories',
-        emptyMessage: 'No advisories detected.',
-        viewportLabel,
-      },
-      perPageOptions: {
-        heading: 'Per-page HTTP findings',
-        summaryClass: 'summary-page--http',
-        containerClass: 'summary-report summary-a11y summary-a11y--per-page',
-        renderCard: (entrySummary) =>
-          renderHttpPageCard(entrySummary, { projectLabel, viewportLabel }),
-        formatSummaryLabel: (entrySummary) => formatPageLabel(entrySummary?.page || 'Page'),
-      },
-    });
-    if (!sectionContent) return '';
-
-    if (multiBucket) {
-      return renderProjectBlockSection({
-        projectLabel,
-        content: sectionContent,
-      });
-    }
-
-    return sectionContent;
-  }).filter(Boolean);
-
-  return renderSchemaGroupContainer({
-    sections,
-    heading: multiBucket && group.title ? group.title : null,
-    element: 'article',
-  });
-};
+;
 
 const normalizePerformanceMessage = ({ message, raw }) => {
   const source = raw && typeof raw === 'object' ? raw : {};
@@ -3021,354 +2554,9 @@ const normalizeVisualMessage = ({ message, raw }) => {
   };
 };
 
-const renderPerformanceGroupHtml = (group) => {
-  const buckets = collectSchemaProjects(group);
-  if (buckets.length === 0) return '';
+;
 
-  const multiBucket = buckets.length > 1;
-
-  const sections = buckets.map((bucket) => {
-    const runPayload = firstRunPayload(bucket) || {};
-    const metadata = runPayload.metadata || {};
-    const projectLabel = metadata.projectName || bucket.projectName || 'default';
-    const detailPages = Array.isArray(runPayload?.details?.pages) ? runPayload.details.pages : [];
-    const pageEntryPayloads = (bucket.pageEntries || [])
-      .map((entry) => entry.payload || {})
-      .filter((payload) => payload.kind === KIND_PAGE_SUMMARY || payload.summary);
-
-    const pagesData = (pageEntryPayloads.length ? pageEntryPayloads : detailPages).map(
-      (payload) => {
-        if (payload.summary) return payload.summary;
-        return payload;
-      }
-    );
-
-    if (pagesData.length === 0) return '';
-
-    const normalizeBreaches = (page) => {
-      const list = Array.isArray(page.budgetBreaches) ? page.budgetBreaches : [];
-      return list.map((breach) => {
-        const metricKey = breach?.metric || 'metric';
-        const metricLabel = humaniseKey(metricKey);
-        const value = Number.isFinite(breach?.value) ? Math.round(breach.value) : null;
-        const budget = Number.isFinite(breach?.budget) ? Math.round(breach.budget) : null;
-        const detail = value != null && budget != null ? `${value}ms > ${budget}ms` : null;
-        return {
-          metric: metricKey,
-          message: `${metricLabel} budget exceeded`,
-          detail,
-        };
-      });
-    };
-
-    const pagesForIssues = pagesData.map((page) => {
-      const gatingList = Array.isArray(page.gating) ? page.gating : [];
-      const normalizedGating = gatingList.map((entry) =>
-        typeof entry === 'object' ? entry : { message: entry }
-      );
-      return {
-        ...page,
-        performanceGating: [...normalizedGating, ...normalizeBreaches(page)],
-      };
-    });
-
-    const pagesForAdvisories = pagesData.map((page) => {
-      const combined = []
-        .concat(Array.isArray(page.warnings) ? page.warnings : [])
-        .concat(Array.isArray(page.advisories) ? page.advisories : []);
-      const normalisedCombined = combined
-        .filter((entry) => entry != null)
-        .map((entry) => (typeof entry === 'object' ? entry : { message: entry }));
-      return {
-        ...page,
-        performanceAdvisories: normalisedCombined,
-      };
-    });
-
-    const gatingIssues = collectIssueMessages(
-      pagesForIssues,
-      'performanceGating',
-      'critical',
-      {
-        normalize: normalizePerformanceMessage,
-        dedupeIgnoreImpact: true,
-      }
-    ).filter((issue) => issue.pageCount > 0);
-    const advisoryIssues = collectIssueMessages(
-      pagesForAdvisories,
-      'performanceAdvisories',
-      'moderate',
-      {
-        normalize: normalizePerformanceMessage,
-        dedupeIgnoreImpact: true,
-      }
-    );
-
-    const perPageEntries =
-      pageEntryPayloads.length > 0
-        ? pageEntryPayloads.map((payload) => {
-            const summary = payload.summary || {};
-            const gating = Array.isArray(summary.gating) ? summary.gating : [];
-            const breachesForPage = normalizeBreaches(summary);
-            const warnings = Array.isArray(summary.warnings) ? summary.warnings : [];
-            const advisories = Array.isArray(summary.advisories) ? summary.advisories : [];
-            const summaryClass =
-              gating.length > 0 || breachesForPage.length > 0
-                ? 'summary-page--fail'
-                : warnings.length
-                  ? 'summary-page--warn'
-                  : advisories.length
-                    ? 'summary-page--advisory'
-                    : 'summary-page--ok';
-            return {
-              ...summary,
-              page: payload.page || summary.page,
-              budgetBreaches: summary.budgetBreaches || [],
-              _summaryClass: summaryClass,
-            };
-          })
-        : pagesData.map((summary) => {
-            const breachesForPage = normalizeBreaches(summary);
-            const warnings = Array.isArray(summary.warnings) ? summary.warnings : [];
-            const advisories = Array.isArray(summary.advisories) ? summary.advisories : [];
-            const summaryClass =
-              breachesForPage.length > 0
-                ? 'summary-page--fail'
-                : warnings.length
-                  ? 'summary-page--warn'
-                  : advisories.length
-                    ? 'summary-page--advisory'
-                    : 'summary-page--ok';
-            return {
-              ...summary,
-              page: summary.page,
-              budgetBreaches: summary.budgetBreaches || [],
-              _summaryClass: summaryClass,
-            };
-          });
-
-    const sectionContent = renderSuiteFindingsBlock({
-      gatingIssues,
-      advisoryIssues,
-      perPageEntries,
-      gatingOptions: {
-        title: 'Blocking performance issues',
-        emptyMessage: 'No performance budget breaches detected.',
-      },
-      advisoryOptions: {
-        title: 'Performance advisories',
-        emptyMessage: 'No advisories detected.',
-      },
-      perPageOptions: {
-        heading: 'Per-page performance findings',
-        summaryClass: 'summary-page--performance',
-        containerClass: 'summary-report summary-a11y summary-a11y--per-page',
-        renderCard: (entrySummary) => renderPerformancePageCard(entrySummary, { projectLabel }),
-        formatSummaryLabel: (entrySummary) => formatPageLabel(entrySummary?.page || 'Page'),
-      },
-    });
-    if (!sectionContent) return '';
-
-    if (multiBucket) {
-      return renderProjectBlockSection({
-        projectLabel,
-        content: sectionContent,
-      });
-    }
-
-    return sectionContent;
-  }).filter(Boolean);
-
-  return renderSchemaGroupContainer({
-    sections,
-    heading: multiBucket && group.title ? group.title : null,
-    element: 'article',
-  });
-};
-
-const renderVisualGroupHtml = (group) => {
-  const buckets = collectSchemaProjects(group);
-  if (buckets.length === 0) return '';
-
-  const multiBucket = buckets.length > 1;
-
-  const sections = buckets
-    .map((bucket) => {
-      const runPayload = firstRunPayload(bucket) || {};
-      const metadata = runPayload.metadata || {};
-      const viewportLabel =
-        metadata.viewport ||
-        (Array.isArray(metadata.viewports) ? metadata.viewports.join(', ') : null) ||
-        metadata.projectName ||
-        bucket.projectName ||
-        'Visual regression';
-      const projectLabel = metadata.projectName || bucket.projectName || viewportLabel;
-
-      const detailPages = Array.isArray(runPayload?.details?.pages) ? runPayload.details.pages : [];
-      const pageEntryPayloads = (bucket.pageEntries || [])
-        .map((entry) => entry.payload || {})
-        .filter((payload) => payload.kind === KIND_PAGE_SUMMARY);
-
-      const pagesData =
-        detailPages.length > 0
-          ? detailPages
-          : pageEntryPayloads.map((payload) => payload.summary || payload);
-
-      if (pagesData.length === 0 && pageEntryPayloads.length === 0) return '';
-
-      let perPageEntries = (bucket.pageEntries || []).map((entry) => {
-        const payload = entry.payload || {};
-        const summary = payload.summary || {};
-        const result = (summary.result || '').toLowerCase();
-        const gatingList = []
-          .concat(Array.isArray(summary.gating) ? summary.gating : [])
-          .filter(Boolean);
-        if (summary.error) gatingList.push(summary.error);
-        if (result === 'diff') gatingList.push('Visual diff detected');
-        const warningsList = Array.isArray(summary.warnings) ? summary.warnings : [];
-        const advisoriesList = Array.isArray(summary.advisories) ? summary.advisories : [];
-        const summaryClass =
-          gatingList.length > 0 || result === 'diff' || result === 'error'
-            ? 'summary-page--fail'
-            : warningsList.length > 0
-              ? 'summary-page--warn'
-              : advisoriesList.length > 0
-                ? 'summary-page--advisory'
-                : 'summary-page--ok';
-
-        return {
-          ...summary,
-          page: payload.page || summary.page,
-          viewport: summary.viewport || viewportLabel,
-          _result: result,
-          _summaryClass: summaryClass,
-        };
-      });
-
-      if (perPageEntries.length === 0) {
-        perPageEntries = pagesData.map((summary) => {
-          const result = (summary.result || '').toLowerCase();
-          const gatingList = []
-            .concat(Array.isArray(summary.gating) ? summary.gating : [])
-            .filter(Boolean);
-          if (summary.error) gatingList.push(summary.error);
-          if (result === 'diff') gatingList.push('Visual diff detected');
-          const warningsList = Array.isArray(summary.warnings) ? summary.warnings : [];
-          const advisoriesList = Array.isArray(summary.advisories) ? summary.advisories : [];
-          const summaryClass =
-            gatingList.length > 0 || result === 'diff' || result === 'error'
-              ? 'summary-page--fail'
-              : warningsList.length > 0
-                ? 'summary-page--warn'
-                : advisoriesList.length > 0
-                  ? 'summary-page--advisory'
-                  : 'summary-page--ok';
-          return {
-            ...summary,
-            page: summary.page,
-            viewport: summary.viewport || viewportLabel,
-            _result: result,
-            _summaryClass: summaryClass,
-          };
-        });
-      }
-
-      const overview = runPayload.overview || {};
-      const thresholdsUsed = Array.isArray(overview.thresholdsUsed) ? overview.thresholdsUsed : [];
-
-      const pagesForIssues = perPageEntries.map((entry) => {
-        const artifacts = entry.artifacts || {};
-        const diffSample = artifacts.diff ? `attachment://${artifacts.diff}` : null;
-        const gatingList = []
-          .concat(
-            (Array.isArray(entry.gating) ? entry.gating : []).map((item) =>
-              typeof item === 'object' ? item : { message: item }
-            )
-          )
-          .filter(Boolean);
-        if (entry.error) gatingList.push({ message: entry.error });
-        if (entry._result === 'diff') {
-          gatingList.push({
-            message: 'Visual diff detected',
-            sample: diffSample || artifacts.actual || artifacts.baseline || null,
-          });
-        }
-        const advisoryList = []
-          .concat(Array.isArray(entry.warnings) ? entry.warnings : [])
-          .concat(Array.isArray(entry.advisories) ? entry.advisories : [])
-          .filter(Boolean)
-          .map((item) => (typeof item === 'object' ? item : { message: item }));
-        return {
-          ...entry,
-          visualGating: gatingList,
-          visualAdvisories: advisoryList,
-        };
-      });
-
-      const gatingIssues = collectIssueMessages(
-        pagesForIssues,
-        'visualGating',
-        'critical',
-        {
-          normalize: normalizeVisualMessage,
-          dedupeIgnoreImpact: true,
-        }
-      ).filter((issue) => issue.pageCount > 0);
-      const advisoryIssues = collectIssueMessages(
-        pagesForIssues,
-        'visualAdvisories',
-        'moderate',
-        {
-          normalize: normalizeVisualMessage,
-          dedupeIgnoreImpact: true,
-        }
-      );
-
-      const sectionContent = renderSuiteFindingsBlock({
-        gatingIssues,
-        advisoryIssues,
-        perPageEntries,
-        gatingOptions: {
-          title: 'Blocking visual issues',
-          emptyMessage: 'No blocking visual issues detected.',
-          viewportLabel,
-        },
-        advisoryOptions: {
-          title: 'Visual advisories',
-          emptyMessage: 'No advisories detected.',
-          viewportLabel,
-        },
-        perPageOptions: {
-          heading: 'Per-page visual findings',
-          summaryClass: 'summary-page--visual',
-          containerClass: 'summary-report summary-a11y summary-a11y--per-page',
-          renderCard: (entrySummary) =>
-            renderVisualPageCard(entrySummary, {
-              viewportLabel,
-              thresholdsUsed,
-            }),
-          formatSummaryLabel: (entrySummary) => formatPageLabel(entrySummary?.page || 'Page'),
-        },
-      });
-      if (!sectionContent) return '';
-
-      if (multiBucket) {
-        return renderProjectBlockSection({
-          projectLabel,
-          content: sectionContent,
-        });
-      }
-
-      return sectionContent;
-    })
-    .filter(Boolean);
-
-  return renderSchemaGroupContainer({
-    sections,
-    heading: multiBucket && group.title ? group.title : null,
-    element: 'article',
-  });
-};
+;
 
 const renderVisualPageCard = (summary, { viewportLabel, thresholdsUsed = [] } = {}) => {
   if (!summary) return '';
@@ -3540,6 +2728,8 @@ const renderVisualPageCard = (summary, { viewportLabel, thresholdsUsed = [] } = 
     </section>
   `;
 };
+
+
 
 const renderSchemaGroupFallbackHtml = (group) => {
   const headline = group.title || humaniseKey(group.baseName);
@@ -7894,95 +7084,37 @@ const renderFormsGroupHtml = (group) => {
   });
 };
 
-const renderWcagPageCard = (summary, { viewportLabel, failThreshold } = {}) => {
-  if (!summary) return '';
-  if (summary.cardHtml) return summary.cardHtml;
-
-  const statusMeta = deriveWcagPageStatus(summary);
-  const violations = Array.isArray(summary.violations) ? summary.violations : [];
-  const advisories =
-    Array.isArray(summary.advisoriesList) && summary.advisoriesList.length
-      ? summary.advisoriesList
-      : Array.isArray(summary.advisories)
-        ? summary.advisories
-        : [];
-  const bestPractices =
-    Array.isArray(summary.bestPracticesList) && summary.bestPracticesList.length
-      ? summary.bestPracticesList
-      : Array.isArray(summary.bestPractices)
-        ? summary.bestPractices
-        : [];
-  const stabilityHtml = formatWcagStability(summary.stability);
-  const advisoryCount = summary.advisoryFindings ?? advisories.length;
-  const bestPracticeCount = summary.bestPracticeFindings ?? bestPractices.length;
-
-  const metaLines = [
-    `<p class="details"><strong>Viewport:</strong> ${escapeHtml(
-      summary.projectName || viewportLabel || 'Not recorded'
-    )}</p>`,
-    stabilityHtml ? `<p class="details"><strong>Stability:</strong> ${stabilityHtml}</p>` : '',
-    `<p class="details"><strong>Gating:</strong> ${escapeHtml(
-      summary.gatingLabel || failThreshold || 'Not recorded'
-    )}</p>`,
-    advisoryCount
-      ? `<p class="details"><strong>Advisory findings:</strong> ${escapeHtml(
-          formatCount(advisoryCount)
-        )}</p>`
-      : '',
-    bestPracticeCount
-      ? `<p class="details"><strong>Best-practice advisories:</strong> ${escapeHtml(
-          formatCount(bestPracticeCount)
-        )}</p>`
-      : '',
-  ]
-    .filter(Boolean)
-    .join('\n');
-
-  const notes = Array.isArray(summary.notes) ? summary.notes.filter(Boolean) : [];
-  const notesHtml = notes.length
-    ? `<details class="summary-note"><summary>Notes (${notes.length})</summary><ul class="details">${notes
-        .map((note) => `<li>${escapeHtml(String(note))}</li>`)
-        .join('')}</ul></details>`
-    : '';
-
-  const gatingSection = violations.length
-    ? renderPerPageIssuesTable(
-        violations,
-        `Gating WCAG violations (${formatCount(violations.length)})`
-      )
-    : '<p class="details">No gating violations detected.</p>';
-
-  const advisorySection = advisories.length
-    ? renderPerPageIssuesTable(
-        advisories,
-        `WCAG advisory findings (${formatCount(advisories.length)})`
-      )
-    : '';
-
-  const bestPracticeSection = bestPractices.length
-    ? renderPerPageIssuesTable(
-        bestPractices,
-        `Best-practice advisories (${formatCount(bestPractices.length)})`,
-        { headingClass: 'summary-heading-best-practice' }
-      )
-    : '';
-
-  return `
-    <section class="summary-report summary-a11y summary-a11y--page-card">
-      <div class="page-card__header">
-        <h3>${escapeHtml(summary.page || 'Unknown page')}</h3>
-        <span class="status-pill ${statusMeta.pillClass}">${escapeHtml(statusMeta.pillLabel)}</span>
-      </div>
-      <div class="page-card__meta">
-        ${metaLines}
-      </div>
-      ${notesHtml}
-      ${gatingSection}
-      ${advisorySection}
-      ${bestPracticeSection}
-    </section>
-  `;
-};
+const {
+  renderInternalLinksGroupHtml,
+  renderInteractiveGroupHtml,
+  renderAvailabilityGroupHtml,
+  renderHttpGroupHtml,
+  renderPerformanceGroupHtml,
+  renderVisualGroupHtml,
+} = createSiteQualityRenderers({
+  collectSchemaProjects,
+  firstRunPayload,
+  collectIssueMessages,
+  renderSuiteFindingsBlock,
+  renderProjectBlockSection,
+  renderSchemaGroupContainer,
+  formatPageLabel,
+  renderPerPageIssuesTable,
+  formatUniqueRulesHeading,
+  stripAnsiSequences,
+  simplifyUrlForDisplay,
+  normalizeInteractiveMessage,
+  normalizeAvailabilityMessage,
+  normalizeHttpMessage,
+  normalizePerformanceMessage,
+  normalizeVisualMessage,
+  renderInternalLinksPageCard,
+  renderInteractivePageCard,
+  renderAvailabilityPageCard,
+  renderHttpPageCard,
+  renderPerformancePageCard,
+  renderVisualPageCard,
+});
 
 const SCHEMA_HTML_RENDERERS = {
   forms: renderFormsGroupHtml,

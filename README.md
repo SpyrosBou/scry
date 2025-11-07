@@ -2,6 +2,8 @@
 
 Automated Playwright-powered testing harness for auditing WordPress websites across functionality, responsiveness, accessibility, and visual regression criteria. The suite standardises how sites are exercised, captures rich HTML (HyperText Markup Language) reports, and keeps a historical record of findings for ongoing quality assurance.
 
+> Last updated for commit 1c4d67a.
+
 ## Key Capabilities
 - Generates Solarized-themed HTML reports with parity to the approved reporting mocks.
 - Supports functionality, responsive, accessibility, and visual regression suites with per-page manifest control.
