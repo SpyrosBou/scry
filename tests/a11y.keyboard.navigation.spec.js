@@ -5,7 +5,7 @@ test.use({ trace: 'off', video: 'off' });
 
 const { PNG } = require('pngjs');
 const SiteLoader = require('../utils/site-loader');
-const { mapWithConcurrency, resolveConcurrencyLimit } = require('../utils/concurrency-helpers');
+const { runPageTasks, resolveConcurrencyLimit } = require('../utils/concurrency-helpers');
 const {
   safeNavigate,
   waitForPageStability,
@@ -307,13 +307,14 @@ test.describe('Accessibility: Keyboard navigation', () => {
       process.env.A11Y_PARALLEL_PAGES
     );
 
-    const reports = await mapWithConcurrency(
+    const reports = await runPageTasks(
+      browser,
       pages,
-      async (testPage) =>
-        runKeyboardAudit(browser, siteConfig, testPage, {
+      async ({ page, pagePath }) =>
+        runKeyboardAudit(page, siteConfig, pagePath, {
           maxTabIterations,
         }),
-      { concurrency }
+      { concurrency, testInfo, logLabel: 'Keyboard audit' }
     );
 
     const gatingTotal = reports.reduce((total, report) => total + report.gating.length, 0);
@@ -382,7 +383,7 @@ test.describe('Accessibility: Keyboard navigation', () => {
   });
 });
 
-async function runKeyboardAudit(browser, siteConfig, testPage, { maxTabIterations }) {
+async function runKeyboardAudit(page, siteConfig, testPage, { maxTabIterations }) {
   const report = {
     page: testPage,
     focusableCount: 0,
@@ -395,11 +396,8 @@ async function runKeyboardAudit(browser, siteConfig, testPage, { maxTabIteration
     notes: [],
   };
 
-  const context = await browser.newContext();
-  const auditPage = await context.newPage();
   try {
-    console.log(`🧭 Keyboard audit: ${testPage}`);
-    const response = await safeNavigate(auditPage, `${siteConfig.baseUrl}${testPage}`);
+    const response = await safeNavigate(page, `${siteConfig.baseUrl}${testPage}`);
     if (!response || response.status() >= 400) {
       report.gating.push(
         `Received HTTP status ${response ? response.status() : 'unknown'} when loading page.`
@@ -407,20 +405,20 @@ async function runKeyboardAudit(browser, siteConfig, testPage, { maxTabIteration
       return report;
     }
 
-    const stability = await waitForPageStability(auditPage);
+    const stability = await waitForPageStability(page);
     if (!stability.ok) {
       report.gating.push(`Page did not reach a stable state: ${stability.message}`);
       return report;
     }
 
-    const focusable = await auditPage.evaluate(focusableElementScript);
+    const focusable = await page.evaluate(focusableElementScript);
     report.focusableCount = focusable.length;
     if (focusable.length === 0) {
       report.gating.push('No focusable elements detected on page.');
       return report;
     }
 
-    report.skipLink = await auditPage.evaluate(skipLinkMetadataScript);
+    report.skipLink = await page.evaluate(skipLinkMetadataScript);
     if (!report.skipLink) {
       report.advisories.push(
         createKeyboardAdvisory('Skip navigation link not detected near top of document.', '2.4.1', {
@@ -429,17 +427,17 @@ async function runKeyboardAudit(browser, siteConfig, testPage, { maxTabIteration
       );
     }
 
-    await auditPage.evaluate(() => {
+    await page.evaluate(() => {
       if (document.body) document.body.focus({ preventScroll: true });
     });
 
     const visited = [];
 
     for (let step = 0; step < Math.min(maxTabIterations, focusable.length); step += 1) {
-      await auditPage.keyboard.press('Tab');
-      await auditPage.waitForTimeout(75);
+      await page.keyboard.press('Tab');
+      await page.waitForTimeout(75);
 
-      const snapshot = await auditPage.evaluate(activeElementSnapshotScript);
+      const snapshot = await page.evaluate(activeElementSnapshotScript);
       if (!snapshot || snapshot.type === 'none') {
         report.gating.push('No active element after tabbing — possible focus trap.');
         break;
@@ -453,11 +451,11 @@ async function runKeyboardAudit(browser, siteConfig, testPage, { maxTabIteration
       const identity = `${snapshot.tag}|${snapshot.id || ''}|${snapshot.role || ''}|${snapshot.label || ''}`;
       visited.push(identity);
 
-      const activeElementHandle = await auditPage.evaluateHandle(() => document.activeElement);
+      const activeElementHandle = await page.evaluateHandle(() => document.activeElement);
       let hasIndicator = false;
       let nodeScreenshot = null;
       if (activeElementHandle && activeElementHandle.asElement()) {
-        const result = await detectFocusIndicator(auditPage, activeElementHandle.asElement());
+        const result = await detectFocusIndicator(page, activeElementHandle.asElement());
         hasIndicator = result.hasIndicator;
         nodeScreenshot = result.screenshotDataUri || null;
       }
@@ -498,14 +496,14 @@ async function runKeyboardAudit(browser, siteConfig, testPage, { maxTabIteration
     }
 
     if (visited.length > 1) {
-      await auditPage.keyboard.press('Shift+Tab');
-      await auditPage.waitForTimeout(75);
-      const reverseSnapshot = await auditPage.evaluate(activeElementSnapshotScript);
+      await page.keyboard.press('Shift+Tab');
+      await page.waitForTimeout(75);
+      const reverseSnapshot = await page.evaluate(activeElementSnapshotScript);
       if (!reverseSnapshot || reverseSnapshot.isBody) {
         report.gating.push('Reverse tabbing returned focus to <body>; keyboard users may get trapped.');
       }
-      await auditPage.keyboard.press('Tab');
-      await auditPage.waitForTimeout(50);
+      await page.keyboard.press('Tab');
+      await page.waitForTimeout(50);
     }
 
     report.notes.push(
@@ -519,7 +517,7 @@ async function runKeyboardAudit(browser, siteConfig, testPage, { maxTabIteration
   } catch (error) {
     report.gating.push(`Navigation failed: ${error.message}`);
   } finally {
-    await context.close();
+    // cleaned up by runPageTasks
   }
 
   return report;

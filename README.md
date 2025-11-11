@@ -72,6 +72,7 @@ node run-tests.js --site example-site --pages 5 --responsive
 Helpful environment variables:
 - `REPORT_BROWSER` and `REPORT_BROWSER_ARGS` force a specific viewer when opening reports.
 - `A11Y_SAMPLE=<n>` caps accessibility sampling when the suite is large.
+- `A11Y_PARALLEL_PAGES`, `A11Y_STRUCTURE_CONCURRENCY`, `A11Y_KEYBOARD_CONCURRENCY`, `A11Y_MOTION_CONCURRENCY`, `A11Y_REFLOW_CONCURRENCY`, and `A11Y_IFRAME_CONCURRENCY` tune how many accessibility pages audit simultaneously (defaults auto-scale based on CPU count).
 - `A11Y_PARALLEL_PAGES`, `A11Y_STRUCTURE_CONCURRENCY`, and `A11Y_KEYBOARD_CONCURRENCY` control how many accessibility audits run concurrently (defaults to a small CPU-aware limit so we stay performant without hammering target sites).
 
 ## Reports and Artifacts

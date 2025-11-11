@@ -1,6 +1,6 @@
 const { test, expect } = require('../utils/test-fixtures');
 const SiteLoader = require('../utils/site-loader');
-const { mapWithConcurrency, resolveConcurrencyLimit } = require('../utils/concurrency-helpers');
+const { runPageTasks, resolveConcurrencyLimit } = require('../utils/concurrency-helpers');
 
 test.use({ trace: 'off', video: 'off' });
 const {
@@ -147,10 +147,11 @@ test.describe('Accessibility: Structural landmarks', () => {
       process.env.A11Y_PARALLEL_PAGES
     );
 
-    const reports = await mapWithConcurrency(
+    const reports = await runPageTasks(
+      browser,
       pages,
-      async (pagePath) => runStructureAudit(browser, siteConfig, pagePath),
-      { concurrency }
+      async ({ page, pagePath }) => runStructureAudit(page, siteConfig, pagePath),
+      { concurrency, testInfo, logLabel: 'Structure audit' }
     );
 
     const gatingTotal = reports.reduce((sum, report) => sum + report.gating.length, 0);
@@ -227,7 +228,7 @@ test.describe('Accessibility: Structural landmarks', () => {
   });
 });
 
-async function runStructureAudit(browser, siteConfig, pagePath) {
+async function runStructureAudit(page, siteConfig, pagePath) {
   const report = {
     page: pagePath,
     gating: [],
@@ -243,11 +244,8 @@ async function runStructureAudit(browser, siteConfig, pagePath) {
     notes: [],
   };
 
-  const context = await browser.newContext();
-  const auditPage = await context.newPage();
   try {
-    console.log(`🧭 Structure audit: ${pagePath}`);
-    const response = await safeNavigate(auditPage, `${siteConfig.baseUrl}${pagePath}`);
+    const response = await safeNavigate(page, `${siteConfig.baseUrl}${pagePath}`);
     if (!response || response.status() >= 400) {
       report.gating.push(
         `Failed to load page (status ${response ? response.status() : 'unknown'})`
@@ -255,13 +253,13 @@ async function runStructureAudit(browser, siteConfig, pagePath) {
       return report;
     }
 
-    const stability = await waitForPageStability(auditPage);
+    const stability = await waitForPageStability(page);
     if (!stability.ok) {
       report.gating.push(`Page did not reach a stable state: ${stability.message}`);
       return report;
     }
 
-    const structure = await evaluateStructure(auditPage);
+    const structure = await evaluateStructure(page);
     report.headingLevels = structure.headings;
     report.h1Count = structure.h1Count;
     report.hasMain = structure.hasMain;
@@ -332,7 +330,7 @@ async function runStructureAudit(browser, siteConfig, pagePath) {
       const targetLabel = `h${skip.level}: "${skip.text}"`;
       let screenshotDataUri = null;
       try {
-        const locator = auditPage.locator('h1, h2, h3, h4, h5, h6').nth(skip.index);
+        const locator = page.locator('h1, h2, h3, h4, h5, h6').nth(skip.index);
         const buffer = await locator.screenshot();
         screenshotDataUri = `data:image/png;base64,${buffer.toString('base64')}`;
       } catch (_) {
@@ -360,7 +358,7 @@ async function runStructureAudit(browser, siteConfig, pagePath) {
   } catch (error) {
     report.gating.push(`Navigation failed: ${error.message}`);
   } finally {
-    await context.close();
+    // cleanup handled by runPageTasks
   }
 
   return report;

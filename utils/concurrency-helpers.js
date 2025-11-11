@@ -1,6 +1,7 @@
 'use strict';
 
 const os = require('os');
+const { setupTestPage, teardownTestPage } = require('./test-helpers');
 
 const DEFAULT_LIMIT = Math.max(1, Math.min(os.cpus().length || 1, 6));
 
@@ -53,7 +54,41 @@ const mapWithConcurrency = async (items, worker, { concurrency } = {}) => {
   return results;
 };
 
+const runPageTasks = async (
+  browser,
+  pages,
+  worker,
+  { concurrency, testInfo, logLabel = 'Page task' } = {}
+) => {
+  if (!browser) {
+    throw new Error('runPageTasks requires a browser instance');
+  }
+  if (typeof worker !== 'function') {
+    throw new Error('runPageTasks requires a worker function');
+  }
+
+  return mapWithConcurrency(
+    pages,
+    async (pagePath, index) => {
+      const context = await browser.newContext();
+      const page = await context.newPage();
+      const errorContext = await setupTestPage(page, context, testInfo);
+      try {
+        if (logLabel) {
+          console.log(`${logLabel}: ${pagePath}`);
+        }
+        return await worker({ pagePath, page, context, index, errorContext });
+      } finally {
+        await teardownTestPage(page, context, errorContext, testInfo).catch(() => {});
+        await context.close().catch(() => {});
+      }
+    },
+    { concurrency }
+  );
+};
+
 module.exports = {
   mapWithConcurrency,
   resolveConcurrencyLimit,
+  runPageTasks,
 };
