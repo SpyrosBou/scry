@@ -1594,7 +1594,6 @@ ul.status-summary li {
   gap: 0.4rem;
   padding: 0.25rem 0.55rem;
   border-radius: 12px;
-  background: var(--summary-heading-advisory-bg);
   color: var(--summary-heading-advisory-text);
 }
 
@@ -1645,6 +1644,7 @@ ul.status-summary li {
   border-radius: 12px;
   background: var(--surface-card);
   box-shadow: var(--shadow-inset);
+  margin-bottom: 0.25rem;
   transition: background 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
