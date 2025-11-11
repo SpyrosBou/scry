@@ -19,6 +19,7 @@ const CONTENT_TYPE_EXTENSIONS = {
   'image/bmp': '.bmp',
   'image/svg+xml': '.svg',
 };
+const DEFAULT_IMAGE_ATTACHMENT_LIMIT = 20;
 
 const inferAttachmentExtension = (contentType, fallbackName = '') => {
   if (CONTENT_TYPE_EXTENSIONS[contentType]) {
@@ -33,6 +34,28 @@ const inferAttachmentExtension = (contentType, fallbackName = '') => {
     if (subtype) return `.${subtype}`;
   }
   return '';
+};
+
+const normaliseImageAttachmentLimit = (value) => {
+  if (value === undefined || value === null || value === '') {
+    return DEFAULT_IMAGE_ATTACHMENT_LIMIT;
+  }
+  if (value === false) return Infinity;
+  const raw = typeof value === 'number' ? value : Number(String(value).trim());
+  if (Number.isFinite(raw)) {
+    if (raw <= 0) return Infinity;
+    return Math.max(1, Math.floor(raw));
+  }
+  const normalised = String(value).trim().toLowerCase();
+  if (['infinite', 'infinity', 'all', 'unlimited'].includes(normalised)) {
+    return Infinity;
+  }
+  const parsed = Number(normalised);
+  if (Number.isFinite(parsed)) {
+    if (parsed <= 0) return Infinity;
+    return Math.max(1, Math.floor(parsed));
+  }
+  return DEFAULT_IMAGE_ATTACHMENT_LIMIT;
 };
 
 const DEFAULT_INLINE_LIMIT = 8 * 1024 * 1024; // 8 MB
@@ -83,6 +106,9 @@ class CustomHtmlReporter {
     this.orderCounter = 0;
     this.pendingAssets = [];
     this.assetCounter = 0;
+    this.imageAttachmentLimit = normaliseImageAttachmentLimit(
+      options.imageAttachmentLimit ?? process.env.REPORT_IMAGE_LIMIT
+    );
   }
 
   scheduleAttachmentAsset({ name, contentType, sourcePath, buffer }) {
@@ -223,6 +249,9 @@ class CustomHtmlReporter {
     const processed = [];
     const summaries = [];
     const schemaSummaries = [];
+    const limit = this.imageAttachmentLimit;
+    const enforceLimit = Number.isFinite(limit);
+    let imageCount = 0;
 
     for (const attachment of attachments) {
       const name = attachment?.name || 'attachment';
@@ -306,13 +335,19 @@ class CustomHtmlReporter {
       }
 
       if (contentType.startsWith('image/')) {
-        const relativePath = this.scheduleAttachmentAsset({
-          name,
-          contentType,
-          sourcePath,
-          buffer: sourcePath ? null : ensureBuffer(),
-        });
-        attachmentEntry.assetPath = relativePath;
+        if (enforceLimit && imageCount >= limit) {
+          attachmentEntry.omitted = true;
+          attachmentEntry.reason = `Screenshot omitted; reached per-test cap of ${limit}.`;
+        } else {
+          imageCount += 1;
+          const relativePath = this.scheduleAttachmentAsset({
+            name,
+            contentType,
+            sourcePath,
+            buffer: sourcePath ? null : ensureBuffer(),
+          });
+          attachmentEntry.assetPath = relativePath;
+        }
       } else if (contentType.startsWith('text/')) {
         const textBuffer = ensureBuffer();
         if (!textBuffer) {
