@@ -396,9 +396,9 @@ const collectIssueMessages = (pages, fields, defaultImpact, options = {}) => {
   for (const page of pages) {
     const pageId = page?.page || 'Unknown page';
     const pageProject =
+      page?.browser ||
       page?.projectName ||
       page?.project ||
-      page?.browser ||
       (Array.isArray(page?.projects) ? page.projects[0] : null);
     const pageViewport =
       page?.viewport ||

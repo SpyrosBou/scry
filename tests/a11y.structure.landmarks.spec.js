@@ -12,9 +12,11 @@ const { createRunSummaryPayload, createPageSummaryPayload } = require('../utils/
 const {
   selectAccessibilityTestPages,
   DEFAULT_ACCESSIBILITY_SAMPLE,
-  resolveAccessibilityMetadata,
-  applyViewportMetadata,
 } = require('../utils/a11y-shared');
+const {
+  resolveReportMetadata,
+  applyViewportMetadata,
+} = require('../utils/report-metadata');
 
 const STRUCTURE_WCAG_REFERENCES = [
   { id: '1.3.1', name: 'Info and Relationships', level: 'A' },
@@ -157,8 +159,8 @@ test.describe('Accessibility: Structural landmarks', () => {
     );
 
     const gatingTotal = reports.reduce((sum, report) => sum + report.gating.length, 0);
-    const { siteLabel, viewportLabel } = resolveAccessibilityMetadata(siteConfig, testInfo);
-    applyViewportMetadata(reports, viewportLabel);
+    const { siteLabel, viewportLabel } = resolveReportMetadata(siteConfig, testInfo);
+    applyViewportMetadata(reports, { viewportLabel, siteLabel });
 
     const runPayload = createRunSummaryPayload({
       baseName: `a11y-structure-summary-${slugify(siteLabel)}`,
@@ -195,10 +197,11 @@ test.describe('Accessibility: Structural landmarks', () => {
         advisories: report.advisories,
         headingOutline: report.headingLevels,
         notes: report.notes,
-        projectName: viewportLabel,
-        browser: viewportLabel,
-        viewport: viewportLabel,
-        viewports: [viewportLabel],
+        projectName: report.projectName,
+        siteName: report.siteName,
+        browser: report.browser,
+        viewport: report.viewport,
+        viewports: report.viewports,
       })),
       wcagReferences: STRUCTURE_WCAG_REFERENCES,
     };
@@ -223,10 +226,11 @@ test.describe('Accessibility: Structural landmarks', () => {
           advisories: report.advisories,
           headingOutline: report.headingLevels,
           notes: report.notes,
-          projectName: viewportLabel,
-          browser: viewportLabel,
-          viewport: viewportLabel,
-          viewports: [viewportLabel],
+          projectName: report.projectName,
+          siteName: report.siteName,
+          browser: report.browser,
+          viewport: report.viewport,
+          viewports: report.viewports,
         },
         metadata: {
           spec: 'a11y.structure.landmarks',

@@ -1,3 +1,5 @@
+const { resolveReportMetadata, applyViewportMetadata: applyMetadata } = require('./report-metadata');
+
 const DEFAULT_ACCESSIBILITY_SAMPLE = 'all';
 
 const ensureHomepageFirst = (pages = []) => {
@@ -93,28 +95,13 @@ const selectAccessibilityTestPages = (siteConfig, options = {}) => {
   return limitedPages;
 };
 
-const resolveAccessibilityMetadata = (siteConfig, testInfo) => {
-  const siteLabel = siteConfig?.name || process.env.SITE_NAME || 'default';
-  const viewportLabel = (testInfo?.project?.name || 'Chrome').trim() || 'Chrome';
-  return { siteLabel, viewportLabel };
-};
-
-const applyViewportMetadata = (items = [], viewportLabel) => {
-  items.forEach((item) => {
-    if (!item || typeof item !== 'object') return;
-    item.projectName = viewportLabel;
-    item.browser = viewportLabel;
-    item.viewport = viewportLabel;
-    item.viewports = [viewportLabel];
-  });
-};
-
 module.exports = {
   DEFAULT_ACCESSIBILITY_SAMPLE,
   ensureHomepageFirst,
   parseSampleSetting,
   resolveSampleSetting,
   selectAccessibilityTestPages,
-  resolveAccessibilityMetadata,
-  applyViewportMetadata,
+  resolveAccessibilityMetadata: resolveReportMetadata,
+  applyViewportMetadata: (items, viewportLabel, siteLabel) =>
+    applyMetadata(items, { viewportLabel, siteLabel }),
 };
