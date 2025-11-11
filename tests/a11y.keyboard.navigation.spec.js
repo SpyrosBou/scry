@@ -5,6 +5,7 @@ test.use({ trace: 'off', video: 'off' });
 
 const { PNG } = require('pngjs');
 const SiteLoader = require('../utils/site-loader');
+const { mapWithConcurrency, resolveConcurrencyLimit } = require('../utils/concurrency-helpers');
 const {
   safeNavigate,
   waitForPageStability,
@@ -292,7 +293,7 @@ test.describe('Accessibility: Keyboard navigation', () => {
     errorContext = sharedErrorContext;
   });
 
-  test('Keyboard focus flows are accessible', async ({ page }, testInfo) => {
+  test('Keyboard focus flows are accessible', async ({ browser }, testInfo) => {
     test.setTimeout(7200000);
 
     const pages = selectAccessibilityTestPages(siteConfig, {
