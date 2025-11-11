@@ -156,10 +156,11 @@ test.describe('Accessibility: Structural landmarks', () => {
 
     const gatingTotal = reports.reduce((sum, report) => sum + report.gating.length, 0);
 
-    const projectName = siteConfig.name || process.env.SITE_NAME || 'default';
+    const siteLabel = siteConfig.name || process.env.SITE_NAME || 'default';
+    const viewportLabel = testInfo.project?.name || 'Chrome';
 
     const runPayload = createRunSummaryPayload({
-      baseName: `a11y-structure-summary-${slugify(projectName)}`,
+      baseName: `a11y-structure-summary-${slugify(siteLabel)}`,
       title: 'Landmark & heading structure summary',
       overview: {
         totalPagesAudited: reports.length,
@@ -171,36 +172,43 @@ test.describe('Accessibility: Structural landmarks', () => {
       metadata: {
         spec: 'a11y.structure.landmarks',
         summaryType: 'structure',
-        projectName,
+        projectName: siteLabel,
+        siteName: siteLabel,
+        viewports: [viewportLabel],
         suppressPageEntries: true,
         scope: 'project',
       },
     });
     runPayload.details = {
+      viewports: [viewportLabel],
       pages: reports.map((report) => ({
-      page: report.page,
-      h1Count: report.h1Count,
-      hasMainLandmark: report.hasMain,
-      navigationLandmarks: report.navigationCount,
-      headerLandmarks: report.headerCount,
-      footerLandmarks: report.footerCount,
-      headingSkips: report.headingSkips,
-      gating: report.gating,
-      warnings: report.warnings,
-      advisories: report.advisories,
-      headingOutline: report.headingLevels,
-      notes: report.notes,
-    })),
-    wcagReferences: STRUCTURE_WCAG_REFERENCES,
-  };
+        page: report.page,
+        h1Count: report.h1Count,
+        hasMainLandmark: report.hasMain,
+        navigationLandmarks: report.navigationCount,
+        headerLandmarks: report.headerCount,
+        footerLandmarks: report.footerCount,
+        headingSkips: report.headingSkips,
+        gating: report.gating,
+        warnings: report.warnings,
+        advisories: report.advisories,
+        headingOutline: report.headingLevels,
+        notes: report.notes,
+        projectName: viewportLabel,
+        browser: viewportLabel,
+        viewport: viewportLabel,
+        viewports: [viewportLabel],
+      })),
+      wcagReferences: STRUCTURE_WCAG_REFERENCES,
+    };
     await attachSchemaSummary(testInfo, runPayload);
 
     for (const report of reports) {
       const pagePayload = createPageSummaryPayload({
-        baseName: `a11y-structure-${slugify(projectName)}-${slugify(report.page)}`,
+        baseName: `a11y-structure-${slugify(siteLabel)}-${slugify(report.page)}`,
         title: `Structure audit — ${report.page}`,
         page: report.page,
-        viewport: 'structure',
+        viewport: viewportLabel,
         summary: {
           h1Count: report.h1Count,
           hasMainLandmark: report.hasMain,
@@ -214,11 +222,17 @@ test.describe('Accessibility: Structural landmarks', () => {
           advisories: report.advisories,
           headingOutline: report.headingLevels,
           notes: report.notes,
+          projectName: viewportLabel,
+          browser: viewportLabel,
+          viewport: viewportLabel,
+          viewports: [viewportLabel],
         },
         metadata: {
           spec: 'a11y.structure.landmarks',
           summaryType: 'structure',
-          projectName,
+          projectName: siteLabel,
+          siteName: siteLabel,
+          viewports: [viewportLabel],
         },
       });
       await attachSchemaSummary(testInfo, pagePayload);
