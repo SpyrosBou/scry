@@ -72,6 +72,7 @@ const renderRuleSnapshotsTable = (snapshots, { projectName, viewports } = {}) =>
           <td>${renderComplianceCell(wcagTags, {
             ruleId: snapshot.rule || snapshot.id,
             category: snapshot.category,
+            impact: snapshot.impact,
           })}</td>
         </tr>
       `;
@@ -264,6 +265,7 @@ const renderUnifiedIssuesTable = (
           return renderComplianceCell(tags, {
             ruleId: row.ruleId,
             category: row.category,
+            impact: row.impact,
           });
         }
         if (badge) {
@@ -272,6 +274,7 @@ const renderUnifiedIssuesTable = (
         return renderComplianceCell([], {
           ruleId: row.ruleId,
           category: row.category,
+          impact: row.impact,
         });
       })();
       const ruleLabel = row.ruleLabel || row.ruleId || row.label || 'Unknown rule';
@@ -1005,7 +1008,7 @@ const renderWcagBadgesLinked = (tags) => {
 
 // When no WCAG tags are present, derive a meaningful classification badge
 // from the rule id or category so the UI never shows a bare "No WCAG tag".
-const renderComplianceBadgeFallback = ({ ruleId, category }) => {
+const renderComplianceBadgeFallback = ({ ruleId, category, impact }) => {
   const id = String(ruleId || '').toLowerCase();
   const cat = String(category || '').toLowerCase();
   const isAria =
@@ -1013,12 +1016,16 @@ const renderComplianceBadgeFallback = ({ ruleId, category }) => {
   if (isAria) return '<span class="badge badge-neutral">ARIA best practice</span>';
   if (cat === 'best-practice') return '<span class="badge badge-neutral">Best practice</span>';
   if (cat === 'advisory') return '<span class="badge badge-neutral">Advisory</span>';
+  if (cat === 'gating') {
+    const impactLabel = formatIssueImpactLabel(impact || 'info');
+    return `<span class="badge badge-neutral">${escapeHtml(`${impactLabel} impact`)}</span>`;
+  }
   return '<span class="badge badge-neutral">Unclassified</span>';
 };
 
-const renderComplianceCell = (tags, { ruleId, category } = {}) => {
+const renderComplianceCell = (tags, { ruleId, category, impact } = {}) => {
   if (Array.isArray(tags) && tags.length > 0) return renderWcagBadgesLinked(tags);
-  return renderComplianceBadgeFallback({ ruleId, category });
+  return renderComplianceBadgeFallback({ ruleId, category, impact });
 };
 
 const deriveCulpritSummary = (nodes) => {
@@ -1298,10 +1305,31 @@ const renderAccessibilityRuleTable = (
         Array.isArray(rule.wcagTags) && rule.wcagTags.length > 0 ? rule.wcagTags : [];
       const viewportsRaw = rule.viewports || rule.viewportsTested || fallbackViewports;
       const viewportCell = renderCodeList(viewportsRaw, '—');
-      const pageList = renderCodeList(Array.isArray(rule.pages) ? rule.pages : [], '—');
+      const pageArray = Array.isArray(rule.pages) ? rule.pages : [];
+      const normalisedPages = pageArray
+        .map((page) => {
+          if (typeof page !== 'string') return page;
+          const trimmed = page.trim();
+          if (!trimmed) return '';
+          if (projectName && trimmed.startsWith(`${projectName}::`)) {
+            return trimmed.slice(projectName.length + 2);
+          }
+          const doubleColonIndex = trimmed.indexOf('::');
+          if (doubleColonIndex > 0) {
+            return trimmed.slice(doubleColonIndex + 2);
+          }
+          return trimmed;
+        })
+        .filter(Boolean);
+      const pageCount = Number.isFinite(rule.pageCount) ? rule.pageCount : normalisedPages.length;
+      const hasManyPages = pageCount > 5 || normalisedPages.length > 5;
+      const pageCell = hasManyPages
+        ? `<span class="details-text">${escapeHtml(`${formatCount(pageCount)} pages`)}</span>`
+        : renderCodeList(normalisedPages, '—');
       const wcagHtml = renderComplianceCell(wcagTags, {
         ruleId: rule.rule || rule.id,
         category: rule.category,
+        impact: rule.impact,
       });
       const detailsText = rule.description || rule.help || '';
       const detailsContent = detailsText
@@ -1321,7 +1349,7 @@ const renderAccessibilityRuleTable = (
           <td><span class="details-text">${detailsContent}</span>${helpLink}</td>
           <td>${browserList}</td>
           <td>${viewportCell}</td>
-          <td>${pageList}</td>
+          <td>${pageCell}</td>
           <td>${escapeHtml(formatCount(rule.nodes ?? 0))}</td>
           <td>${wcagHtml}</td>
         </tr>
@@ -2112,6 +2140,7 @@ const renderWcagPageIssueTable = (entries, heading, options = {}) => {
       const wcagHtml = renderComplianceCell(entry.tags || entry.wcagTags || [], {
         ruleId: entry.id || entry.rule,
         category: entry.category,
+        impact: entry.impact,
       });
       // Derive Help link from WCAG tags if not explicitly provided
       if (!helpUrl) {

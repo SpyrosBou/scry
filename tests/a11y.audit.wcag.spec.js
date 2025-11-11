@@ -49,12 +49,16 @@ const collectRuleSnapshots = (entries, category) => {
           viewports: new Set(),
           nodes: 0,
           wcagTags: new Set(),
+          description: violation.description || violation.help || violation.message || null,
         });
       }
       const record = aggregate.get(key);
       record.pages.add(pageKey);
       record.viewports.add(viewport);
       record.nodes += violation.nodes?.length || 0;
+      if (!record.description && (violation.description || violation.help || violation.message)) {
+        record.description = violation.description || violation.help || violation.message;
+      }
       extractWcagLevels(violation.tags || []).forEach((level) => {
         if (level?.label) record.wcagTags.add(level.label);
       });
@@ -66,6 +70,7 @@ const collectRuleSnapshots = (entries, category) => {
     impact: record.impact,
     helpUrl: record.helpUrl,
     category: record.category,
+    description: record.description,
     pages: Array.from(record.pages),
     viewports: Array.from(record.viewports),
     nodes: record.nodes,
