@@ -41,6 +41,7 @@ const renderRuleSnapshotsTable = (snapshots, { projectName, viewports } = {}) =>
   const rows = snapshots
     .map((snapshot) => {
       const impact = snapshot.impact || snapshot.category || 'info';
+      const impactLabel = formatIssueImpactLabel(impact);
       const pages = Array.isArray(snapshot.pages) ? snapshot.pages : [];
       const viewports = Array.isArray(snapshot.viewports) ? snapshot.viewports : [];
       const wcagTags = Array.isArray(snapshot.wcagTags) ? snapshot.wcagTags : [];
@@ -62,7 +63,7 @@ const renderRuleSnapshotsTable = (snapshots, { projectName, viewports } = {}) =>
         : '';
       return `
         <tr class="impact-${impact.toLowerCase?.() || 'info'}">
-          <td>${escapeHtml(impact)}</td>
+          <td>${escapeHtml(impactLabel)}</td>
           <td>${escapeHtml(snapshot.rule || snapshot.id || 'rule')}</td>
           <td><span class="details-text">${detailsContent}</span>${helpLink}</td>
           <td>${browsers}</td>
@@ -1270,6 +1271,8 @@ const renderAccessibilityRuleTable = (
   const fallbackViewports = normaliseStringList(defaultViewports);
   const rows = rules
     .map((rule) => {
+      const impactRaw = rule.impact || rule.category || 'info';
+      const impactLabel = formatIssueImpactLabel(impactRaw);
       const browserList = renderCodeList(
         normaliseStringList(rule.browsers, rule.projects, rule.projectName, fallbackBrowsers),
         '—'
@@ -1312,8 +1315,8 @@ const renderAccessibilityRuleTable = (
           )}" target="_blank" rel="noopener noreferrer">Guidance</a>`
         : '';
       return `
-        <tr class="impact-${escapeHtml((rule.impact || rule.category || 'info').toLowerCase())}">
-          <td>${escapeHtml(rule.impact || rule.category || 'info')}</td>
+        <tr class="impact-${escapeHtml(impactRaw.toLowerCase())}">
+          <td>${escapeHtml(impactLabel)}</td>
           <td>${escapeHtml(rule.rule || rule.id || 'Unnamed rule')}</td>
           <td><span class="details-text">${detailsContent}</span>${helpLink}</td>
           <td>${browserList}</td>
