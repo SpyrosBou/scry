@@ -2,7 +2,7 @@
 
 Automated Playwright-powered testing harness for auditing WordPress websites across functionality, responsiveness, accessibility, and visual regression criteria. The suite standardises how sites are exercised, captures rich HTML (HyperText Markup Language) reports, and keeps a historical record of findings for ongoing quality assurance.
 
-> Last updated for version 2025.02.14-parallel-a11y.
+> Last updated for version 2025.02.18-attachment-guard.
 
 ## Key Capabilities
 - Generates Solarized-themed HTML reports with parity to the approved reporting mocks.
@@ -78,6 +78,7 @@ Helpful environment variables:
 ## Reports and Artifacts
 - Run outputs live under `reports/run-*/` with HTML in `report.html` and structured data in `data/run.json`.
 - The custom HTML reporter is always enabled (even on CI) so every run includes `report.html` plus `data/run.json`; CI simply layers Playwright's `blob` reporter on top for merges.
+- Binary attachments (screenshots, diffs, and other large blobs) are saved beside the run as files under `reports/run-*/data/attachments/` and the HTML references them relatively so even extremely large accessibility runs do not try to inline hundreds of megabytes of base64 data (which previously caused the reporter to crash before writing `report.html`).
 - Large manifests are written to `reports/run-manifests/`; trim that folder with `npm run clean:manifests [days]` (default 15 days) when it grows.
 - Capture run manifests and summaries programmatically with `--output ./reports/run-summary.json` — the file contains one entry per site with manifest metadata and report status.
 - Use `npm run reports:dev` to start a preview server with live reload at http://127.0.0.1:4173/ (default). It watches `reports/run-*`, `reports/latest-run.json`, plus the template and SCSS sources in `utils/` and `docs/mocks/`, auto-refreshing immediately when report data, styling, or helper code changes.

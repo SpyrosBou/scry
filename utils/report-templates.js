@@ -7324,12 +7324,18 @@ const renderAttachment = (attachment) => {
   }
 
   let bodyHtml = '';
-  if (attachment.dataUri && attachment.contentType?.startsWith('image/')) {
+  if (attachment.assetPath && attachment.contentType?.startsWith('image/')) {
+    const assetPath = escapeHtml(attachment.assetPath);
+    bodyHtml = `<figure><img src="${assetPath}" alt="${escapeHtml(attachment.name || 'Attachment image')}" /><figcaption>${escapeHtml(attachment.name || attachment.contentType || 'Image')}</figcaption></figure>`;
+  } else if (attachment.dataUri && attachment.contentType?.startsWith('image/')) {
     bodyHtml = `<figure><img src="${attachment.dataUri}" alt="${escapeHtml(attachment.name || 'Attachment image')}" /><figcaption>${escapeHtml(attachment.name || attachment.contentType || 'Image')}</figcaption></figure>`;
   } else if (attachment.html) {
     bodyHtml = `<div class="attachment-html">${attachment.html}</div>`;
   } else if (attachment.text) {
     bodyHtml = `<pre>${escapeHtml(attachment.text)}</pre>`;
+  } else if (attachment.assetPath) {
+    const assetPath = escapeHtml(attachment.assetPath);
+    bodyHtml = `<a class="attachment-download" href="${assetPath}" download="${escapeHtml(attachment.name || 'attachment')}" rel="noopener">Download ${escapeHtml(attachment.name || attachment.contentType || 'attachment')}</a>`;
   } else if (attachment.dataUri) {
     bodyHtml = `<a class="attachment-download" href="${attachment.dataUri}" download="${escapeHtml(attachment.name || 'attachment')}" rel="noopener">Download ${escapeHtml(attachment.name || attachment.contentType || 'attachment')}</a>`;
   } else if (attachment.base64) {
