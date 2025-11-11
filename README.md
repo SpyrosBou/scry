@@ -2,7 +2,7 @@
 
 Automated Playwright-powered testing harness for auditing WordPress websites across functionality, responsiveness, accessibility, and visual regression criteria. The suite standardises how sites are exercised, captures rich HTML (HyperText Markup Language) reports, and keeps a historical record of findings for ongoing quality assurance.
 
-> Last updated for commit 41cb029.
+> Last updated for commit 5d4e38d.
 
 ## Key Capabilities
 - Generates Solarized-themed HTML reports with parity to the approved reporting mocks.
@@ -50,6 +50,7 @@ node run-tests.js --site example-site --pages 5 --responsive
   - Reuse by name (refresh sitemap-backed pages only): `npm run discover -- woodworking-ddev`
   - Flags supported: `--base-url|--baseUrl`, `--site-name|--config-name`, `--name|--display`, `--yes|-y`, `--no|-n`, `--allow-duplicate`, `--local`, `--help`.
   - Behavior: if a config for the base URL already exists, it will be reused unless `--allow-duplicate` is passed. In interactive mode you’ll be prompted; in non-interactive mode pair `--yes` with the necessary flags. When a sitemap strategy is missing, `--discover` seeds one that points to `<baseUrl>/sitemap.xml` and persists new pages back to `sites/<name>.json`.
+  - Host guard rails: when sitemap URLs resolve to a different host (for example `example.com` vs `www.example.com`), discovery now warns, temporarily follows the alternate host so `testPages` stay populated, and reminds you to align `baseUrl` / `discover.sitemapUrl`.
 - **Debugging:** use `--debug` for Playwright trace mode or `--output <path>` to persist manifest JSON.
 - **Baseline refresh:** append `--update-baselines` alongside `--site` to regenerate visual baselines (skips functional runs and exits after Playwright completes).
 - **Page cap:** omit `--pages` to use the default of 5, pass a positive integer to override, or use `--pages all` to test every available page.
