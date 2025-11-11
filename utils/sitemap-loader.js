@@ -17,6 +17,8 @@ const hostsShareBaseLabel = (a, b) => {
   if (!a || !b) return false;
   return stripWww(a) === stripWww(b);
 };
+const trimTrailingSlash = (value) =>
+  typeof value === 'string' ? value.replace(/\/+$/, '') : value;
 
 const parseLimit = (value) => {
   if (value === undefined || value === null) return null;
@@ -236,6 +238,8 @@ async function discoverFromSitemap(siteConfig, discoverConfig = {}) {
   }
 
   const sitemapUrl = discoverConfig.sitemapUrl || `${baseUrl.replace(/\/$/, '')}/sitemap.xml`;
+  const baseHost = getHost(baseUrl) || '';
+  const sitemapHost = getHost(sitemapUrl) || '';
   const resolvedMaxPages = parseLimit(discoverConfig.maxPages);
   const resolvedMaxDepth = parseLimit(discoverConfig.maxDepth);
   const options = {
@@ -257,55 +261,71 @@ async function discoverFromSitemap(siteConfig, discoverConfig = {}) {
 
   const visited = new Set();
   const collected = await collectUrls(sitemapUrl, options, visited, 0);
-  if (collected.length === 0) return [];
 
-  let { normalized, mismatchedHosts } = filterAndNormalize(
-    collected,
-    baseUrl,
-    includePatterns,
-    excludePatterns,
-    options.maxPages
-  );
+  let normalized = [];
+  let mismatchedHosts = new Map();
+  let resolvedBaseUrl = trimTrailingSlash(baseUrl);
+  let hostAdjusted = false;
 
-  if (normalized.length === 0 && mismatchedHosts.size > 0) {
-    const baseHost = (() => {
-      try {
-        return new URL(baseUrl).host;
-      } catch (_error) {
-        return '';
-      }
-    })();
-    const aliasHost = [...mismatchedHosts.keys()].find((host) =>
-      hostsShareBaseLabel(host, baseHost)
+  if (collected.length > 0) {
+    const filtered = filterAndNormalize(
+      collected,
+      baseUrl,
+      includePatterns,
+      excludePatterns,
+      options.maxPages
     );
+    normalized = filtered.normalized;
+    mismatchedHosts = filtered.mismatchedHosts;
 
-    if (aliasHost) {
-      const aliasUrl = new URL(baseUrl);
-      aliasUrl.host = aliasHost;
-      const retry = filterAndNormalize(
-        collected,
-        aliasUrl.toString(),
-        includePatterns,
-        excludePatterns,
-        options.maxPages,
-        { allowHostAlias: true }
+    if (normalized.length === 0 && mismatchedHosts.size > 0) {
+      const aliasHost = [...mismatchedHosts.keys()].find((host) =>
+        hostsShareBaseLabel(host, baseHost)
       );
 
-      if (retry.normalized.length > 0) {
-        normalized = retry.normalized;
-        mismatchedHosts = retry.mismatchedHosts;
+      if (aliasHost) {
+        const aliasUrl = new URL(baseUrl);
+        aliasUrl.host = aliasHost;
+        const retry = filterAndNormalize(
+          collected,
+          aliasUrl.toString(),
+          includePatterns,
+          excludePatterns,
+          options.maxPages,
+          { allowHostAlias: true }
+        );
+
+        if (retry.normalized.length > 0) {
+          normalized = retry.normalized;
+          mismatchedHosts = retry.mismatchedHosts;
+          resolvedBaseUrl = trimTrailingSlash(aliasUrl.toString());
+          hostAdjusted = true;
+          console.warn(
+            `⚠️  Sitemap host mismatch detected (${baseHost} vs ${aliasHost}); falling back to ${aliasHost} for discovery. Update baseUrl or discover.sitemapUrl to skip this warning.`
+          );
+        }
+      }
+
+      if (normalized.length === 0) {
+        const offendingHost = [...mismatchedHosts.keys()][0];
         console.warn(
-          `⚠️  Sitemap host mismatch detected (${baseHost} vs ${aliasHost}); falling back to ${aliasHost} for discovery. Update baseUrl or discover.sitemapUrl to skip this warning.`
+          `⚠️  Sitemap entries resolved to ${offendingHost}, but baseUrl host ${baseHost} does not match. Update your site config baseUrl/discover.sitemapUrl.`
         );
       }
     }
+  }
 
-    if (normalized.length === 0) {
-      const offendingHost = [...mismatchedHosts.keys()][0];
-      console.warn(
-        `⚠️  Sitemap entries resolved to ${offendingHost}, but baseUrl host ${baseHost} does not match. Update your site config baseUrl/discover.sitemapUrl.`
-      );
-    }
+  if (collected.length === 0) {
+    const empty = [];
+    empty.meta = {
+      baseHost,
+      sitemapHost,
+      resolvedHost: getHost(resolvedBaseUrl) || baseHost,
+      resolvedBaseUrl,
+      hostAdjusted: false,
+      mismatchedHosts: [],
+    };
+    return empty;
   }
 
   const unique = Array.from(new Set(normalized));
@@ -319,6 +339,18 @@ async function discoverFromSitemap(siteConfig, discoverConfig = {}) {
   } else {
     unique.unshift('/');
   }
+
+  unique.meta = {
+    baseHost,
+    sitemapHost,
+    resolvedHost: getHost(resolvedBaseUrl) || baseHost,
+    resolvedBaseUrl,
+    hostAdjusted,
+    mismatchedHosts: Array.from(mismatchedHosts.entries()).map(([host, count]) => ({
+      host,
+      count,
+    })),
+  };
 
   return unique;
 }

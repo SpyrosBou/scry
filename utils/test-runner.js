@@ -17,6 +17,45 @@ const sanitiseForFilename = (input) =>
 
 const toPosixPath = (value) => value.split(path.sep).join('/');
 
+const trimTrailingSlash = (value) =>
+  typeof value === 'string' ? value.replace(/\/+$/, '') : value;
+
+const normaliseBaseUrlString = (value) => {
+  if (!value) return '';
+  try {
+    const parsed = new URL(value);
+    parsed.hash = '';
+    parsed.search = '';
+    if (parsed.pathname === '/') {
+      parsed.pathname = '';
+    }
+    return trimTrailingSlash(parsed.toString());
+  } catch (_error) {
+    return trimTrailingSlash(String(value));
+  }
+};
+
+const resolveUrl = (input, base) => {
+  if (!input) return null;
+  try {
+    return new URL(input);
+  } catch (_error) {
+    if (!base) return null;
+    try {
+      return new URL(input, base);
+    } catch (_error2) {
+      return null;
+    }
+  }
+};
+
+const normaliseHost = (value) => String(value || '').trim().toLowerCase();
+const stripWww = (host) => normaliseHost(host).replace(/^www\./, '');
+const hostsShareBaseLabel = (a, b) => {
+  if (!a || !b) return false;
+  return stripWww(a) === stripWww(b);
+};
+
 function normaliseSpecPattern(specInput) {
   const raw = String(specInput || '').trim();
   if (!raw) return null;
@@ -309,6 +348,50 @@ class TestRunner {
         if (siteConfig.discover && siteConfig.discover.strategy === 'sitemap') {
           try {
             const discovered = await discoverFromSitemap(siteConfig, siteConfig.discover);
+            const discoveryMeta =
+              discovered && typeof discovered === 'object' ? discovered.meta || {} : {};
+
+            const currentBaseUrl = normaliseBaseUrlString(siteConfig.baseUrl);
+            let baseUrlUpdated = false;
+            let sitemapUrlUpdated = false;
+
+            if (discoveryMeta.hostAdjusted && discoveryMeta.resolvedBaseUrl) {
+              const resolvedBase = normaliseBaseUrlString(discoveryMeta.resolvedBaseUrl);
+              if (resolvedBase && resolvedBase !== currentBaseUrl) {
+                console.log(
+                  `ℹ️  Aligning baseUrl host from ${currentBaseUrl} to ${resolvedBase} based on sitemap discovery.`
+                );
+                siteConfig.baseUrl = resolvedBase;
+                baseUrlUpdated = true;
+              }
+            }
+
+            if (
+              discoveryMeta.hostAdjusted &&
+              discoveryMeta.resolvedHost &&
+              siteConfig.discover &&
+              siteConfig.discover.sitemapUrl
+            ) {
+              const sitemapUrlObj = resolveUrl(
+                siteConfig.discover.sitemapUrl,
+                siteConfig.baseUrl
+              );
+              if (sitemapUrlObj) {
+                const previousHost = sitemapUrlObj.host;
+                if (
+                  previousHost !== discoveryMeta.resolvedHost &&
+                  hostsShareBaseLabel(previousHost, discoveryMeta.resolvedHost)
+                ) {
+                  sitemapUrlObj.host = discoveryMeta.resolvedHost;
+                  siteConfig.discover.sitemapUrl = sitemapUrlObj.toString();
+                  sitemapUrlUpdated = true;
+                  console.log(
+                    `ℹ️  Aligning sitemapUrl host from ${previousHost} to ${discoveryMeta.resolvedHost} based on sitemap discovery.`
+                  );
+                }
+              }
+            }
+
             if (discovered.length === 0) {
               console.log('ℹ️  Sitemap discovery returned no pages. Test list unchanged.');
 
@@ -327,6 +410,31 @@ class TestRunner {
                 } catch (writeError) {
                   console.log(
                     `⚠️  Unable to persist default sitemap config: ${writeError.message}`
+                  );
+                }
+              }
+
+              if (baseUrlUpdated || sitemapUrlUpdated) {
+                try {
+                  const sitePath = path.join(process.cwd(), 'sites', `${siteName}.json`);
+                  const raw = fs.readFileSync(sitePath, 'utf8');
+                  const parsed = JSON.parse(raw);
+                  if (baseUrlUpdated) {
+                    parsed.baseUrl = siteConfig.baseUrl;
+                  }
+                  if (sitemapUrlUpdated && siteConfig.discover) {
+                    parsed.discover = {
+                      ...(parsed.discover || {}),
+                      ...siteConfig.discover,
+                    };
+                  }
+                  fs.writeFileSync(sitePath, `${JSON.stringify(parsed, null, 2)}\n`);
+                  console.log(
+                    `📄 Updated sites/${siteName}.json with canonical host information.`
+                  );
+                } catch (writeError) {
+                  console.log(
+                    `⚠️  Unable to persist canonical host changes: ${writeError.message}`
                   );
                 }
               }
@@ -358,6 +466,9 @@ class TestRunner {
                 const raw = fs.readFileSync(sitePath, 'utf8');
                 const parsed = JSON.parse(raw);
                 parsed.testPages = siteConfig.testPages;
+                if (baseUrlUpdated) {
+                  parsed.baseUrl = siteConfig.baseUrl;
+                }
                 if (siteConfig.discover) {
                   const mergedDiscover = {
                     ...(parsed.discover || {}),
