@@ -388,18 +388,17 @@ test.describe('Accessibility: Resilience checks', () => {
     const projectName = siteConfig.name || process.env.SITE_NAME || 'default';
 
     const runPayload = createRunSummaryPayload({
-      baseName: `a11y-reduced-motion-summary-${slugify(projectName)}`,
-      title: 'Reduced motion support summary',
+      baseName: `a11y-iframe-summary-${slugify(projectName)}`,
+      title: 'Iframe accessibility summary',
       overview: {
         totalPagesAudited: reports.length,
-        pagesRespectingPreference: reports.filter((report) => report.matchesReduce).length,
-        pagesWithGatingIssues: reports.filter((report) => report.gating.length > 0).length,
+        totalIframesDetected: reports.reduce((sum, report) => sum + report.frames.length, 0),
+        pagesWithMissingLabels: reports.filter((report) => report.gating.length > 0).length,
         pagesWithAdvisories: reports.filter((report) => report.advisories.length > 0).length,
-        totalSignificantAnimations: reports.reduce((sum, report) => sum + report.significant.length, 0),
       },
       metadata: {
         spec: 'a11y.resilience.adaptive',
-        summaryType: 'reduced-motion',
+        summaryType: 'iframe-metadata',
         projectName,
         suppressPageEntries: true,
         scope: 'project',
@@ -408,44 +407,42 @@ test.describe('Accessibility: Resilience checks', () => {
     runPayload.details = {
       pages: reports.map((report) => ({
         page: report.page,
-        matchesPreference: report.matchesReduce,
-        animations: report.animations,
-        significantAnimations: report.significant,
+        iframeCount: report.frames.length,
         gating: report.gating,
         warnings: report.warnings,
         advisories: report.advisories,
+        frames: report.frames,
         notes: report.notes,
       })),
-      wcagReferences: REDUCED_MOTION_WCAG_REFERENCES,
+      wcagReferences: IFRAME_WCAG_REFERENCES,
     };
     await attachSchemaSummary(testInfo, runPayload);
 
     for (const report of reports) {
       const pagePayload = createPageSummaryPayload({
         baseName: `a11y-reduced-motion-${slugify(projectName)}-${slugify(report.page)}`,
-        title: `Reduced motion audit — ${report.page}`,
+        title: `Iframe metadata — ${report.page}`,
         page: report.page,
-        viewport: 'reduced-motion',
+        viewport: 'iframe-audit',
         summary: {
-          matchesPreference: report.matchesReduce,
-          animations: report.animations,
-          significantAnimations: report.significant,
+          iframeCount: report.frames.length,
           gatingIssues: report.gating,
           gating: report.gating,
           warnings: report.warnings,
           advisories: report.advisories,
+          frames: report.frames,
           notes: report.notes,
         },
         metadata: {
           spec: 'a11y.resilience.adaptive',
-          summaryType: 'reduced-motion',
+          summaryType: 'iframe-metadata',
           projectName,
         },
       });
       await attachSchemaSummary(testInfo, pagePayload);
     }
 
-    expect(gatingTotal, 'Reduced motion gating issues detected').toBe(0);
+    expect(gatingTotal, 'Iframe accessibility gating issues detected').toBe(0);
   });
 
   test('Maintains layout under 320px reflow', async ({ browser }, testInfo) => {
@@ -620,251 +617,7 @@ test.describe('Accessibility: Resilience checks', () => {
     expect(gatingTotal, 'Reduced motion gating issues detected').toBe(0);
   });
 
-  test('Maintains layout under 320px reflow', async ({ browser }, testInfo) => {
-    test.setTimeout(7200000);
+  
 
-    const pages = selectAccessibilityTestPages(siteConfig, {
-      defaultSize: DEFAULT_ACCESSIBILITY_SAMPLE,
-      configKeys: ['a11yReflowSampleSize', 'a11yResponsiveSampleSize'],
-    });
-
-    const concurrency = resolveConcurrencyLimit(
-      process.env.A11Y_REFLOW_CONCURRENCY,
-      process.env.A11Y_PARALLEL_PAGES
-    );
-
-    const reports = await runPageTasks(
-      browser,
-      pages,
-      async ({ page, pagePath }) => runReflowAudit(page, siteConfig, pagePath),
-      { concurrency, testInfo, logLabel: 'Reflow audit' }
-    );
-
-    const gatingTotal = reports.reduce((total, report) => total + report.gating.length, 0);
-
-    const projectName = siteConfig.name || process.env.SITE_NAME || 'default';
-
-    const reflowRunPayload = createRunSummaryPayload({
-      baseName: `a11y-reflow-summary-${slugify(projectName)}`,
-      title: '320px reflow summary',
-      overview: {
-        totalPagesAudited: reports.length,
-        pagesWithOverflow: reports.filter((report) => report.gating.length > 0).length,
-        pagesWithAdvisories: reports.filter((report) => report.advisories.length > 0).length,
-        maxOverflowPx: reports.reduce((max, report) => Math.max(max, report.horizontalOverflow || 0), 0),
-      },
-      metadata: {
-        spec: 'a11y.resilience.adaptive',
-        summaryType: 'reflow',
-        projectName,
-        suppressPageEntries: true,
-        scope: 'project',
-      },
-    });
-    reflowRunPayload.details = {
-      pages: reports.map((report) => ({
-        page: report.page,
-        viewportWidth: report.viewportWidth,
-        documentWidth: report.scrollWidth,
-        horizontalOverflowPx: report.horizontalOverflow,
-        gating: report.gating,
-        warnings: report.warnings,
-        advisories: report.advisories,
-        overflowSources: report.offenders,
-        notes: report.notes,
-      })),
-      wcagReferences: REFLOW_WCAG_REFERENCES,
-      maxOverflowTolerancePx: MAX_OVERFLOW_TOLERANCE_PX,
-    };
-    await attachSchemaSummary(testInfo, reflowRunPayload);
-
-    for (const report of reports) {
-      const reflowPagePayload = createPageSummaryPayload({
-        baseName: `a11y-reflow-${slugify(projectName)}-${slugify(report.page)}`,
-        title: `320px reflow — ${report.page}`,
-        page: report.page,
-        viewport: '320px',
-        summary: {
-          viewportWidth: report.viewportWidth,
-          documentWidth: report.scrollWidth,
-          horizontalOverflowPx: report.horizontalOverflow,
-          gatingIssues: report.gating,
-          gating: report.gating,
-          warnings: report.warnings,
-          advisories: report.advisories,
-          overflowSources: report.offenders,
-          notes: report.notes,
-        },
-        metadata: {
-          spec: 'a11y.resilience.adaptive',
-          summaryType: 'reflow',
-          projectName,
-        },
-      });
-      await attachSchemaSummary(testInfo, reflowPagePayload);
-    }
-
-    expect(gatingTotal, 'Reflow gating issues detected').toBe(0);
-  });
-
-  test('Iframes expose accessible metadata', async ({ page }, testInfo) => {
-    test.setTimeout(7200000);
-
-    const pages = selectAccessibilityTestPages(siteConfig, {
-      defaultSize: DEFAULT_ACCESSIBILITY_SAMPLE,
-      configKeys: ['a11yIframeSampleSize', 'a11yResponsiveSampleSize'],
-    });
-
-    const reports = [];
-
-    for (const testPage of pages) {
-      await test.step(`Iframe audit: ${testPage}`, async () => {
-        const report = {
-          page: testPage,
-          frames: [],
-          gating: [],
-          warnings: [],
-          advisories: [],
-          notes: [],
-        };
-        reports.push(report);
-
-        let response;
-        try {
-          response = await safeNavigate(page, `${siteConfig.baseUrl}${testPage}`);
-        } catch (error) {
-          report.gating.push(`Navigation failed: ${error.message}`);
-          return;
-        }
-
-        if (!response || response.status() >= 400) {
-          report.gating.push(
-            `Received HTTP status ${response ? response.status() : 'unknown'} when loading page.`
-          );
-          return;
-        }
-
-        const stability = await waitForPageStability(page);
-        if (!stability.ok) {
-          report.gating.push(`Page did not reach a stable state: ${stability.message}`);
-          return;
-        }
-
-        const frameHandles = page.frames().filter((frame) => frame.parentFrame());
-
-        if (!frameHandles.length) {
-          report.advisories.push('No iframe elements detected on this page.');
-          return;
-        }
-
-        for (const [index, frame] of frameHandles.entries()) {
-          const frameElement = await frame.frameElement();
-          const meta = await frameElement.evaluate((el) => ({
-            title: el.getAttribute('title') || null,
-            ariaLabel: el.getAttribute('aria-label') || null,
-            name: el.getAttribute('name') || null,
-            role: el.getAttribute('role') || null,
-            src: el.getAttribute('src') || null,
-            allow: el.getAttribute('allow') || null,
-          }));
-          await frameElement.dispose();
-
-          const frameUrl = frame.url();
-          const crossOrigin = !isSameOrigin(frameUrl, siteConfig.baseUrl);
-          const accessibleLabel = meta.title || meta.ariaLabel || meta.name;
-
-          report.frames.push({
-            index,
-            ...meta,
-            resolvedUrl: frameUrl,
-            crossOrigin,
-            accessible: Boolean(accessibleLabel),
-          });
-
-          if (!accessibleLabel) {
-            report.gating.push(
-              `Iframe ${meta.src || frameUrl || `#${index}`} is missing accessible label (title/aria-label/name)${
-                crossOrigin ? ' — cross-origin content cannot inherit context' : ''
-              }.`
-            );
-          } else if (crossOrigin) {
-            report.advisories.push(
-              `Cross-origin iframe ${meta.src || frameUrl || `#${index}`} relies on accessible metadata; manual verification recommended.`
-            );
-          }
-
-          if (!crossOrigin) {
-            report.advisories.push(
-              `Same-origin iframe ${meta.src || frameUrl || `#${index}`} detected; include it in deeper interactive audits if it contains key journeys.`
-            );
-          }
-        }
-
-        report.notes.push(
-          `${report.frames.length} iframe(s) evaluated; ${report.frames.filter((frame) => frame.crossOrigin).length} cross-origin.`
-        );
-      });
-    }
-
-    const gatingTotal = reports.reduce((total, report) => total + report.gating.length, 0);
-
-    const projectName = siteConfig.name || process.env.SITE_NAME || 'default';
-
-    const iframeRunPayload = createRunSummaryPayload({
-      baseName: `a11y-iframe-summary-${slugify(projectName)}`,
-      title: 'Iframe accessibility summary',
-      overview: {
-        totalPagesAudited: reports.length,
-        totalIframesDetected: reports.reduce((sum, report) => sum + report.frames.length, 0),
-        pagesWithMissingLabels: reports.filter((report) => report.gating.length > 0).length,
-        pagesWithAdvisories: reports.filter((report) => report.advisories.length > 0).length,
-      },
-      metadata: {
-        spec: 'a11y.resilience.adaptive',
-        summaryType: 'iframe-metadata',
-        projectName,
-        suppressPageEntries: true,
-        scope: 'project',
-      },
-    });
-    iframeRunPayload.details = {
-      pages: reports.map((report) => ({
-        page: report.page,
-        iframeCount: report.frames.length,
-        gating: report.gating,
-        warnings: report.warnings,
-        advisories: report.advisories,
-        frames: report.frames,
-        notes: report.notes,
-      })),
-      wcagReferences: IFRAME_WCAG_REFERENCES,
-    };
-    await attachSchemaSummary(testInfo, iframeRunPayload);
-
-    for (const report of reports) {
-      const iframePagePayload = createPageSummaryPayload({
-        baseName: `a11y-iframe-${slugify(projectName)}-${slugify(report.page)}`,
-        title: `Iframe metadata — ${report.page}`,
-        page: report.page,
-        viewport: 'iframe-audit',
-        summary: {
-          iframeCount: report.frames.length,
-          gatingIssues: report.gating,
-          gating: report.gating,
-          warnings: report.warnings,
-          advisories: report.advisories,
-          frames: report.frames,
-          notes: report.notes,
-        },
-        metadata: {
-          spec: 'a11y.resilience.adaptive',
-          summaryType: 'iframe-metadata',
-          projectName,
-        },
-      });
-      await attachSchemaSummary(testInfo, iframePagePayload);
-    }
-
-    expect(gatingTotal, 'Iframe accessibility gating issues detected').toBe(0);
-  });
+  
 });
