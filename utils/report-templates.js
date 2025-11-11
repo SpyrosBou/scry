@@ -69,11 +69,7 @@ const renderRuleSnapshotsTable = (snapshots, { projectName, viewports } = {}) =>
           <td>${viewportList}</td>
           <td>${pages.length ? renderCodeList(pages) : '—'}</td>
           <td>${snapshot.nodes != null ? escapeHtml(formatCount(snapshot.nodes)) : '—'}</td>
-          <td>${renderComplianceCell(wcagTags, {
-            ruleId: snapshot.rule || snapshot.id,
-            category: snapshot.category,
-            impact: snapshot.impact,
-          })}</td>
+          <td>${renderComplianceCell(wcagTags)}</td>
         </tr>
       `;
     })
@@ -262,20 +258,12 @@ const renderUnifiedIssuesTable = (
         const tags = Array.isArray(row.wcagTags) ? row.wcagTags.filter(Boolean) : [];
         const badge = row.wcagBadge != null ? String(row.wcagBadge).trim() : '';
         if (tags.length > 0) {
-          return renderComplianceCell(tags, {
-            ruleId: row.ruleId,
-            category: row.category,
-            impact: row.impact,
-          });
+          return renderComplianceCell(tags);
         }
         if (badge) {
           return `<span class="badge badge-wcag">${escapeHtml(badge)}</span>`;
         }
-        return renderComplianceCell([], {
-          ruleId: row.ruleId,
-          category: row.category,
-          impact: row.impact,
-        });
+        return renderComplianceCell([]);
       })();
       const ruleLabel = row.ruleLabel || row.ruleId || row.label || 'Unknown rule';
       const detailsText = row.details || row.label || '';
@@ -1008,24 +996,9 @@ const renderWcagBadgesLinked = (tags) => {
 
 // When no WCAG tags are present, derive a meaningful classification badge
 // from the rule id or category so the UI never shows a bare "No WCAG tag".
-const renderComplianceBadgeFallback = ({ ruleId, category, impact }) => {
-  const id = String(ruleId || '').toLowerCase();
-  const cat = String(category || '').toLowerCase();
-  const isAria =
-    id.startsWith('aria-') || id.startsWith('landmark-') || id === 'region' || id.includes('aria');
-  if (isAria) return '<span class="badge badge-neutral">ARIA best practice</span>';
-  if (cat === 'best-practice') return '<span class="badge badge-neutral">Best practice</span>';
-  if (cat === 'advisory') return '<span class="badge badge-neutral">Advisory</span>';
-  if (cat === 'gating') {
-    const impactLabel = formatIssueImpactLabel(impact || 'info');
-    return `<span class="badge badge-neutral">${escapeHtml(`${impactLabel} impact`)}</span>`;
-  }
-  return '<span class="badge badge-neutral">Unclassified</span>';
-};
-
-const renderComplianceCell = (tags, { ruleId, category, impact } = {}) => {
+const renderComplianceCell = (tags) => {
   if (Array.isArray(tags) && tags.length > 0) return renderWcagBadgesLinked(tags);
-  return renderComplianceBadgeFallback({ ruleId, category, impact });
+  return '<span class="badge badge-neutral">No WCAG mapping</span>';
 };
 
 const deriveCulpritSummary = (nodes) => {
@@ -1326,11 +1299,7 @@ const renderAccessibilityRuleTable = (
       const pageCell = hasManyPages
         ? `<span class="details-text">${escapeHtml(`${formatCount(pageCount)} pages`)}</span>`
         : renderCodeList(normalisedPages, '—');
-      const wcagHtml = renderComplianceCell(wcagTags, {
-        ruleId: rule.rule || rule.id,
-        category: rule.category,
-        impact: rule.impact,
-      });
+      const wcagHtml = renderComplianceCell(wcagTags);
       const detailsText = rule.description || rule.help || '';
       const detailsContent = detailsText
         ? escapeHtml(detailsText)
@@ -2137,11 +2106,7 @@ const renderWcagPageIssueTable = (entries, heading, options = {}) => {
     .map((entry) => {
       const impact = entry.impact || entry.category || 'info';
       let helpUrl = entry.helpUrl || entry.help || null;
-      const wcagHtml = renderComplianceCell(entry.tags || entry.wcagTags || [], {
-        ruleId: entry.id || entry.rule,
-        category: entry.category,
-        impact: entry.impact,
-      });
+      const wcagHtml = renderComplianceCell(entry.tags || entry.wcagTags || []);
       // Derive Help link from WCAG tags if not explicitly provided
       if (!helpUrl) {
         const tags = (entry.tags || entry.wcagTags || []).filter(Boolean);
