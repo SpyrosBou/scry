@@ -245,7 +245,11 @@ const renderUnifiedIssuesTable = (
       return (a.label || '').localeCompare(b.label || '');
     })
     .map((row) => {
-      const pagesList = renderCodeList(row.pages, '—');
+      const pageCountValue = Number.isFinite(row.pageCount) ? row.pageCount : row.pages.length;
+      const hasManyPages = pageCountValue > 5 || row.pages.length > 5;
+      const pagesList = hasManyPages
+        ? `<span class="details-text">${escapeHtml(`${formatCount(pageCountValue)} pages`)}</span>`
+        : renderCodeList(row.pages, '—');
       const browserList = renderCodeList(row.browsers, '—');
       const viewportsList = renderCodeList(
         row.viewports,
