@@ -491,9 +491,6 @@ test.describe('Functionality: Accessibility (WCAG)', () => {
 
         const stability = await waitForPageStability(page, {
           timeout: STABILITY_TIMEOUT_MS,
-          strategies: Array.isArray(siteConfig.a11yStabilityStrategies)
-            ? siteConfig.a11yStabilityStrategies
-            : ['domcontentloaded', 'load', 'networkidle'],
         });
         pageReport.stability = stability;
         if (!stability.ok) {
