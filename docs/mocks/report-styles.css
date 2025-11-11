@@ -1594,7 +1594,8 @@ ul.status-summary li {
   gap: 0.4rem;
   padding: 0.25rem 0.55rem;
   border-radius: 12px;
-  color: var(--summary-heading-advisory-text);
+  background: var(--surface-card);
+  color: var(--text-strong);
 }
 
 .summary-toggle-controls {
