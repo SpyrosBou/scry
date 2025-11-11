@@ -11,6 +11,8 @@ const { createRunSummaryPayload, createPageSummaryPayload } = require('../utils/
 const {
   DEFAULT_ACCESSIBILITY_SAMPLE,
   selectAccessibilityTestPages,
+  resolveAccessibilityMetadata,
+  applyViewportMetadata,
 } = require('../utils/a11y-shared');
 const { runPageTasks, resolveConcurrencyLimit } = require('../utils/concurrency-helpers');
 
@@ -384,11 +386,11 @@ test.describe('Accessibility: Resilience checks', () => {
     );
 
     const gatingTotal = reports.reduce((total, report) => total + report.gating.length, 0);
-
-    const projectName = siteConfig.name || process.env.SITE_NAME || 'default';
+    const { siteLabel, viewportLabel } = resolveAccessibilityMetadata(siteConfig, testInfo);
+    applyViewportMetadata(reports, viewportLabel);
 
     const runPayload = createRunSummaryPayload({
-      baseName: `a11y-iframe-summary-${slugify(projectName)}`,
+      baseName: `a11y-iframe-summary-${slugify(siteLabel)}`,
       title: 'Iframe accessibility summary',
       overview: {
         totalPagesAudited: reports.length,
@@ -399,7 +401,9 @@ test.describe('Accessibility: Resilience checks', () => {
       metadata: {
         spec: 'a11y.resilience.adaptive',
         summaryType: 'iframe-metadata',
-        projectName,
+        projectName: siteLabel,
+        siteName: siteLabel,
+        viewports: [viewportLabel],
         suppressPageEntries: true,
         scope: 'project',
       },
@@ -413,6 +417,10 @@ test.describe('Accessibility: Resilience checks', () => {
         advisories: report.advisories,
         frames: report.frames,
         notes: report.notes,
+        projectName: viewportLabel,
+        browser: viewportLabel,
+        viewport: viewportLabel,
+        viewports: [viewportLabel],
       })),
       wcagReferences: IFRAME_WCAG_REFERENCES,
     };
@@ -420,10 +428,10 @@ test.describe('Accessibility: Resilience checks', () => {
 
     for (const report of reports) {
       const pagePayload = createPageSummaryPayload({
-        baseName: `a11y-reduced-motion-${slugify(projectName)}-${slugify(report.page)}`,
+        baseName: `a11y-reduced-motion-${slugify(siteLabel)}-${slugify(report.page)}`,
         title: `Iframe metadata — ${report.page}`,
         page: report.page,
-        viewport: 'iframe-audit',
+        viewport: viewportLabel,
         summary: {
           iframeCount: report.frames.length,
           gatingIssues: report.gating,
@@ -432,11 +440,17 @@ test.describe('Accessibility: Resilience checks', () => {
           advisories: report.advisories,
           frames: report.frames,
           notes: report.notes,
+          projectName: viewportLabel,
+          browser: viewportLabel,
+          viewport: viewportLabel,
+          viewports: [viewportLabel],
         },
         metadata: {
           spec: 'a11y.resilience.adaptive',
           summaryType: 'iframe-metadata',
-          projectName,
+          projectName: siteLabel,
+          siteName: siteLabel,
+          viewports: [viewportLabel],
         },
       });
       await attachSchemaSummary(testInfo, pagePayload);
@@ -466,11 +480,11 @@ test.describe('Accessibility: Resilience checks', () => {
     );
 
     const gatingTotal = reports.reduce((total, report) => total + report.gating.length, 0);
-
-    const projectName = siteConfig.name || process.env.SITE_NAME || 'default';
+    const { siteLabel, viewportLabel } = resolveAccessibilityMetadata(siteConfig, testInfo);
+    applyViewportMetadata(reports, viewportLabel);
 
     const reflowRunPayload = createRunSummaryPayload({
-      baseName: `a11y-reflow-summary-${slugify(projectName)}`,
+      baseName: `a11y-reflow-summary-${slugify(siteLabel)}`,
       title: '320px reflow summary',
       overview: {
         totalPagesAudited: reports.length,
@@ -481,7 +495,9 @@ test.describe('Accessibility: Resilience checks', () => {
       metadata: {
         spec: 'a11y.resilience.adaptive',
         summaryType: 'reflow',
-        projectName,
+        projectName: siteLabel,
+        siteName: siteLabel,
+        viewports: [viewportLabel],
         suppressPageEntries: true,
         scope: 'project',
       },
@@ -497,6 +513,10 @@ test.describe('Accessibility: Resilience checks', () => {
         advisories: report.advisories,
         overflowSources: report.offenders,
         notes: report.notes,
+        projectName: viewportLabel,
+        browser: viewportLabel,
+        viewport: viewportLabel,
+        viewports: [viewportLabel],
       })),
       wcagReferences: REFLOW_WCAG_REFERENCES,
       maxOverflowTolerancePx: MAX_OVERFLOW_TOLERANCE_PX,
@@ -505,10 +525,10 @@ test.describe('Accessibility: Resilience checks', () => {
 
     for (const report of reports) {
       const reflowPagePayload = createPageSummaryPayload({
-        baseName: `a11y-reflow-${slugify(projectName)}-${slugify(report.page)}`,
+        baseName: `a11y-reflow-${slugify(siteLabel)}-${slugify(report.page)}`,
         title: `320px reflow — ${report.page}`,
         page: report.page,
-        viewport: '320px',
+        viewport: viewportLabel,
         summary: {
           viewportWidth: report.viewportWidth,
           documentWidth: report.scrollWidth,
@@ -519,11 +539,17 @@ test.describe('Accessibility: Resilience checks', () => {
           advisories: report.advisories,
           overflowSources: report.offenders,
           notes: report.notes,
+          projectName: viewportLabel,
+          browser: viewportLabel,
+          viewport: viewportLabel,
+          viewports: [viewportLabel],
         },
         metadata: {
           spec: 'a11y.resilience.adaptive',
           summaryType: 'reflow',
-          projectName,
+          projectName: siteLabel,
+          siteName: siteLabel,
+          viewports: [viewportLabel],
         },
       });
       await attachSchemaSummary(testInfo, reflowPagePayload);
@@ -553,11 +579,11 @@ test.describe('Accessibility: Resilience checks', () => {
     );
 
     const gatingTotal = reports.reduce((total, report) => total + report.gating.length, 0);
-
-    const projectName = siteConfig.name || process.env.SITE_NAME || 'default';
+    const { siteLabel, viewportLabel } = resolveAccessibilityMetadata(siteConfig, testInfo);
+    applyViewportMetadata(reports, viewportLabel);
 
     const runPayload = createRunSummaryPayload({
-      baseName: `a11y-reduced-motion-summary-${slugify(projectName)}`,
+      baseName: `a11y-reduced-motion-summary-${slugify(siteLabel)}`,
       title: 'Reduced motion support summary',
       overview: {
         totalPagesAudited: reports.length,
@@ -569,7 +595,9 @@ test.describe('Accessibility: Resilience checks', () => {
       metadata: {
         spec: 'a11y.resilience.adaptive',
         summaryType: 'reduced-motion',
-        projectName,
+        projectName: siteLabel,
+        siteName: siteLabel,
+        viewports: [viewportLabel],
         suppressPageEntries: true,
         scope: 'project',
       },
@@ -584,6 +612,10 @@ test.describe('Accessibility: Resilience checks', () => {
         warnings: report.warnings,
         advisories: report.advisories,
         notes: report.notes,
+        projectName: viewportLabel,
+        browser: viewportLabel,
+        viewport: viewportLabel,
+        viewports: [viewportLabel],
       })),
       wcagReferences: REDUCED_MOTION_WCAG_REFERENCES,
     };
@@ -591,10 +623,10 @@ test.describe('Accessibility: Resilience checks', () => {
 
     for (const report of reports) {
       const pagePayload = createPageSummaryPayload({
-        baseName: `a11y-reduced-motion-${slugify(projectName)}-${slugify(report.page)}`,
+        baseName: `a11y-reduced-motion-${slugify(siteLabel)}-${slugify(report.page)}`,
         title: `Reduced motion audit — ${report.page}`,
         page: report.page,
-        viewport: 'reduced-motion',
+        viewport: viewportLabel,
         summary: {
           matchesPreference: report.matchesReduce,
           animations: report.animations,
@@ -604,11 +636,17 @@ test.describe('Accessibility: Resilience checks', () => {
           warnings: report.warnings,
           advisories: report.advisories,
           notes: report.notes,
+          projectName: viewportLabel,
+          browser: viewportLabel,
+          viewport: viewportLabel,
+          viewports: [viewportLabel],
         },
         metadata: {
           spec: 'a11y.resilience.adaptive',
           summaryType: 'reduced-motion',
-          projectName,
+          projectName: siteLabel,
+          siteName: siteLabel,
+          viewports: [viewportLabel],
         },
       });
       await attachSchemaSummary(testInfo, pagePayload);

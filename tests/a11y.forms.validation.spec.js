@@ -8,6 +8,7 @@ const {
 } = require('../utils/test-helpers');
 const { attachSchemaSummary } = require('../utils/reporting-utils');
 const { createRunSummaryPayload, createPageSummaryPayload } = require('../utils/report-schema');
+const { resolveAccessibilityMetadata, applyViewportMetadata } = require('../utils/a11y-shared');
 
 const ERROR_SELECTORS = [
   '[role="alert"]',
@@ -357,11 +358,11 @@ test.describe('Accessibility: Forms', () => {
     }
 
     const gatingTotal = reports.reduce((sum, report) => sum + report.gating.length, 0);
-
-    const projectName = siteConfig.name || process.env.SITE_NAME || 'default';
+    const { siteLabel, viewportLabel } = resolveAccessibilityMetadata(siteConfig, testInfo);
+    applyViewportMetadata(reports, viewportLabel);
 
     const runPayload = createRunSummaryPayload({
-      baseName: `a11y-forms-summary-${slugify(projectName)}`,
+      baseName: `a11y-forms-summary-${slugify(siteLabel)}`,
       title: 'Forms accessibility summary',
       overview: {
         totalFormsAudited: reports.length,
@@ -374,7 +375,9 @@ test.describe('Accessibility: Forms', () => {
       metadata: {
         spec: 'a11y.forms.validation',
         summaryType: 'forms',
-        projectName,
+        projectName: siteLabel,
+        siteName: siteLabel,
+        viewports: [viewportLabel],
         suppressPageEntries: true,
         scope: 'project',
       },
@@ -389,6 +392,10 @@ test.describe('Accessibility: Forms', () => {
       advisories: report.advisories,
       fields: report.fields,
       notes: report.notes,
+      projectName: viewportLabel,
+      browser: viewportLabel,
+      viewport: viewportLabel,
+      viewports: [viewportLabel],
     })),
     wcagReferences: FORMS_WCAG_REFERENCES,
   };
@@ -396,10 +403,10 @@ test.describe('Accessibility: Forms', () => {
 
     for (const report of reports) {
       const pagePayload = createPageSummaryPayload({
-        baseName: `a11y-forms-${slugify(projectName)}-${slugify(report.formName)}-${slugify(report.page)}`,
+        baseName: `a11y-forms-${slugify(siteLabel)}-${slugify(report.formName)}-${slugify(report.page)}`,
         title: `${report.formName} — ${report.page}`,
         page: report.page,
-        viewport: 'forms',
+        viewport: viewportLabel,
         summary: {
           formName: report.formName,
           selectorUsed: report.selectorUsed,
@@ -409,11 +416,17 @@ test.describe('Accessibility: Forms', () => {
           advisories: report.advisories,
           fields: report.fields,
           notes: report.notes,
+          projectName: viewportLabel,
+          browser: viewportLabel,
+          viewport: viewportLabel,
+          viewports: [viewportLabel],
         },
         metadata: {
           spec: 'a11y.forms.validation',
           summaryType: 'forms',
-          projectName,
+          projectName: siteLabel,
+          siteName: siteLabel,
+          viewports: [viewportLabel],
         },
       });
       await attachSchemaSummary(testInfo, pagePayload);

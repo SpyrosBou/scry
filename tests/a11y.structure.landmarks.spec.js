@@ -12,6 +12,8 @@ const { createRunSummaryPayload, createPageSummaryPayload } = require('../utils/
 const {
   selectAccessibilityTestPages,
   DEFAULT_ACCESSIBILITY_SAMPLE,
+  resolveAccessibilityMetadata,
+  applyViewportMetadata,
 } = require('../utils/a11y-shared');
 
 const STRUCTURE_WCAG_REFERENCES = [
@@ -155,9 +157,8 @@ test.describe('Accessibility: Structural landmarks', () => {
     );
 
     const gatingTotal = reports.reduce((sum, report) => sum + report.gating.length, 0);
-
-    const siteLabel = siteConfig.name || process.env.SITE_NAME || 'default';
-    const viewportLabel = testInfo.project?.name || 'Chrome';
+    const { siteLabel, viewportLabel } = resolveAccessibilityMetadata(siteConfig, testInfo);
+    applyViewportMetadata(reports, viewportLabel);
 
     const runPayload = createRunSummaryPayload({
       baseName: `a11y-structure-summary-${slugify(siteLabel)}`,

@@ -7,16 +7,17 @@ const { PNG } = require('pngjs');
 const SiteLoader = require('../utils/site-loader');
 const { runPageTasks, resolveConcurrencyLimit } = require('../utils/concurrency-helpers');
 const {
+  selectAccessibilityTestPages,
+  DEFAULT_ACCESSIBILITY_SAMPLE,
+  resolveAccessibilityMetadata,
+  applyViewportMetadata,
+} = require('../utils/a11y-shared');
+const {
   safeNavigate,
   waitForPageStability,
 } = require('../utils/test-helpers');
 const { attachSchemaSummary } = require('../utils/reporting-utils');
 const { createRunSummaryPayload, createPageSummaryPayload } = require('../utils/report-schema');
-const {
-  DEFAULT_ACCESSIBILITY_SAMPLE,
-  selectAccessibilityTestPages,
-} = require('../utils/a11y-shared');
-
 const KEYBOARD_WCAG_REFERENCES = [
   { id: '2.1.1', name: 'Keyboard', level: 'A' },
   { id: '2.1.2', name: 'No Keyboard Trap', level: 'A' },
@@ -318,10 +319,11 @@ test.describe('Accessibility: Keyboard navigation', () => {
     );
 
     const gatingTotal = reports.reduce((total, report) => total + report.gating.length, 0);
-    const projectName = siteConfig.name || process.env.SITE_NAME || 'default';
+    const { siteLabel, viewportLabel } = resolveAccessibilityMetadata(siteConfig, testInfo);
+    applyViewportMetadata(reports, viewportLabel);
 
     const runPayload = createRunSummaryPayload({
-      baseName: `a11y-keyboard-summary-${slugify(projectName)}`,
+      baseName: `a11y-keyboard-summary-${slugify(siteLabel)}`,
       title: 'Keyboard navigation summary',
       overview: {
         totalPagesAudited: reports.length,
@@ -332,12 +334,15 @@ test.describe('Accessibility: Keyboard navigation', () => {
       metadata: {
         spec: 'a11y.keyboard.navigation',
         summaryType: 'keyboard',
-        projectName,
+        projectName: siteLabel,
+        siteName: siteLabel,
+        viewports: [viewportLabel],
         suppressPageEntries: true,
         scope: 'project',
       },
     });
   runPayload.details = {
+    viewports: [viewportLabel],
     pages: reports.map((report) => ({
       page: report.page,
       focusableCount: report.focusableCount,
@@ -348,6 +353,10 @@ test.describe('Accessibility: Keyboard navigation', () => {
       advisories: report.advisories,
       focusSequence: report.sequence,
       notes: report.notes,
+      projectName: viewportLabel,
+      browser: viewportLabel,
+      viewport: viewportLabel,
+      viewports: [viewportLabel],
     })),
     wcagReferences: KEYBOARD_WCAG_REFERENCES,
   };
@@ -355,10 +364,10 @@ test.describe('Accessibility: Keyboard navigation', () => {
 
     for (const report of reports) {
       const pagePayload = createPageSummaryPayload({
-        baseName: `a11y-keyboard-${slugify(projectName)}-${slugify(report.page)}`,
+        baseName: `a11y-keyboard-${slugify(siteLabel)}-${slugify(report.page)}`,
         title: `Keyboard audit — ${report.page}`,
         page: report.page,
-        viewport: 'keyboard',
+        viewport: viewportLabel,
         summary: {
           gatingIssues: report.gating,
           gating: report.gating,
@@ -369,11 +378,17 @@ test.describe('Accessibility: Keyboard navigation', () => {
           skipLink: report.skipLink,
           focusSequence: report.sequence,
           notes: report.notes,
+          projectName: viewportLabel,
+          browser: viewportLabel,
+          viewport: viewportLabel,
+          viewports: [viewportLabel],
         },
         metadata: {
           spec: 'a11y.keyboard.navigation',
           summaryType: 'keyboard',
-          projectName,
+          projectName: siteLabel,
+          siteName: siteLabel,
+          viewports: [viewportLabel],
         },
       });
       await attachSchemaSummary(testInfo, pagePayload);

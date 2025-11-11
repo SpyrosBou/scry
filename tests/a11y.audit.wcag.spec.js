@@ -13,7 +13,12 @@ const {
   violationHasWcagCoverage,
 } = require('../utils/a11y-utils');
 const { createAxeBuilder } = require('../utils/a11y-runner');
-const { selectAccessibilityTestPages, resolveSampleSetting } = require('../utils/a11y-shared');
+const {
+  selectAccessibilityTestPages,
+  resolveSampleSetting,
+  resolveAccessibilityMetadata,
+  applyViewportMetadata,
+} = require('../utils/a11y-shared');
 const { createRunSummaryPayload, createPageSummaryPayload } = require('../utils/report-schema');
 
 test.use({ trace: 'off', video: 'off' });
@@ -596,6 +601,8 @@ test.describe('Functionality: Accessibility (WCAG)', () => {
         console.warn('ℹ️  Accessibility suite executed with no configured pages.');
         return;
       }
+      const { siteLabel, viewportLabel } = resolveAccessibilityMetadata(siteConfig, testInfo);
+      applyViewportMetadata(reports, viewportLabel);
 
       const { aggregatedViolations, aggregatedAdvisories, aggregatedBestPractices } =
         deriveAggregatedFindings(reports);
@@ -610,9 +617,11 @@ test.describe('Functionality: Accessibility (WCAG)', () => {
         title: `WCAG findings – ${testInfo.project.name}`,
         metadata: {
           scope: 'project',
-          projectName: testInfo.project.name,
+          projectName: siteLabel,
+          siteName: siteLabel,
           summaryType: 'wcag',
           suppressPageEntries: true,
+          viewports: [viewportLabel],
         },
       });
       if (schemaRunPayload) {
@@ -622,6 +631,9 @@ test.describe('Functionality: Accessibility (WCAG)', () => {
       const schemaPagePayloads = buildAccessibilityPageSchemaPayloads(reports, {
         summaryType: 'wcag',
         gatingLabel: failOnLabel,
+        projectName: siteLabel,
+        siteName: siteLabel,
+        viewports: [viewportLabel],
       });
       for (const payload of schemaPagePayloads) {
         await attachSchemaSummary(testInfo, payload);
