@@ -34,4 +34,3 @@ function loadRunEntries(reportsRoot = path.join(process.cwd(), 'reports')) {
 module.exports = {
   loadRunEntries,
 };
-
