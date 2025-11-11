@@ -250,7 +250,7 @@ const renderUnifiedIssuesTable = (
         : renderCodeList(row.pages, '—');
       const browserList = renderCodeList(row.browsers, '—');
       const viewportsList = renderCodeList(
-        row.viewports,
+        formatViewportList(row.viewports),
         viewportLabel ? escapeHtml(viewportLabel) : '—'
       );
       const wcagHtml = (() => {
@@ -1280,7 +1280,7 @@ const renderAccessibilityRuleTable = (
       const wcagTags =
         Array.isArray(rule.wcagTags) && rule.wcagTags.length > 0 ? rule.wcagTags : [];
       const viewportsRaw = rule.viewports || rule.viewportsTested || fallbackViewports;
-      const viewportCell = renderCodeList(viewportsRaw, '—');
+      const viewportCell = renderCodeList(formatViewportList(viewportsRaw), '—');
       const pageArray = Array.isArray(rule.pages) ? rule.pages : [];
       const normalisedPages = pageArray
         .map((page) => {
@@ -2136,7 +2136,9 @@ const renderWcagPageIssueTable = (entries, heading, options = {}) => {
         '—'
       );
       const viewportList = renderCodeList(
-        normaliseStringList(entry.viewport, entry.viewportName, entry.viewports, viewportFallback),
+        formatViewportList(
+          normaliseStringList(entry.viewport, entry.viewportName, entry.viewports, viewportFallback)
+        ),
         '—'
       );
       const culprit = deriveCulpritSummary(entry.nodes || []);
@@ -7911,4 +7913,22 @@ module.exports.__test__ = {
   renderPerformancePageCard,
   renderResponsiveStructurePageCard,
   renderVisualPageCard,
+};
+const NORMALISED_VIEWPORT_LABELS = {
+  chrome: 'Desktop',
+  firefox: 'Desktop',
+  safari: 'Desktop',
+  'chrome mobile': 'Mobile',
+  'chrome tablet': 'Tablet',
+  'chrome desktop large': 'Desktop',
+};
+
+const formatViewportList = (values) => {
+  const list = normaliseStringList(values);
+  if (list.length === 0) return [];
+  return list.map((value) => {
+    const key = String(value || '').trim().toLowerCase();
+    if (!key) return value;
+    return NORMALISED_VIEWPORT_LABELS[key] || value;
+  });
 };
