@@ -1,5 +1,6 @@
 const { test, expect } = require('../utils/test-fixtures');
 const SiteLoader = require('../utils/site-loader');
+const { mapWithConcurrency, resolveConcurrencyLimit } = require('../utils/concurrency-helpers');
 
 test.use({ trace: 'off', video: 'off' });
 const {
@@ -133,7 +134,7 @@ test.describe('Accessibility: Structural landmarks', () => {
     errorContext = sharedErrorContext;
   });
 
-  test('Landmarks and headings meet baseline accessibility expectations', async ({ page }, testInfo) => {
+  test('Landmarks and headings meet baseline accessibility expectations', async ({ browser }, testInfo) => {
     test.setTimeout(7200000);
 
     const pages = selectAccessibilityTestPages(siteConfig, {
@@ -141,147 +142,16 @@ test.describe('Accessibility: Structural landmarks', () => {
       configKeys: ['a11yStructureSampleSize', 'a11yResponsiveSampleSize'],
     });
 
-    const reports = [];
+    const concurrency = resolveConcurrencyLimit(
+      process.env.A11Y_STRUCTURE_CONCURRENCY,
+      process.env.A11Y_PARALLEL_PAGES
+    );
 
-    for (const pagePath of pages) {
-      const report = {
-        page: pagePath,
-        gating: [],
-        warnings: [],
-        advisories: [],
-        headingLevels: [],
-        headingSkips: [],
-        h1Count: 0,
-        hasMain: false,
-        navigationCount: 0,
-        headerCount: 0,
-        footerCount: 0,
-        notes: [],
-      };
-      reports.push(report);
-
-      await test.step(`Structure audit: ${pagePath}`, async () => {
-        const response = await safeNavigate(page, `${siteConfig.baseUrl}${pagePath}`);
-        if (!response || response.status() >= 400) {
-          report.gating.push(
-            `Failed to load page (status ${response ? response.status() : 'unknown'})`
-          );
-          return;
-        }
-
-        const stability = await waitForPageStability(page);
-        if (!stability.ok) {
-          report.gating.push(`Page did not reach a stable state: ${stability.message}`);
-          return;
-        }
-
-        const structure = await evaluateStructure(page);
-        report.headingLevels = structure.headings;
-        report.h1Count = structure.h1Count;
-        report.hasMain = structure.hasMain;
-        report.navigationCount = structure.navigationCount;
-        report.headerCount = structure.headerCount;
-        report.footerCount = structure.footerCount;
-
-        if (structure.h1Count === 0) {
-          report.gating.push(
-            createStructureFinding('No H1 heading found on the page.', '2.4.6', {
-              impact: 'critical',
-              summary: 'Missing H1 heading',
-            })
-          );
-        } else if (structure.h1Count > 1) {
-          report.gating.push(
-            createStructureFinding(
-              `Expected a single H1 heading; found ${structure.h1Count}.`,
-              '2.4.6',
-              {
-                impact: 'critical',
-                summary: 'Multiple H1 headings detected',
-              }
-            )
-          );
-        }
-
-        if (!structure.hasMain) {
-          report.gating.push(
-            createStructureFinding(
-              'Missing <main> landmark (or equivalent role="main").',
-              '1.3.1',
-              {
-                impact: 'critical',
-                summary: 'Missing main landmark',
-              }
-            )
-          );
-        }
-
-        if (!structure.navigationCount) {
-          report.advisories.push(
-            createStructureFinding(
-              'No navigation landmark detected. Ensure primary navigation is wrapped in <nav>.',
-              '2.4.1',
-              {
-                summary: 'No navigation landmark detected',
-              }
-            )
-          );
-        }
-
-        if (!structure.headerCount) {
-          report.advisories.push(
-            createStructureFinding('No header/banner landmark detected.', '1.3.1', {
-              summary: 'No header landmark detected',
-            })
-          );
-        }
-
-        if (!structure.footerCount) {
-          report.advisories.push(
-            createStructureFinding('No footer/contentinfo landmark detected.', '1.3.1', {
-              summary: 'No footer landmark detected',
-            })
-          );
-        }
-
-        const headingSkipCount = structure.headingSkips.length;
-        // Enrich heading skip findings with precise targets and screenshots
-        report.headingSkips = [];
-        for (const skip of structure.headingSkips) {
-          // best-effort target label for readability in the report
-          const targetLabel = `h${skip.level}: "${skip.text}"`;
-          let screenshotDataUri = null;
-          try {
-            const locator = page.locator('h1, h2, h3, h4, h5, h6').nth(skip.index);
-            const buffer = await locator.screenshot();
-            screenshotDataUri = `data:image/png;base64,${buffer.toString('base64')}`;
-          } catch (_) {
-            // non-fatal: continue without screenshot
-          }
-
-          report.headingSkips.push(
-            createStructureFinding(skip.message, '2.4.6', {
-              impact: 'moderate',
-              summary: 'Heading level sequence issue',
-              details: `Jumps H${skip.prevLevel} → H${skip.level}`,
-              nodes: [
-                {
-                  target: [targetLabel],
-                  screenshotDataUri: screenshotDataUri || undefined,
-                },
-              ],
-            })
-          );
-        }
-
-        // Do not also add a duplicative advisory for heading skips; the per-occurrence
-        // warnings above already capture the issue with precise targets and screenshots.
-
-        report.notes.push(
-          `Heading outline captured ${structure.headings.length} nodes with ${headingSkipCount} level skip(s).`
-        );
-      });
-    }
+    const reports = await mapWithConcurrency(
+      pages,
+      async (pagePath) => runStructureAudit(browser, siteConfig, pagePath),
+      { concurrency }
+    );
 
     const gatingTotal = reports.reduce((sum, report) => sum + report.gating.length, 0);
 
@@ -356,3 +226,142 @@ test.describe('Accessibility: Structural landmarks', () => {
     expect(gatingTotal, 'Structural accessibility gating issues detected').toBe(0);
   });
 });
+
+async function runStructureAudit(browser, siteConfig, pagePath) {
+  const report = {
+    page: pagePath,
+    gating: [],
+    warnings: [],
+    advisories: [],
+    headingLevels: [],
+    headingSkips: [],
+    h1Count: 0,
+    hasMain: false,
+    navigationCount: 0,
+    headerCount: 0,
+    footerCount: 0,
+    notes: [],
+  };
+
+  const context = await browser.newContext();
+  const auditPage = await context.newPage();
+  try {
+    console.log(`🧭 Structure audit: ${pagePath}`);
+    const response = await safeNavigate(auditPage, `${siteConfig.baseUrl}${pagePath}`);
+    if (!response || response.status() >= 400) {
+      report.gating.push(
+        `Failed to load page (status ${response ? response.status() : 'unknown'})`
+      );
+      return report;
+    }
+
+    const stability = await waitForPageStability(auditPage);
+    if (!stability.ok) {
+      report.gating.push(`Page did not reach a stable state: ${stability.message}`);
+      return report;
+    }
+
+    const structure = await evaluateStructure(auditPage);
+    report.headingLevels = structure.headings;
+    report.h1Count = structure.h1Count;
+    report.hasMain = structure.hasMain;
+    report.navigationCount = structure.navigationCount;
+    report.headerCount = structure.headerCount;
+    report.footerCount = structure.footerCount;
+
+    if (structure.h1Count === 0) {
+      report.gating.push(
+        createStructureFinding('No H1 heading found on the page.', '2.4.6', {
+          impact: 'critical',
+          summary: 'Missing H1 heading',
+        })
+      );
+    } else if (structure.h1Count > 1) {
+      report.gating.push(
+        createStructureFinding(
+          `Expected a single H1 heading; found ${structure.h1Count}.`,
+          '2.4.6',
+          {
+            impact: 'critical',
+            summary: 'Multiple H1 headings detected',
+          }
+        )
+      );
+    }
+
+    if (!structure.hasMain) {
+      report.gating.push(
+        createStructureFinding('Missing <main> landmark (or equivalent role="main").', '1.3.1', {
+          impact: 'critical',
+          summary: 'Missing main landmark',
+        })
+      );
+    }
+
+    if (!structure.navigationCount) {
+      report.advisories.push(
+        createStructureFinding(
+          'No navigation landmark detected. Ensure primary navigation is wrapped in <nav>.',
+          '2.4.1',
+          {
+            summary: 'No navigation landmark detected',
+          }
+        )
+      );
+    }
+
+    if (!structure.headerCount) {
+      report.advisories.push(
+        createStructureFinding('No header/banner landmark detected.', '1.3.1', {
+          summary: 'No header landmark detected',
+        })
+      );
+    }
+
+    if (!structure.footerCount) {
+      report.advisories.push(
+        createStructureFinding('No footer/contentinfo landmark detected.', '1.3.1', {
+          summary: 'No footer landmark detected',
+        })
+      );
+    }
+
+    const headingSkipCount = structure.headingSkips.length;
+    report.headingSkips = [];
+    for (const skip of structure.headingSkips) {
+      const targetLabel = `h${skip.level}: "${skip.text}"`;
+      let screenshotDataUri = null;
+      try {
+        const locator = auditPage.locator('h1, h2, h3, h4, h5, h6').nth(skip.index);
+        const buffer = await locator.screenshot();
+        screenshotDataUri = `data:image/png;base64,${buffer.toString('base64')}`;
+      } catch (_) {
+        // ignore screenshot failures
+      }
+
+      report.headingSkips.push(
+        createStructureFinding(skip.message, '2.4.6', {
+          impact: 'moderate',
+          summary: 'Heading level sequence issue',
+          details: `Jumps H${skip.prevLevel} → H${skip.level}`,
+          nodes: [
+            {
+              target: [targetLabel],
+              screenshotDataUri: screenshotDataUri || undefined,
+            },
+          ],
+        })
+      );
+    }
+
+    report.notes.push(
+      `Heading outline captured ${structure.headings.length} nodes with ${headingSkipCount} level skip(s).`
+    );
+  } catch (error) {
+    report.gating.push(`Navigation failed: ${error.message}`);
+  } finally {
+    await context.close();
+  }
+
+  return report;
+}

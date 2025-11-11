@@ -2,7 +2,7 @@
 
 Automated Playwright-powered testing harness for auditing WordPress websites across functionality, responsiveness, accessibility, and visual regression criteria. The suite standardises how sites are exercised, captures rich HTML (HyperText Markup Language) reports, and keeps a historical record of findings for ongoing quality assurance.
 
-> Last updated for version 2025.02.14-host-alignment.
+> Last updated for version 2025.02.14-parallel-a11y.
 
 ## Key Capabilities
 - Generates Solarized-themed HTML reports with parity to the approved reporting mocks.
@@ -72,9 +72,11 @@ node run-tests.js --site example-site --pages 5 --responsive
 Helpful environment variables:
 - `REPORT_BROWSER` and `REPORT_BROWSER_ARGS` force a specific viewer when opening reports.
 - `A11Y_SAMPLE=<n>` caps accessibility sampling when the suite is large.
+- `A11Y_PARALLEL_PAGES`, `A11Y_STRUCTURE_CONCURRENCY`, and `A11Y_KEYBOARD_CONCURRENCY` control how many accessibility audits run concurrently (defaults to a small CPU-aware limit so we stay performant without hammering target sites).
 
 ## Reports and Artifacts
 - Run outputs live under `reports/run-*/` with HTML in `report.html` and structured data in `data/run.json`.
+- The custom HTML reporter is always enabled (even on CI) so every run includes `report.html` plus `data/run.json`; CI simply layers Playwright's `blob` reporter on top for merges.
 - Large manifests are written to `reports/run-manifests/`; trim that folder with `npm run clean:manifests [days]` (default 15 days) when it grows.
 - Capture run manifests and summaries programmatically with `--output ./reports/run-summary.json` — the file contains one entry per site with manifest metadata and report status.
 - Use `npm run reports:dev` to start a preview server with live reload at http://127.0.0.1:4173/ (default). It watches `reports/run-*`, `reports/latest-run.json`, plus the template and SCSS sources in `utils/` and `docs/mocks/`, auto-refreshing immediately when report data, styling, or helper code changes.
