@@ -45,7 +45,6 @@ const collectRuleSnapshots = (entries, category) => {
     const viewportSet = new Set(
       Array.isArray(viewports) && viewports.length ? viewports : [browserLabel]
     );
-    const pageKey = `${projectKey}::${page}`;
     violations.forEach((violation) => {
       const ruleId = violation.id || 'unknown-rule';
       const key = `${category || 'rule'}::${ruleId}`;
@@ -55,7 +54,7 @@ const collectRuleSnapshots = (entries, category) => {
           impact: violation.impact || category || 'info',
           helpUrl: violation.helpUrl || null,
           category,
-          pages: new Set(),
+          pages: new Map(),
           viewports: new Set(),
           browsers: new Set(),
           nodes: 0,
@@ -64,7 +63,8 @@ const collectRuleSnapshots = (entries, category) => {
         });
       }
       const record = aggregate.get(key);
-      record.pages.add(pageKey);
+      const dedupeKey = `${projectKey}::${browserLabel}::${page || ''}`;
+      record.pages.set(dedupeKey, page);
       viewportSet.forEach((value) => record.viewports.add(value || DATA_MISSING_LABEL));
       record.browsers.add(browserLabel);
       record.nodes += violation.nodes?.length || 0;
@@ -83,7 +83,7 @@ const collectRuleSnapshots = (entries, category) => {
     helpUrl: record.helpUrl,
     category: record.category,
     description: record.description,
-    pages: Array.from(record.pages),
+    pages: Array.from(record.pages.values()),
     viewports: Array.from(record.viewports),
     browsers: Array.from(record.browsers),
     nodes: record.nodes,
