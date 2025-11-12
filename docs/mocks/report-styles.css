@@ -1294,20 +1294,9 @@ body[data-theme=dark] .theme-toggle__icon--moon {
   background: var(--summary-impact-minor-bg);
 }
 
-.summary-a11y--rule-table-best-practice tr.impact-critical td,
-.summary-a11y--rule-table-best-practice tr.impact-serious td,
-.summary-a11y--rule-table-best-practice tr.impact-moderate td,
-.summary-a11y--rule-table-best-practice tr.impact-minor td {
-  background: var(--table-advisory-bg);
-}
-
 .summary-a11y--rule-table-advisory tbody tr td,
 .summary-a11y--rule-table-best-practice tbody tr td {
   transition: background 0.2s ease;
-}
-
-.summary-a11y--rule-table-best-practice tbody tr:hover td {
-  background: var(--table-advisory-hover-bg);
 }
 
 .summary-report code {
