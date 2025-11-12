@@ -368,7 +368,7 @@ test.describe('Accessibility: Forms', () => {
 
     const gatingTotal = reports.reduce((sum, report) => sum + report.gating.length, 0);
     const { siteLabel, viewportLabel } = resolveAccessibilityMetadata(siteConfig, testInfo);
-    applyViewportMetadata(reports, viewportLabel);
+    applyViewportMetadata(reports, viewportLabel, siteLabel);
 
     const runPayload = createRunSummaryPayload({
       baseName: `a11y-forms-summary-${slugify(siteLabel)}`,

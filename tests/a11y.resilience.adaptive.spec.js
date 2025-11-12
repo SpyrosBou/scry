@@ -385,7 +385,7 @@ test.describe('Accessibility: Resilience checks', () => {
 
     const gatingTotal = reports.reduce((total, report) => total + report.gating.length, 0);
     const { siteLabel, viewportLabel } = resolveAccessibilityMetadata(siteConfig, testInfo);
-    applyViewportMetadata(reports, viewportLabel);
+    applyViewportMetadata(reports, viewportLabel, siteLabel);
 
     const runPayload = createRunSummaryPayload({
       baseName: `a11y-iframe-summary-${slugify(siteLabel)}`,
@@ -479,7 +479,7 @@ test.describe('Accessibility: Resilience checks', () => {
 
     const gatingTotal = reports.reduce((total, report) => total + report.gating.length, 0);
     const { siteLabel, viewportLabel } = resolveAccessibilityMetadata(siteConfig, testInfo);
-    applyViewportMetadata(reports, viewportLabel);
+    applyViewportMetadata(reports, viewportLabel, siteLabel);
 
     const reflowRunPayload = createRunSummaryPayload({
       baseName: `a11y-reflow-summary-${slugify(siteLabel)}`,
@@ -578,7 +578,7 @@ test.describe('Accessibility: Resilience checks', () => {
 
     const gatingTotal = reports.reduce((total, report) => total + report.gating.length, 0);
     const { siteLabel, viewportLabel } = resolveAccessibilityMetadata(siteConfig, testInfo);
-    applyViewportMetadata(reports, viewportLabel);
+    applyViewportMetadata(reports, viewportLabel, siteLabel);
 
     const runPayload = createRunSummaryPayload({
       baseName: `a11y-reduced-motion-summary-${slugify(siteLabel)}`,

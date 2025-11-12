@@ -38,9 +38,11 @@ const collectRuleSnapshots = (entries, category) => {
   if (!Array.isArray(entries) || entries.length === 0) return [];
   const aggregate = new Map();
 
-  entries.forEach(({ page, project, entries: violations }) => {
-    const viewport = project || 'default';
-    const pageKey = `${viewport}::${page}`;
+  entries.forEach(({ page, project, browser, entries: violations }) => {
+    const projectKey = project || 'default';
+    const viewport = browser || projectKey;
+    const browserLabel = browser || viewport;
+    const pageKey = `${projectKey}::${page}`;
     violations.forEach((violation) => {
       const ruleId = violation.id || 'unknown-rule';
       const key = `${category || 'rule'}::${ruleId}`;
@@ -52,6 +54,7 @@ const collectRuleSnapshots = (entries, category) => {
           category,
           pages: new Set(),
           viewports: new Set(),
+          browsers: new Set(),
           nodes: 0,
           wcagTags: new Set(),
           description: violation.description || violation.help || violation.message || null,
@@ -60,6 +63,9 @@ const collectRuleSnapshots = (entries, category) => {
       const record = aggregate.get(key);
       record.pages.add(pageKey);
       record.viewports.add(viewport);
+      if (browserLabel) {
+        record.browsers.add(browserLabel);
+      }
       record.nodes += violation.nodes?.length || 0;
       if (!record.description && (violation.description || violation.help || violation.message)) {
         record.description = violation.description || violation.help || violation.message;
@@ -78,6 +84,7 @@ const collectRuleSnapshots = (entries, category) => {
     description: record.description,
     pages: Array.from(record.pages),
     viewports: Array.from(record.viewports),
+    browsers: Array.from(record.browsers),
     nodes: record.nodes,
     wcagTags: Array.from(record.wcagTags),
   }));
@@ -336,6 +343,7 @@ const deriveAggregatedFindings = (reports) => {
       aggregatedViolations.push({
         page: report.page,
         project: report.projectName || 'default',
+        browser: report.browser || report.projectName || 'default',
         entries: report.violations,
       });
     }
@@ -343,6 +351,7 @@ const deriveAggregatedFindings = (reports) => {
       aggregatedAdvisories.push({
         page: report.page,
         project: report.projectName || 'default',
+        browser: report.browser || report.projectName || 'default',
         entries: report.advisory,
       });
     }
@@ -350,6 +359,7 @@ const deriveAggregatedFindings = (reports) => {
       aggregatedBestPractices.push({
         page: report.page,
         project: report.projectName || 'default',
+        browser: report.browser || report.projectName || 'default',
         entries: report.bestPractice,
       });
     }
@@ -589,7 +599,7 @@ test.describe('Functionality: Accessibility (WCAG)', () => {
         return;
       }
       const { siteLabel, viewportLabel } = resolveAccessibilityMetadata(siteConfig, testInfo);
-      applyViewportMetadata(reports, viewportLabel);
+      applyViewportMetadata(reports, viewportLabel, siteLabel);
 
       const { aggregatedViolations, aggregatedAdvisories, aggregatedBestPractices } =
         deriveAggregatedFindings(reports);
