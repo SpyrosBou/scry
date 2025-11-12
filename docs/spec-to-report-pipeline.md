@@ -24,7 +24,9 @@ This note captures how Playwright specs feed data into the custom HTML reporter 
   - `onBegin()` captures the config/suite metadata and total planned tests.
   - `onTestEnd()` (`utils/custom-html-reporter.js:141-206`) aggregates attempts, stdout/stderr, and calls `processAttachments()` (`utils/custom-html-reporter.js:243-402`) to separate inline text/binary assets from schema summaries/summary blocks.
   - `buildRunData()` (`utils/custom-html-reporter.js:404-518`) serialises tests, deduplicates summary blocks, tallies status counts, and enriches the run with site/profile/environment metadata sourced from env vars or `sites/<name>.json`.
-  - `writeOutputs()` (`utils/custom-html-reporter.js:576-684`) renders the HTML via `renderReportHtml()` (`utils/report-templates.js`), writes `data/run.json`, per-test JSON files under `reports/run-*/data/tests/`, Markdown summaries, and updates `reports/latest-run.json` plus `reports/manifest.json`.
+- `writeOutputs()` (`utils/custom-html-reporter.js:576-684`) renders the HTML via `renderReportHtml()` (`utils/report-templates.js`), writes `data/run.json`, per-test JSON files under `reports/run-*/data/tests/`, Markdown summaries, and updates `reports/latest-run.json` plus `reports/manifest.json`.
+- `utils/report-templates/helpers/render-primitives.js` now centralises the shared HTML primitives that every section uses (status badges, gating/advisory tables, per-page accordions, viewport normalisers, etc.) so section modules import a single API instead of duplicating `MISSING_DATA_LABEL` logic across the 7k-line file.
+- `utils/report-templates/helpers/section-data.js` holds the data shapers (`collectIssueMessages`, `collectSchemaProjects`, `firstRunPayload`, and `summaryTypeFromGroup`) so both the orchestrator and upcoming section modules can reason about schema buckets without re-implementing those reducers.
 
 ## 4. Dashboard and Post-Run Surfacing
 - `reports/latest-run.json` is re-read by `TestRunner.readLatestReportSummary()` (`utils/test-runner.js:777-804`) right after Playwright exits so the CLI can print a “Quick Summary” (pass/fail counts, flaky numbers, report location).
