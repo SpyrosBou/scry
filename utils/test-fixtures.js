@@ -13,7 +13,7 @@ const test = base.test.extend({
       await teardownTestPage(page, context, contextInstance, testInfo);
     }
   },
-  siteContext: async ({}, use) => {
+  siteContext: async (_, use) => {
     await use(getActiveSiteContext());
   },
   siteConfig: async ({ siteContext }, use) => {

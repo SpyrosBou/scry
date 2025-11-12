@@ -1265,6 +1265,7 @@ const WCAG_PER_PAGE_TOGGLE_SCRIPT = `
 })();
 `;
 
+/* Accessibility tables */
 const formatRuleHeading = (label, count) =>
   count ? `${label} (${formatCount(count)} unique rules)` : label;
 
