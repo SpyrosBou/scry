@@ -36,6 +36,17 @@ const createAccessibilityRenderers = require('./report-templates/groups/accessib
 
 const MISSING_DATA_LABEL = 'DATA MISSING';
 
+const ensureDisplayValue = (value) => {
+  if (value === null || value === undefined) return MISSING_DATA_LABEL;
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : MISSING_DATA_LABEL;
+  }
+  return value;
+};
+
+const ensurePageLabel = (page) => ensureDisplayValue(page);
+
 const renderRuleSnapshotsTable = (snapshots) => {
   if (!Array.isArray(snapshots) || snapshots.length === 0) return '';
   const rows = snapshots
@@ -200,7 +211,7 @@ const renderUnifiedIssuesTable = (
 
       return {
         impact: String(hydrated.impact || 'info').toLowerCase(),
-        label: hydrated.label || hydrated.message || hydrated.rule || 'Unknown issue',
+        label: ensureDisplayValue(hydrated.label || hydrated.message || hydrated.rule),
         pages,
         pageCount,
         nodesCount,
@@ -262,7 +273,7 @@ const renderUnifiedIssuesTable = (
         }
         return renderComplianceCell([]);
       })();
-      const ruleLabel = row.ruleLabel || row.ruleId || row.label || 'Unknown rule';
+      const ruleLabel = ensureDisplayValue(row.ruleLabel || row.ruleId || row.label);
       const detailsText = row.details || row.label || '';
       const detailsContent = detailsText ? escapeHtml(detailsText) : '—';
       const helpLink =
@@ -390,7 +401,7 @@ const collectIssueMessages = (pages, fields, defaultImpact, options = {}) => {
   };
 
   for (const page of pages) {
-    const pageId = page?.page || 'Unknown page';
+  const pageId = ensurePageLabel(page?.page);
     const pageProject =
       page?.browser ||
       page?.projectName ||
@@ -1977,7 +1988,7 @@ const renderSchemaPageEntries = (entries) => {
   const grouped = new Map();
   entries.forEach((entry) => {
     const payload = entry.payload || {};
-    const page = payload.page || 'Unknown page';
+    const page = ensurePageLabel(payload.page);
     if (!grouped.has(page)) grouped.set(page, []);
     grouped.get(page).push(entry);
   });
@@ -2686,7 +2697,7 @@ const renderVisualPageCard = (summary, { viewportLabel, thresholdsUsed = [] } = 
   return `
     <section class="summary-report summary-a11y summary-a11y--page-card">
       <div class="page-card__header">
-        <h3>${escapeHtml(summary.page || 'Unknown page')}</h3>
+        <h3>${escapeHtml(ensurePageLabel(summary.page))}</h3>
         <span class="status-pill ${statusMeta.className}">${escapeHtml(statusMeta.label)}</span>
       </div>
       ${metrics}
@@ -3146,7 +3157,7 @@ const renderSchemaPageEntriesMarkdownFallback = (entries) => {
   if (!Array.isArray(entries) || entries.length === 0) return '';
   const lines = entries.map((entry) => {
     const payload = entry.payload || {};
-    const page = payload.page || 'Unknown page';
+    const page = ensurePageLabel(payload.page);
     const viewport = payload.viewport || entry.projectName || 'default';
     const summary =
       payload.summary && Object.keys(payload.summary).length > 0
@@ -3606,7 +3617,7 @@ const renderFormsPageCard = (summary, { projectLabel } = {}) => {
   if (!summary) return '';
 
   const formName = summary.formName || 'Form';
-  const pageLabel = summary.page || projectLabel || 'Unknown page';
+  const pageLabel = ensurePageLabel(summary.page || projectLabel);
   const selector = summary.selectorUsed || summary.selector || 'Not recorded';
   const fields = Array.isArray(summary.fields) ? summary.fields : [];
 
@@ -3851,7 +3862,7 @@ const renderInternalLinksPageCard = (summary, { projectLabel } = {}) => {
   return `
     <section class="summary-report summary-a11y summary-a11y--page-card">
       <div class="page-card__header">
-        <h3>${escapeHtml(summary.page || 'Unknown page')}</h3>
+        <h3>${escapeHtml(ensurePageLabel(summary.page))}</h3>
         <span class="status-pill ${statusMeta.className}">${escapeHtml(statusMeta.label)}</span>
       </div>
       <div class="page-card__meta">
@@ -4011,7 +4022,7 @@ const renderInteractivePageCard = (summary, { projectLabel } = {}) => {
   return `
     <section class="summary-report summary-a11y summary-a11y--page-card">
       <div class="page-card__header">
-        <h3>${escapeHtml(summary.page || 'Unknown page')}</h3>
+        <h3>${escapeHtml(ensurePageLabel(summary.page))}</h3>
         <span class="status-pill ${statusMeta.className}">${escapeHtml(statusMeta.label)}</span>
       </div>
       <div class="page-card__meta">
@@ -4207,7 +4218,7 @@ const renderAvailabilityPageCard = (summary, { projectLabel } = {}) => {
     rule: entry.rule || entry.label || entry.message || 'Issue',
     details: entry.details || entry.message || entry.label || 'Details not captured',
     nodesCount: Number.isFinite(entry.nodesCount) ? entry.nodesCount : entry.count || 1,
-    pages: [summary.page || 'Unknown page'],
+    pages: [ensurePageLabel(summary.page)],
     viewports: projectLabel ? [projectLabel] : [],
   });
 
@@ -4349,7 +4360,7 @@ const renderAvailabilityPageCard = (summary, { projectLabel } = {}) => {
   return `
     <section class="summary-report summary-a11y summary-a11y--page-card availability-card">
       <div class="page-card__header">
-        <h3>${escapeHtml(summary.page || 'Unknown page')}</h3>
+        <h3>${escapeHtml(ensurePageLabel(summary.page))}</h3>
         <span class="status-pill ${statusMeta.className}">${escapeHtml(statusMeta.label)}</span>
       </div>
       ${summaryNarrative}
@@ -4528,7 +4539,7 @@ const renderHttpPageCard = (summary, { projectLabel, viewportLabel } = {}) => {
   return `
     <section class="summary-report summary-a11y summary-a11y--page-card">
       <div class="page-card__header">
-        <h3>${escapeHtml(summary.page || 'Unknown page')}</h3>
+        <h3>${escapeHtml(ensurePageLabel(summary.page))}</h3>
         <span class="status-pill ${statusMeta.className}">${escapeHtml(statusMeta.label)}</span>
       </div>
       <div class="page-card__meta">
@@ -4798,7 +4809,7 @@ const renderPerformancePageCard = (summary, { projectLabel } = {}) => {
   return `
     <section class="summary-report summary-a11y summary-a11y--page-card performance-card">
       <div class="page-card__header">
-        <h3>${escapeHtml(summary.page || 'Unknown page')}</h3>
+        <h3>${escapeHtml(ensurePageLabel(summary.page))}</h3>
         <span class="status-pill ${statusMeta.className}">${escapeHtml(statusMeta.label)}</span>
       </div>
       ${summaryNarrative}
@@ -5164,7 +5175,7 @@ const renderKeyboardPageCard = (summary, { projectLabel } = {}) => {
   return `
     <section class="summary-report summary-a11y summary-a11y--page-card">
       <div class="page-card__header">
-        <h3>${escapeHtml(summary.page || 'Unknown page')}</h3>
+        <h3>${escapeHtml(ensurePageLabel(summary.page))}</h3>
         <span class="status-pill ${statusMeta.className}">${escapeHtml(statusMeta.label)}</span>
       </div>
       <div class="page-card__meta">
@@ -5398,7 +5409,7 @@ const renderKeyboardGroupHtml = (group) => {
               : 'summary-page--ok';
         return {
           ...page,
-          page: page.page || page.url || 'Unknown page',
+          page: ensurePageLabel(page.page || page.url),
           _summaryClass: summaryClass,
         };
       });
@@ -5555,7 +5566,7 @@ const renderReducedMotionPageCard = (summary) => {
   return `
     <section class="summary-report summary-a11y summary-a11y--page-card">
       <div class="page-card__header">
-        <h3>${escapeHtml(summary.page || 'Unknown page')}</h3>
+        <h3>${escapeHtml(ensurePageLabel(summary.page))}</h3>
         <span class="status-pill ${statusMeta.className}">${escapeHtml(statusMeta.label)}</span>
       </div>
       ${metrics}
@@ -5775,7 +5786,7 @@ const renderReflowPageCard = (summary) => {
   return `
     <section class="summary-report summary-a11y summary-a11y--page-card">
       <div class="page-card__header">
-        <h3>${escapeHtml(summary.page || 'Unknown page')}</h3>
+        <h3>${escapeHtml(ensurePageLabel(summary.page))}</h3>
         <span class="status-pill ${statusMeta.className}">${escapeHtml(statusMeta.label)}</span>
       </div>
       ${metrics}
@@ -5965,7 +5976,7 @@ const renderIframePageCard = (summary) => {
   return `
     <section class="summary-report summary-a11y summary-a11y--page-card">
       <div class="page-card__header">
-        <h3>${escapeHtml(summary.page || 'Unknown page')}</h3>
+        <h3>${escapeHtml(ensurePageLabel(summary.page))}</h3>
         <span class="status-pill ${statusMeta.className}">${escapeHtml(statusMeta.label)}</span>
       </div>
       ${metrics}
@@ -6174,7 +6185,7 @@ const renderStructurePageCard = (summary) => {
   return `
     <section class="summary-report summary-a11y summary-a11y--page-card">
       <div class="page-card__header">
-        <h3>${escapeHtml(summary.page || 'Unknown page')}</h3>
+        <h3>${escapeHtml(ensurePageLabel(summary.page))}</h3>
         <span class="status-pill ${statusMeta.className}">${escapeHtml(statusMeta.label)}</span>
       </div>
       <div class="page-card__meta">
@@ -6463,7 +6474,7 @@ const renderResponsiveStructurePageCard = (summary, { viewportLabel } = {}) => {
   return `
     <section class="summary-report summary-a11y summary-a11y--page-card">
       <div class="page-card__header">
-        <h3>${escapeHtml(summary.page || 'Unknown page')}</h3>
+        <h3>${escapeHtml(ensurePageLabel(summary.page))}</h3>
         <span class="status-pill ${statusMeta.className}">${escapeHtml(statusMeta.label)}</span>
       </div>
       ${metrics}
@@ -6730,7 +6741,7 @@ const renderResponsiveWpPageCard = (summary, { projectLabel } = {}) => {
   return `
     <section class="summary-report summary-a11y summary-a11y--page-card">
       <div class="page-card__header">
-        <h3>${escapeHtml(summary.page || 'Unknown page')}</h3>
+        <h3>${escapeHtml(ensurePageLabel(summary.page))}</h3>
         <span class="status-pill ${statusMeta.className}">${escapeHtml(statusMeta.label)}</span>
       </div>
       ${metrics}
@@ -6944,7 +6955,7 @@ const renderStructureGroupHtml = (group) => {
         heading: 'Per-page structure findings',
         summaryClass: 'summary-page--structure',
         renderCard: (entrySummary) => renderStructurePageCard(entrySummary),
-        formatSummaryLabel: (entrySummary) => entrySummary?.page || 'Unknown page',
+        formatSummaryLabel: (entrySummary) => ensurePageLabel(entrySummary?.page),
       },
     });
     if (!sectionContent) return '';
@@ -6984,7 +6995,7 @@ const renderFormsGroupHtml = (group) => {
 
     const issueSource = formsData.map((form) => ({
       ...form,
-      page: `${form.page || 'Unknown page'} › ${form.formName || 'Form'}`,
+      page: `${ensurePageLabel(form.page)} › ${form.formName || 'Form'}`,
     }));
 
     const gatingIssues = collectIssueMessages(issueSource, 'gating', 'critical');
@@ -7033,7 +7044,7 @@ const renderFormsGroupHtml = (group) => {
         return {
           ...form,
           formName: form.formName || 'Form',
-          page: form.page || 'Unknown page',
+          page: ensurePageLabel(form.page),
           _summaryClass: summaryClass,
         };
       });
@@ -7058,7 +7069,7 @@ const renderFormsGroupHtml = (group) => {
         renderCard: (entrySummary) => renderFormsPageCard(entrySummary, { projectLabel }),
         formatSummaryLabel: (entrySummary) => {
           const formName = entrySummary?.formName || 'Form';
-          const page = entrySummary?.page || 'Unknown page';
+          const page = ensurePageLabel(entrySummary?.page);
           return `${formName} — ${page}`;
         },
       },
