@@ -468,6 +468,22 @@
     "/terms-of-use/",
     "/work-with-us/"
   ],
+  "forms": [
+    {
+      "name": "Contact Form",
+      "page": "/contact-us/",
+      "selector": "#work-contact-form, form.contact-block-form",
+      "fields": {
+        "name": "input#c_fname, input[name='c_fname']",
+        "email": "input#c_email, input[name='c_email']",
+        "groupCompany": "select#c_group, select[name='c_group']",
+        "sector": "select#c_solutions, select[name='c_solutions']",
+        "message": "textarea#c_message, textarea[name='c_message']",
+        "privacy": "input#c_terms, input[name='c_terms']"
+      },
+      "submitButton": "#contact-block-form-submit, button[type='submit']"
+    }
+  ],
   "criticalElements": [
     {
       "name": "Navigation",

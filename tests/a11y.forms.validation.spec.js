@@ -18,6 +18,7 @@ const ERROR_SELECTORS = [
   '.form-error',
   '.field-error',
   '.validation-error',
+  '.error-msg',
   '.wpcf7-not-valid-tip',
   '.nf-error',
   '.gfield_validation_message',
@@ -78,12 +79,19 @@ const getAccessibleNameDetails = async (fieldLocator) => {
       controlType === 'button' || inputType === 'submit' || inputType === 'button'
         ? (el.value || '').trim()
         : '';
+    const elementText =
+      controlType === 'button' || controlType === 'summary' || controlType === 'a'
+        ? (el.textContent || '').trim()
+        : '';
 
-    const accessibleName = [labelText, ariaLabel, labelledbyText, title, valueText]
+    let accessibleName = [labelText, ariaLabel, labelledbyText, title, valueText]
       .map((value) => value.trim())
       .filter(Boolean)
       .join(' ')
       .trim();
+    if (!accessibleName && elementText) {
+      accessibleName = elementText;
+    }
 
     const describedByIds = (el.getAttribute('aria-describedby') || '')
       .split(/\s+/)
@@ -161,12 +169,15 @@ const evaluatePostSubmitState = async (formLocator, fieldSelectors) => {
           .map((value) => value.trim())
           .filter(Boolean);
 
+        const fieldContainer =
+          field.closest('label, .form-field, .field, .gfield, .nf-field, .wpcf7-form-control-wrap') ||
+          field.parentElement ||
+          form;
+
         const inlineErrors = Array.from(
           new Set(
             errorSelectors.flatMap((selector) => {
-              const nodes = Array.from(
-                field.closest('label, .form-field, .field, .gfield, .nf-field, .wpcf7-form-control-wrap')?.querySelectorAll(selector) || []
-              );
+              const nodes = Array.from(fieldContainer.querySelectorAll(selector));
               if (nodes.length) return nodes;
               return [];
             })
