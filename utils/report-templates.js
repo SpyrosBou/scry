@@ -45,10 +45,9 @@ const renderRuleSnapshotsTable = (snapshots, { projectName, viewports } = {}) =>
       const pages = Array.isArray(snapshot.pages) ? snapshot.pages : [];
       const viewports = Array.isArray(snapshot.viewports) ? snapshot.viewports : [];
       const wcagTags = Array.isArray(snapshot.wcagTags) ? snapshot.wcagTags : [];
-      const browsers = renderCodeList(
-        normaliseStringList(snapshot.browsers, snapshot.projects, defaultBrowsers),
-        '—'
-      );
+      const snapshotBrowsers = normaliseStringList(snapshot.browsers, snapshot.projects);
+      const browserValues = snapshotBrowsers.length ? snapshotBrowsers : defaultBrowsers;
+      const browsers = renderCodeList(browserValues, '—');
       const viewportList = renderCodeList(viewports.length ? viewports : defaultViewports, '—');
       const detailsText = snapshot.description || snapshot.help || '';
       const detailsContent = detailsText
@@ -2125,16 +2124,10 @@ const renderWcagPageIssueTable = (entries, heading, options = {}) => {
             helpUrl
           )}" target="_blank" rel="noopener noreferrer">Guidance</a>`
         : '';
-      const browserList = renderCodeList(
-        normaliseStringList(
-          entry.browser,
-          entry.browsers,
-          entry.projectName,
-          entry.project,
-          entry.projects
-        ),
-        '—'
-      );
+      const explicitBrowsers = normaliseStringList(entry.browser, entry.browsers);
+      const fallbackBrowsers = normaliseStringList(entry.projectName, entry.project, entry.projects);
+      const browserValues = explicitBrowsers.length ? explicitBrowsers : fallbackBrowsers;
+      const browserList = renderCodeList(browserValues, '—');
       const viewportList = renderCodeList(
         formatViewportList(
           normaliseStringList(entry.viewport, entry.viewportName, entry.viewports, viewportFallback)
