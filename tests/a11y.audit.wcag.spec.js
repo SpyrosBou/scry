@@ -286,28 +286,10 @@ const A11Y_MODE = siteConfig.a11yMode === 'audit' ? 'audit' : 'gate';
 const SUPPRESS_BEST_PRACTICE_RULES = new Set([
   'heading-order',
 ]);
-const projectReportStore = new Map();
+const { createAggregationStore } = require('../utils/report-aggregation-store');
+
+const aggregationStore = createAggregationStore();
 let globalSummaryAttached = false;
-
-const getProjectBucket = (projectName) => {
-  const key = projectName || 'default';
-  if (!projectReportStore.has(key)) {
-    projectReportStore.set(key, new Map());
-  }
-  return projectReportStore.get(key);
-};
-
-const recordPageReport = (projectName, report) => {
-  const bucket = getProjectBucket(projectName);
-  const indexKey = report.index ?? bucket.size + 1;
-  bucket.set(indexKey, { ...report });
-};
-
-const readProjectReports = (projectName) => {
-  const bucket = projectReportStore.get(projectName || 'default');
-  if (!bucket) return [];
-  return Array.from(bucket.values()).sort((a, b) => (a.index || 0) - (b.index || 0));
-};
 
 const deriveAggregatedFindings = (reports) => {
   const aggregatedViolations = [];
@@ -356,12 +338,12 @@ const deriveAggregatedFindings = (reports) => {
 
 const maybeAttachGlobalSummary = async ({ testInfo, totalPagesExpected, failOnLabel }) => {
   if (globalSummaryAttached) return false;
-  const projectNames = Array.from(projectReportStore.keys());
+  const projectNames = aggregationStore.readAllProjects();
   if (projectNames.length === 0) return false;
   const combinedReports = [];
 
   for (const projectName of projectNames) {
-    const reports = readProjectReports(projectName).filter(
+    const reports = aggregationStore.readProjectReports(projectName).filter(
       (report) => report.runToken === RUN_TOKEN && typeof report.index === 'number'
     );
     if (reports.length < totalPagesExpected) {
@@ -433,7 +415,7 @@ test.describe('Functionality: Accessibility (WCAG)', () => {
           pageReport.notes.push(`Navigation failed: ${error.message}`);
           console.error(`⚠️  Navigation failed for ${testPage}: ${error.message}`);
 
-        recordPageReport(testInfo.project.name, pageReport);
+        aggregationStore.record(testInfo.project.name, pageReport);
         if (A11Y_MODE !== 'audit') {
           throw new Error(`Navigation failed for ${testPage}: ${error.message}`);
         }
@@ -446,7 +428,7 @@ test.describe('Functionality: Accessibility (WCAG)', () => {
           pageReport.notes.push(`Received HTTP status ${response.status()}; scan skipped.`);
           console.error(`⚠️  HTTP ${response.status()} while loading ${testPage}; skipping scan.`);
 
-          recordPageReport(testInfo.project.name, pageReport);
+          aggregationStore.record(testInfo.project.name, pageReport);
           if (A11Y_MODE !== 'audit') {
             throw new Error(`HTTP ${response.status()} received for ${testPage}`);
           }
@@ -462,7 +444,7 @@ test.describe('Functionality: Accessibility (WCAG)', () => {
           pageReport.notes.push(stability.message);
           console.warn(`⚠️  ${stability.message} for ${testPage}`);
 
-          recordPageReport(testInfo.project.name, pageReport);
+          aggregationStore.record(testInfo.project.name, pageReport);
           return;
         }
 
@@ -538,7 +520,7 @@ test.describe('Functionality: Accessibility (WCAG)', () => {
           }
         }
 
-        recordPageReport(testInfo.project.name, pageReport);
+        aggregationStore.record(testInfo.project.name, pageReport);
       });
     });
   });
@@ -547,7 +529,7 @@ test.describe('Functionality: Accessibility (WCAG)', () => {
     test('Aggregate results', async ({}, testInfo) => {
       test.setTimeout(300000);
 
-      const reports = readProjectReports(testInfo.project.name);
+      const reports = aggregationStore.readProjectReports(testInfo.project.name);
       if (reports.length < totalPages) {
         throw new Error(
           `Accessibility summary expected ${totalPages} page report(s) for ${testInfo.project.name}, found ${reports.length}`
