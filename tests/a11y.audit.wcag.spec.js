@@ -580,7 +580,7 @@ test.describe('Functionality: Accessibility (WCAG)', () => {
   });
 
   test.describe.serial('Accessibility summary', () => {
-    test('Aggregate results', async (_fixtures, testInfo) => {
+    test('Aggregate results', async ({}, testInfo) => {
       test.setTimeout(300000);
 
       const reports = await waitForPageReports(testInfo.project.name, totalPages);
