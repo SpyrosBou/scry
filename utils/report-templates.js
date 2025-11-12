@@ -2569,7 +2569,7 @@ const renderVisualPageCard = (summary, { viewportLabel, thresholdsUsed = [] } = 
 
   const metrics = renderSummaryMetrics(
     [
-      { label: 'Viewport', value: summary.viewport || viewportLabel || 'Not recorded' },
+      { label: 'Viewport', value: ensureDisplayValue(summary.viewport || viewportLabel) },
       { label: 'Result', value: result ? result.toUpperCase() : 'UNKNOWN' },
       {
         label: 'Pixel diff',
@@ -3618,7 +3618,7 @@ const renderFormsPageCard = (summary, { projectLabel } = {}) => {
 
   const formName = summary.formName || 'Form';
   const pageLabel = ensurePageLabel(summary.page || projectLabel);
-  const selector = summary.selectorUsed || summary.selector || 'Not recorded';
+  const selector = ensureDisplayValue(summary.selectorUsed || summary.selector);
   const fields = Array.isArray(summary.fields) ? summary.fields : [];
 
   const gating = []
@@ -3814,7 +3814,7 @@ const renderInternalLinksPageCard = (summary, { projectLabel } = {}) => {
       : '';
 
   const metaLines = [
-    `<p class="details"><strong>Viewport:</strong> ${escapeHtml(projectLabel || 'Not recorded')}</p>`,
+    `<p class="details"><strong>Viewport:</strong> ${escapeHtml(ensureDisplayValue(projectLabel))}</p>`,
     `<p class="details"><strong>Links found:</strong> ${escapeHtml(
       formatCount(summary.totalLinks ?? 'n/a')
     )}</p>`,
@@ -3838,7 +3838,7 @@ const renderInternalLinksPageCard = (summary, { projectLabel } = {}) => {
           const statusLabel =
             item.status != null ? `Status ${item.status}` : escapeHtml(item.error || 'Error');
           const method = item.methodTried ? `via ${item.methodTried}` : '';
-          return `<li><code>${escapeHtml(item.url || 'unknown URL')}</code> (${escapeHtml(
+          return `<li><code>${escapeHtml(ensureDisplayValue(item.url))}</code> (${escapeHtml(
             [statusLabel, method].filter(Boolean).join(' ').trim()
           )})</li>`;
         })
@@ -3951,14 +3951,14 @@ const renderInteractivePageCard = (summary, { projectLabel } = {}) => {
     else if (sample?.failure) parts.push(sample.failure);
     const method = sample?.methodTried || sample?.method;
     if (method) parts.push(`via ${method}`);
-    const urlLabel = sample?.url ? simplifyUrlForDisplay(sample.url) : 'Unknown URL';
+    const urlLabel = sample?.url ? simplifyUrlForDisplay(sample.url) : MISSING_DATA_LABEL;
     const label = `${parts.length ? parts.join(' ') : 'Request failure'} – ${urlLabel}`;
     return { key: label, label };
   });
 
   const buildSummaryMeta = () =>
     [
-      `<p class="details"><strong>Viewport:</strong> ${escapeHtml(projectLabel || 'Not recorded')}</p>`,
+    `<p class="details"><strong>Viewport:</strong> ${escapeHtml(ensureDisplayValue(projectLabel))}</p>`,
       `<p class="details"><strong>Console errors:</strong> ${escapeHtml(
         formatCount(consoleErrors)
       )}</p>`,
@@ -4169,7 +4169,7 @@ const renderAvailabilityPageCard = (summary, { projectLabel } = {}) => {
       },
       {
         label: 'Viewport',
-        value: projectLabel || 'Not recorded',
+        value: ensureDisplayValue(projectLabel),
         tone: 'info',
       },
     ].filter(Boolean)
@@ -4504,20 +4504,20 @@ const renderHttpPageCard = (summary, { projectLabel, viewportLabel } = {}) => {
 
   const redirectDisplay = summary.redirectLocation
     ? `<code>${escapeHtml(simplifyUrlForDisplay(summary.redirectLocation))}</code>`
-    : '—';
+    : MISSING_DATA_LABEL;
 
   const statusDisplay =
     summary.status != null
       ? summary.statusText
         ? `${summary.status} ${summary.statusText}`
         : String(summary.status)
-      : 'n/a';
+      : MISSING_DATA_LABEL;
 
   const metaLines = [
     `<p class="details"><strong>HTTP status:</strong> ${escapeHtml(statusDisplay)}</p>`,
     `<p class="details"><strong>Redirect target:</strong> ${redirectDisplay}</p>`,
     `<p class="details"><strong>Viewport:</strong> ${escapeHtml(
-      viewportLabel || projectLabel || 'Not recorded'
+      ensureDisplayValue(viewportLabel || projectLabel)
     )}</p>`,
   ].join('\n');
 
@@ -4665,7 +4665,7 @@ const renderPerformancePageCard = (summary, { projectLabel } = {}) => {
     [
       {
         label: 'Viewport',
-        value: projectLabel || 'Not recorded',
+        value: ensureDisplayValue(projectLabel),
         tone: 'info',
       },
       {
@@ -5047,7 +5047,7 @@ const renderKeyboardPageCard = (summary, { projectLabel } = {}) => {
   const focusSequence = Array.isArray(summary.focusSequence) ? summary.focusSequence : [];
   const notes = Array.isArray(summary.notes) ? summary.notes.filter(Boolean) : [];
 
-  const viewportName = summary.projectName || summary.viewport || projectLabel || 'Not recorded';
+  const viewportName = ensureDisplayValue(summary.projectName || summary.viewport || projectLabel);
   const focusableCount = Number.isFinite(summary.focusableCount) ? summary.focusableCount : null;
   const visitedCount = Number.isFinite(summary.visitedCount) ? summary.visitedCount : null;
   const coveragePercent =
@@ -5498,16 +5498,17 @@ const renderReducedMotionPageCard = (summary) => {
     statusMeta = { className: 'status-info', label: 'Advisories present' };
   }
 
-  const preferenceLabel = preferenceIgnored
-    ? 'Ignored'
-    : matchesPreference === true
+  const preferenceLabel =
+    matchesPreference === true
       ? 'Respected'
-      : 'Unknown';
+      : matchesPreference === false
+        ? 'Ignored'
+        : MISSING_DATA_LABEL;
 
   const metrics = renderSummaryMetrics([
     {
       label: 'Viewport',
-      value: summary.viewport || summary.projectName || 'Not recorded',
+      value: ensureDisplayValue(summary.viewport || summary.projectName),
     },
     { label: 'Prefers-reduced-motion', value: preferenceLabel },
     { label: 'Animations observed', value: formatCount(animations.length) },
@@ -5716,11 +5717,14 @@ const renderReflowPageCard = (summary) => {
     statusMeta = { className: 'status-info', label: 'Advisories present' };
   }
 
-  const formatPx = (value) =>
-    Number.isFinite(value) ? `${Math.round(value)}px` : value != null ? `${value}` : 'Not recorded';
+  const formatPx = (value) => {
+    if (Number.isFinite(value)) return `${Math.round(value)}px`;
+    if (value != null && value !== '') return String(value);
+    return MISSING_DATA_LABEL;
+  };
 
   const metrics = renderSummaryMetrics([
-    { label: 'Viewport', value: summary.viewport || summary.projectName || 'Not recorded' },
+    { label: 'Viewport', value: ensureDisplayValue(summary.viewport || summary.projectName) },
     { label: 'Viewport width', value: formatPx(summary.viewportWidth) },
     { label: 'Document width', value: formatPx(summary.documentWidth) },
     { label: 'Horizontal overflow', value: formatPx(horizontalOverflow) },
@@ -5918,7 +5922,7 @@ const renderIframePageCard = (summary) => {
   const crossOriginCount = frames.filter((frame) => frame && frame.crossOrigin).length;
 
   const metrics = renderSummaryMetrics([
-    { label: 'Viewport', value: summary.viewport || summary.projectName || 'Not recorded' },
+    { label: 'Viewport', value: ensureDisplayValue(summary.viewport || summary.projectName) },
     { label: 'Iframes detected', value: formatCount(iframeCount) },
     { label: 'Cross-origin frames', value: formatCount(crossOriginCount) },
     { label: 'Missing accessible name', value: formatCount(unlabeledFrames) },
@@ -6399,7 +6403,7 @@ const renderResponsiveStructurePageCard = (summary, { viewportLabel } = {}) => {
           : { className: 'status-ok', label: 'Pass' };
 
   const metrics = renderSummaryMetrics([
-    { label: 'Viewport', value: summary.viewport || viewportLabel || 'Not recorded' },
+    { label: 'Viewport', value: ensureDisplayValue(summary.viewport || viewportLabel) },
     { label: 'Load time', value: formatMillisecondsDisplay(summary.loadTimeMs) },
     { label: 'Threshold', value: formatMillisecondsDisplay(summary.thresholdMs) },
     { label: 'Header landmark', value: summary.headerPresent === false ? 'Missing' : 'Present' },
@@ -6687,7 +6691,7 @@ const renderResponsiveWpPageCard = (summary, { projectLabel } = {}) => {
   }
 
   const metricsInput = [
-    { label: 'Viewport', value: summary.viewport || projectLabel || 'Not recorded' },
+    { label: 'Viewport', value: ensureDisplayValue(summary.viewport || projectLabel) },
     { label: 'Responsive layout', value: responsiveDetected ? 'Detected' : 'Missing' },
     { label: 'WordPress blocks', value: formatCount(summary.blockElements ?? 0) },
     { label: 'Widgets', value: formatCount(summary.widgets ?? 0) },
@@ -7208,7 +7212,7 @@ const groupTests = (tests) => {
       return;
     }
 
-    const filePath = test.location?.file || 'Unknown file';
+    const filePath = test.location?.file || MISSING_DATA_LABEL;
     const fileName = filePath.split(/[/\\]/).pop();
     const project = test.projectName || 'Default project';
     const key = `${project}::${filePath}`;

@@ -91,6 +91,7 @@ const renderPerPageAccordion = (items, options = {}) => {
 };
 
 const renderSummaryMetrics = (entries) => {
+  const MISSING_DATA_LABEL = 'DATA MISSING';
   const items = Array.isArray(entries)
     ? entries
         .map((entry) => {
@@ -99,8 +100,8 @@ const renderSummaryMetrics = (entries) => {
           if (!label) return '';
           const rawValue = entry.value;
           let displayValue;
-          if (rawValue === null || rawValue === undefined) {
-            displayValue = '—';
+          if (rawValue === null || rawValue === undefined || rawValue === '') {
+            displayValue = MISSING_DATA_LABEL;
           } else if (typeof rawValue === 'number') {
             displayValue = rawValue.toLocaleString();
           } else {

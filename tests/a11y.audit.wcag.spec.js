@@ -15,9 +15,11 @@ const {
   resolveAccessibilityMetadata,
   applyViewportMetadata,
 } = require('../utils/a11y-shared');
-const { createRunSummaryPayload, createPageSummaryPayload } = require('../utils/report-schema');
+const {
+  buildRunSummaryPayload,
+  buildPageSummaryPayload,
+} = require('../utils/report-summary-builder');
 const { getActiveSiteContext } = require('../utils/test-context');
-const { slugifyIdentifier } = require('../utils/reporting-helpers');
 
 test.use({ trace: 'off', video: 'off' });
 
@@ -128,8 +130,9 @@ const buildAccessibilityRunSchemaPayload = ({
     0
   );
 
-  const payload = createRunSummaryPayload({
-    baseName,
+  const payload = buildRunSummaryPayload({
+    prefix: 'a11y-wcag',
+    key: metadata?.projectName || metadata?.siteName || baseName,
     title,
     overview: {
       totalPages: reports.length,
@@ -142,13 +145,13 @@ const buildAccessibilityRunSchemaPayload = ({
       viewportsTested: viewportSet.size,
       failThreshold: failOnLabel,
     },
-    ruleSnapshots,
     metadata: {
       spec: 'a11y.audit.wcag',
       ...metadata,
       viewports: Array.from(viewportSet),
       failOn: failOnLabel,
     },
+    ruleSnapshots,
   });
 
   payload.details = {
@@ -224,11 +227,12 @@ const buildAccessibilityPageSchemaPayloads = (reports, metadataExtras = {}) =>
           viewports: summaryViewports,
         };
 
-        return createPageSummaryPayload({
-          baseName: `a11y-page-${slugifyIdentifier(report.projectName || 'default')}-${slugifyIdentifier(summaryViewport || 'viewport')}-${slugifyIdentifier(report.page)}`,
-          title: pageSummaryTitle(report.page, 'WCAG issues overview'),
-          page: report.page,
+        return buildPageSummaryPayload({
+          prefix: 'a11y-wcag',
+          projectName: report.projectName || 'default',
           viewport: summaryViewport || DATA_MISSING_LABEL,
+          page: report.page,
+          title: pageSummaryTitle(report.page, 'WCAG issues overview'),
           summary,
           metadata: {
             spec: 'a11y.audit.wcag',
@@ -565,7 +569,7 @@ test.describe('Functionality: Accessibility (WCAG)', () => {
         aggregatedAdvisories,
         aggregatedBestPractices,
         failOnLabel,
-        baseName: `a11y-summary-${slugifyIdentifier(testInfo.project.name)}`,
+        baseName: testInfo.project.name,
         title: `WCAG findings – ${testInfo.project.name}`,
         metadata: {
           scope: 'project',

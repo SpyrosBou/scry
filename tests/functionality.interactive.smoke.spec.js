@@ -6,9 +6,11 @@ const {
 const { createTestData } = require('../utils/test-data-factory');
 const { WordPressPageObjects } = require('../utils/wordpress-page-objects');
 const { attachSchemaSummary } = require('../utils/reporting-utils');
-const { createRunSummaryPayload, createPageSummaryPayload } = require('../utils/report-schema');
 const { getActiveSiteContext } = require('../utils/test-context');
-const { slugifyIdentifier } = require('../utils/reporting-helpers');
+const {
+  buildRunSummaryPayload,
+  buildPageSummaryPayload,
+} = require('../utils/report-summary-builder');
 
 const { siteConfig } = getActiveSiteContext();
 
@@ -61,8 +63,9 @@ const buildInteractiveSchemaPayloads = ({ pages, resourceBudget, projectName }) 
   const pagesWithWarnings = enrichedPages.filter((entry) => entry.warnings.length > 0).length;
   const pagesWithGatingIssues = enrichedPages.filter((entry) => entry.gating.length > 0).length;
 
-  const runPayload = createRunSummaryPayload({
-    baseName: `interactive-${slugify(projectName)}`,
+  const runPayload = buildRunSummaryPayload({
+    prefix: 'interactive',
+    key: projectName,
     title: 'Interactive smoke summary',
     overview: {
       totalPages: pages.length,
@@ -110,11 +113,12 @@ const buildInteractiveSchemaPayloads = ({ pages, resourceBudget, projectName }) 
       failure: error.failure || null,
     }));
 
-    return createPageSummaryPayload({
-      baseName: `interactive-${slugifyIdentifier(projectName)}-${slugifyIdentifier(entry.page)}`,
-      title: `Interactive checks – ${entry.page}`,
-      page: entry.page,
+    return buildPageSummaryPayload({
+      prefix: 'interactive',
+      projectName,
       viewport: projectName,
+      page: entry.page,
+      title: `Interactive checks – ${entry.page}`,
       summary: {
         status: entry.status,
         gating: entry.gating,
