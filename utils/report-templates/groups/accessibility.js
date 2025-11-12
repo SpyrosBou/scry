@@ -56,17 +56,43 @@ module.exports = function createAccessibilityRenderers({
           .join('')}</ul></details>`
       : '';
 
+    const hydrateIssueMetadata = (issue = {}) => {
+      const viewports = Array.isArray(issue.viewports) && issue.viewports.length
+        ? issue.viewports
+        : Array.isArray(summary.viewports) && summary.viewports.length
+          ? summary.viewports
+          : viewportLabel
+            ? [viewportLabel]
+            : [];
+      const browserLabel =
+        issue.browser || summary.browser || viewportLabel || summary.projectName || null;
+      return {
+        ...issue,
+        browser: browserLabel,
+        browsers:
+          Array.isArray(issue.browsers) && issue.browsers.length
+            ? issue.browsers
+            : browserLabel
+              ? [browserLabel]
+              : undefined,
+        viewport: issue.viewport || viewports[0] || viewportLabel || null,
+        viewports,
+      };
+    };
+
     const gatingSection = violations.length
       ? renderPerPageIssuesTable(
           violations,
-          `Gating WCAG violations (${formatCount(violations.length)})`
+          `Gating WCAG violations (${formatCount(violations.length)})`,
+          { hydrate: hydrateIssueMetadata }
         )
       : '<p class="details">No gating violations detected.</p>';
 
     const advisorySection = advisories.length
       ? renderPerPageIssuesTable(
           advisories,
-          `WCAG advisory findings (${formatCount(advisories.length)})`
+          `WCAG advisory findings (${formatCount(advisories.length)})`,
+          { hydrate: hydrateIssueMetadata }
         )
       : '';
 
@@ -74,7 +100,7 @@ module.exports = function createAccessibilityRenderers({
       ? renderPerPageIssuesTable(
           bestPractices,
           `Best-practice advisories (${formatCount(bestPractices.length)})`,
-          { headingClass: 'summary-heading-best-practice' }
+          { headingClass: 'summary-heading-best-practice', hydrate: hydrateIssueMetadata }
         )
       : '';
 
