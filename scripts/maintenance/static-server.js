@@ -3,6 +3,8 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
+// Lightweight HTTP server used in CI smoke tests to serve fixtures/static-site.
+
 const root = path.join(process.cwd(), 'fixtures', 'static-site');
 const port = process.env.PORT || 8080;
 

@@ -4,7 +4,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const repoRoot = path.resolve(__dirname, '..');
+const repoRoot = path.resolve(__dirname, '..', '..');
 const IGNORE_DIRECTORIES = new Set([
   '.git',
   'node_modules',
@@ -17,8 +17,10 @@ const IGNORE_DIRECTORIES = new Set([
 
 const ALLOWED_FILES = new Set([
   path.join('utils', 'test-helpers.js'),
-  path.join('scripts', 'check-browser-teardown.js'),
+  path.join('scripts', 'maintenance', 'check-browser-teardown.js'),
 ]);
+
+// Ensures no spec manually calls page/context.close(), leaving teardown to fixtures.
 
 const TARGET_EXTENSIONS = new Set(['.js', '.mjs', '.cjs']);
 

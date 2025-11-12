@@ -43,7 +43,7 @@ const sharedReporters = [
 const reporter = process.env.CI ? [...sharedReporters, ['blob']] : sharedReporters;
 
 module.exports = defineConfig({
-  globalSetup: require.resolve('./scripts/playwright-global-setup'),
+  globalSetup: require.resolve('./scripts/runtime/playwright-global-setup'),
   testDir: './tests',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,

@@ -3,7 +3,9 @@ const fs = require('fs');
 const path = require('path');
 const sass = require('sass');
 
-const rootDir = path.resolve(__dirname, '..');
+// Compiles the SCSS report theme so docs/mocks stay in sync with the reporter styles.
+
+const rootDir = path.resolve(__dirname, '..', '..');
 const sourcePath = path.join(rootDir, 'styles', 'report', 'report-styles.scss');
 const targetPath = path.join(rootDir, 'docs', 'mocks', 'report-styles.css');
 

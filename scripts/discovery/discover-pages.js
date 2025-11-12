@@ -1,93 +1,26 @@
 #!/usr/bin/env node
 
+// CLI helper that scaffolds or refreshes site configs, then runs TestRunner in discovery mode.
+
 const minimist = require('minimist');
 const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
-const TestRunner = require(path.join(__dirname, '..', 'utils', 'test-runner'));
-
-const SITES_DIR = path.join(__dirname, '..', 'sites');
+const repoRoot = path.resolve(__dirname, '..', '..');
+const TestRunner = require(path.join(repoRoot, 'utils', 'test-runner'));
+const {
+  SITES_DIR,
+  sanitiseSiteKey,
+  deriveDisplayNameFromKey,
+  normaliseBaseUrlInput,
+  loadSiteInventory,
+  findSitesByBaseUrl,
+} = require(path.join(repoRoot, 'utils', 'site-inventory'));
 const DEFAULT_CRITICAL_ELEMENTS = [
   { name: 'Navigation', selector: 'nav, .navigation, #main-menu' },
   { name: 'Header', selector: 'header, .site-header' },
   { name: 'Footer', selector: 'footer, .site-footer' },
 ];
-
-const sanitiseSiteKey = (value) =>
-  String(value || '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .substring(0, 60) || '';
-
-const deriveDisplayNameFromKey = (key) =>
-  String(key || 'New Site')
-    .replace(/[-_]+/g, ' ')
-    .replace(/\b\w/g, (char) => char.toUpperCase());
-
-const normaliseBaseUrlInput = (input) => {
-  if (!input) return '';
-  const trimmed = String(input).trim();
-  if (!trimmed) return '';
-
-  let parsed;
-  try {
-    parsed = new URL(trimmed);
-  } catch (_error) {
-    return '';
-  }
-
-  parsed.hash = '';
-  parsed.search = '';
-
-  let result = `${parsed.protocol}//${parsed.host}${parsed.pathname}`;
-  if (result.endsWith('/') && result.length > `${parsed.protocol}//${parsed.host}`.length) {
-    result = result.replace(/\/+$/, '');
-  }
-
-  return result;
-};
-
-const canonicaliseBaseUrl = (input) => normaliseBaseUrlInput(input).toLowerCase();
-
-const loadSiteInventory = () => {
-  if (!fs.existsSync(SITES_DIR)) return [];
-  return fs
-    .readdirSync(SITES_DIR)
-    .filter((file) => file.endsWith('.json'))
-    .map((file) => {
-      const siteKey = file.replace(/\.json$/, '');
-      const filePath = path.join(SITES_DIR, file);
-      let baseUrl = '';
-      let displayName = '';
-
-      try {
-        const raw = fs.readFileSync(filePath, 'utf8');
-        const parsed = JSON.parse(raw);
-        if (typeof parsed.baseUrl === 'string') {
-          baseUrl = normaliseBaseUrlInput(parsed.baseUrl);
-        }
-        if (typeof parsed.name === 'string') {
-          displayName = parsed.name;
-        }
-      } catch (_error) {
-        // Ignore malformed configs; they will still be referenced by filename.
-      }
-
-      return {
-        key: siteKey,
-        path: filePath,
-        baseUrl,
-        displayName,
-      };
-    });
-};
-
-const findSitesByBaseUrl = (baseUrl, inventory) => {
-  const canonical = canonicaliseBaseUrl(baseUrl);
-  if (!canonical) return [];
-  return inventory.filter((entry) => canonicaliseBaseUrl(entry.baseUrl) === canonical);
-};
 
 const createPrompt = () => {
   const rl = readline.createInterface({

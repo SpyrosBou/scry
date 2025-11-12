@@ -1,9 +1,14 @@
 #!/usr/bin/env node
 
+// CLI helper that refreshes visual baselines across one or more site configs.
+
 const minimist = require('minimist');
-const fs = require('fs');
 const path = require('path');
-const TestRunner = require(path.join(__dirname, '..', 'utils', 'test-runner'));
+const repoRoot = path.resolve(__dirname, '..', '..');
+const TestRunner = require(path.join(repoRoot, 'utils', 'test-runner'));
+const { getSiteConfigPath, siteConfigExists } = require(
+  path.join(repoRoot, 'utils', 'site-inventory')
+);
 
 async function main() {
   const args = minimist(process.argv.slice(2));
@@ -26,9 +31,9 @@ async function main() {
   let exitCode = 0;
 
   for (const siteName of sites) {
-    const siteConfigPath = path.join(__dirname, '..', 'sites', `${siteName}.json`);
-    if (!fs.existsSync(siteConfigPath)) {
-      console.error(`❌ Unknown site "${siteName}". Create ${siteName}.json under ./sites/ first.`);
+    if (!siteConfigExists(siteName)) {
+      const relativePath = path.relative(process.cwd(), getSiteConfigPath(siteName));
+      console.error(`❌ Unknown site "${siteName}". Create ${relativePath} first.`);
       exitCode = 1;
       continue;
     }

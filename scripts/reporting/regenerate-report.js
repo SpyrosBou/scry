@@ -2,11 +2,11 @@
 const fs = require('fs');
 const path = require('path');
 const minimist = require('minimist');
-const { renderReportHtml } = require('../utils/report-templates');
-const { loadRunEntries } = require('./report-utils');
+const { RUN_DATA_FILE, loadRunEntries, renderReportFromDataPath } = require('./run-utils');
+
+// Rebuilds a historical report's HTML from its stored JSON payload.
 
 const REPORT_FILE_NAME = 'report.html';
-const RUN_DATA_FILE = path.join('data', 'run.json');
 const reportsDir = path.join(process.cwd(), 'reports');
 
 const args = minimist(process.argv.slice(2));
@@ -29,23 +29,13 @@ function regenerate(entry) {
     return;
   }
 
-  let runData;
-  try {
-    const raw = fs.readFileSync(runDataPath, 'utf8');
-    runData = JSON.parse(raw);
-  } catch (error) {
-    console.error(
-      `Failed to read ${entry.name}/${RUN_DATA_FILE}: ${error.message || 'Unknown error'}`
-    );
-    process.exitCode = 1;
-    return;
-  }
-
   let html;
   try {
-    html = renderReportHtml(runData);
+    html = renderReportFromDataPath(runDataPath);
   } catch (error) {
-    console.error(`Failed to render report for ${entry.name}: ${error.message || 'Unknown error'}`);
+    const context =
+      error.code === 'ENOENT' ? `missing ${RUN_DATA_FILE}` : error.message || 'Unknown error';
+    console.error(`Failed to regenerate ${entry.name}: ${context}`);
     process.exitCode = 1;
     return;
   }

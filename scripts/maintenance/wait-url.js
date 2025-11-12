@@ -2,9 +2,11 @@
 const http = require('http');
 const https = require('https');
 
+// Polls a URL until it responds with a sub-500 status or the timeout elapses.
+
 const urlString = process.argv[2];
 if (!urlString) {
-  console.error('Usage: node scripts/wait-url.js <url> [timeoutMs]');
+  console.error('Usage: node scripts/maintenance/wait-url.js <url> [timeoutMs]');
   process.exit(1);
 }
 const DEFAULT_TIMEOUT_MS = 120000;

@@ -2,7 +2,7 @@
 
 Automated Playwright-powered testing harness for auditing WordPress websites across functionality, responsiveness, accessibility, and visual regression criteria. The suite standardises how sites are exercised, captures rich HTML (HyperText Markup Language) reports, and keeps a historical record of findings for ongoing quality assurance.
 
-> Last updated for version 2025.11.12-agents-refresh.
+> Last updated for version 2025.11.12-agents-refresh (ref b972dc6).
 
 ## Key Capabilities
 - Generates Solarized-themed HTML reports with parity to the approved reporting mocks.
@@ -116,7 +116,7 @@ Helpful environment variables:
 - `sites/` – JSON configs describing environments and page manifests.
 - `tests/` – Playwright specs grouped by suite family (responsive, functionality, accessibility, visual) plus `unit/` tests.
 - `utils/` – shared helpers including `test-runner.js`, fixtures, reporting utilities, and schema logic.
-- `scripts/` – Node scripts backing CLI commands (`discover`, `install-browsers`, `cleanup`, report tools).
+- `scripts/` – Node scripts grouped by concern (`discovery/`, `reporting/`, `maintenance/`, `runtime/`). See `scripts/README.md` for the current tree.
 - `docs/` – reference material, reporting mocks, and the redesign roadmap.
 - `reports/` & `test-results/` – generated artifacts (safe to delete; regenerated on demand).
 

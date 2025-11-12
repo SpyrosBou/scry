@@ -28,7 +28,7 @@ This note captures how Playwright specs feed data into the custom HTML reporter 
 
 ## 4. Dashboard and Post-Run Surfacing
 - `reports/latest-run.json` is re-read by `TestRunner.readLatestReportSummary()` (`utils/test-runner.js:777-804`) right after Playwright exits so the CLI can print a “Quick Summary” (pass/fail counts, flaky numbers, report location).
-- The CLI prints `npm run reports:read` as the way to open the dashboard. That script (`scripts/read-reports.js`) loads `reports/manifest.json`, selects the newest run (or a specific historical run if requested), and opens the HTML in the user’s browser.
+- The CLI prints `npm run reports:read` as the way to open the dashboard. That script (`scripts/reporting/read-reports.js`) loads `reports/manifest.json`, selects the newest run (or a specific historical run if requested), and opens the HTML in the user’s browser.
 - Reporter styles originate from `styles/report/report-styles.scss`; whenever those change you run `npm run styles:build` to regenerate the CSS shipped with the HTML.
 
 ## 5. Data Flow Recap

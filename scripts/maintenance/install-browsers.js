@@ -4,7 +4,12 @@
 const { spawnSync } = require('child_process');
 const path = require('path');
 
-const browsersPath = path.resolve(__dirname, '..', '.pw-browsers');
+// Installs Playwright browsers while forcing the cache into .pw-browsers at the repo root.
+
+// Environment Variables:
+// - PLAYWRIGHT_BROWSERS_PATH: overrides the cache directory for Playwright binaries.
+
+const browsersPath = path.resolve(__dirname, '..', '..', '.pw-browsers');
 const result = spawnSync('npx', ['playwright', 'install'], {
   stdio: 'inherit',
   env: {

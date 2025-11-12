@@ -4,8 +4,14 @@ const path = require('path');
 const openModule = require('open');
 const openBrowser = openModule.default || openModule;
 
+// Opens the most recent (or requested) HTML test report in a browser.
+
+// Environment Variables:
+// - REPORT_BROWSER: preferred browser executable (overrides OS defaults).
+// - REPORT_BROWSER_ARGS: space-delimited flags passed to the browser process.
+
 const minimist = require('minimist');
-const { loadRunEntries } = require('./report-utils');
+const { loadRunEntries } = require('./run-utils');
 
 const normalisedArgv = process.argv.slice(2).map((arg) => (arg === '-past' ? '--past' : arg));
 
