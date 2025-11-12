@@ -24,6 +24,7 @@ const { createRunSummaryPayload, createPageSummaryPayload } = require('../utils/
 test.use({ trace: 'off', video: 'off' });
 
 const STABILITY_TIMEOUT_MS = 20000;
+const DATA_MISSING_LABEL = 'DATA MISSING';
 
 const formatPageLabel = (page) => (page === '/' ? 'Homepage' : page);
 const pageSummaryTitle = (page, suffix) => `${formatPageLabel(page)} — ${suffix}`;
@@ -40,8 +41,8 @@ const collectRuleSnapshots = (entries, category) => {
 
   entries.forEach(({ page, project, browser, entries: violations }) => {
     const projectKey = project || 'default';
-    const viewport = browser || projectKey;
-    const browserLabel = browser || viewport;
+    const browserLabel = browser || DATA_MISSING_LABEL;
+    const viewport = browser || DATA_MISSING_LABEL;
     const pageKey = `${projectKey}::${page}`;
     violations.forEach((violation) => {
       const ruleId = violation.id || 'unknown-rule';
@@ -63,9 +64,7 @@ const collectRuleSnapshots = (entries, category) => {
       const record = aggregate.get(key);
       record.pages.add(pageKey);
       record.viewports.add(viewport);
-      if (browserLabel) {
-        record.browsers.add(browserLabel);
-      }
+      record.browsers.add(browserLabel);
       record.nodes += violation.nodes?.length || 0;
       if (!record.description && (violation.description || violation.help || violation.message)) {
         record.description = violation.description || violation.help || violation.message;
@@ -104,7 +103,9 @@ const buildAccessibilityRunSchemaPayload = ({
 }) => {
   if (!Array.isArray(reports) || reports.length === 0) return null;
 
-  const viewportSet = new Set(reports.map((report) => report.projectName || 'default'));
+  const viewportSet = new Set(
+    reports.map((report) => report.browser || report.viewport || DATA_MISSING_LABEL)
+  );
   const toUniqueKey = (entry) => `${entry.project || 'default'}::${entry.page}`;
   const gatingPages = new Set(aggregatedViolations.map(toUniqueKey));
   const advisoryPages = new Set(aggregatedAdvisories.map(toUniqueKey));
@@ -157,6 +158,15 @@ const buildAccessibilityRunSchemaPayload = ({
       page: report.page,
       status: report.status,
       projectName: report.projectName || 'default',
+      siteName: report.siteName || report.projectName || null,
+      browser: report.browser || null,
+      viewport: report.viewport || null,
+      viewports:
+        Array.isArray(report.viewports) && report.viewports.length
+          ? report.viewports
+          : report.viewport
+            ? [report.viewport]
+            : [],
       gatingViolations: (report.violations || []).length,
       advisoryFindings: (report.advisory || []).length,
       bestPracticeFindings: (report.bestPractice || []).length,
@@ -183,6 +193,13 @@ const buildAccessibilityRunSchemaPayload = ({
 const buildAccessibilityPageSchemaPayloads = (reports, metadataExtras = {}) =>
   Array.isArray(reports)
     ? reports.map((report) => {
+        const summaryViewport = report.viewport || report.browser || null;
+        const summaryViewports =
+          Array.isArray(report.viewports) && report.viewports.length
+            ? report.viewports
+            : summaryViewport
+              ? [summaryViewport]
+              : [];
         const summary = {
           page: report.page,
           status: report.status,
@@ -203,19 +220,23 @@ const buildAccessibilityPageSchemaPayloads = (reports, metadataExtras = {}) =>
           advisoriesList: report.advisory || [],
           bestPracticesList: report.bestPractice || [],
           projectName: report.projectName || 'default',
-          viewport: report.projectName || 'default',
+          siteName: report.siteName || report.projectName || null,
+          browser: report.browser || null,
+          viewport: summaryViewport,
+          viewports: summaryViewports,
         };
 
         return createPageSummaryPayload({
           baseName: `a11y-page-${slugify(report.projectName || 'default')}-${slugify(report.page)}`,
           title: pageSummaryTitle(report.page, 'WCAG issues overview'),
           page: report.page,
-          viewport: report.projectName || 'default',
+          viewport: summaryViewport || DATA_MISSING_LABEL,
           summary,
           metadata: {
             spec: 'a11y.audit.wcag',
             projectName: report.projectName || 'default',
             scope: 'project',
+            viewports: summaryViewports.length ? summaryViewports : undefined,
             ...metadataExtras,
           },
         });
@@ -339,11 +360,12 @@ const deriveAggregatedFindings = (reports) => {
   const aggregatedBestPractices = [];
 
   for (const report of reports) {
+    const browserLabel = report.browser || report.viewport || DATA_MISSING_LABEL;
     if (Array.isArray(report.violations) && report.violations.length > 0) {
       aggregatedViolations.push({
         page: report.page,
         project: report.projectName || 'default',
-        browser: report.browser || report.projectName || 'default',
+        browser: browserLabel,
         entries: report.violations,
       });
     }
@@ -351,7 +373,7 @@ const deriveAggregatedFindings = (reports) => {
       aggregatedAdvisories.push({
         page: report.page,
         project: report.projectName || 'default',
-        browser: report.browser || report.projectName || 'default',
+        browser: browserLabel,
         entries: report.advisory,
       });
     }
@@ -359,7 +381,7 @@ const deriveAggregatedFindings = (reports) => {
       aggregatedBestPractices.push({
         page: report.page,
         project: report.projectName || 'default',
-        browser: report.browser || report.projectName || 'default',
+        browser: browserLabel,
         entries: report.bestPractice,
       });
     }
@@ -456,6 +478,9 @@ test.describe('Functionality: Accessibility (WCAG)', () => {
 
         console.log(`➡️  [${index + 1}/${totalPages}] Accessibility scan for ${testPage}`);
 
+      const { siteLabel: pageSiteLabel, viewportLabel: pageViewportLabel } =
+        resolveAccessibilityMetadata(siteConfig, testInfo);
+
       const pageReport = {
         page: testPage,
         index: index + 1,
@@ -468,8 +493,9 @@ test.describe('Functionality: Accessibility (WCAG)', () => {
         advisory: [],
         bestPractice: [],
         gatingLabel: failOnLabel,
-        projectName: testInfo.project?.name || 'default',
       };
+
+      applyViewportMetadata([pageReport], pageViewportLabel, pageSiteLabel);
 
         let response;
         try {

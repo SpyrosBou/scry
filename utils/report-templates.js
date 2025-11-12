@@ -34,6 +34,8 @@ const { KIND_RUN_SUMMARY, KIND_PAGE_SUMMARY } = require('./report-schema');
 const createSiteQualityRenderers = require('./report-templates/groups/site-quality');
 const createAccessibilityRenderers = require('./report-templates/groups/accessibility');
 
+const MISSING_DATA_LABEL = 'DATA MISSING';
+
 const renderRuleSnapshotsTable = (snapshots, { projectName, viewports } = {}) => {
   if (!Array.isArray(snapshots) || snapshots.length === 0) return '';
   const defaultBrowsers = normaliseStringList(projectName);
@@ -46,9 +48,13 @@ const renderRuleSnapshotsTable = (snapshots, { projectName, viewports } = {}) =>
       const viewports = Array.isArray(snapshot.viewports) ? snapshot.viewports : [];
       const wcagTags = Array.isArray(snapshot.wcagTags) ? snapshot.wcagTags : [];
       const snapshotBrowsers = normaliseStringList(snapshot.browsers, snapshot.projects);
-      const browserValues = snapshotBrowsers.length ? snapshotBrowsers : defaultBrowsers;
-      const browsers = renderCodeList(browserValues, '—');
-      const viewportList = renderCodeList(viewports.length ? viewports : defaultViewports, '—');
+      const browserValues = snapshotBrowsers.length ? snapshotBrowsers : [MISSING_DATA_LABEL];
+      const browsers = renderCodeList(browserValues, MISSING_DATA_LABEL);
+      const viewportValues = viewports.length ? viewports : defaultViewports;
+      const viewportList = renderCodeList(
+        viewportValues.length ? viewportValues : [MISSING_DATA_LABEL],
+        MISSING_DATA_LABEL
+      );
       const detailsText = snapshot.description || snapshot.help || '';
       const detailsContent = detailsText
         ? escapeHtml(detailsText)
@@ -2125,14 +2131,15 @@ const renderWcagPageIssueTable = (entries, heading, options = {}) => {
           )}" target="_blank" rel="noopener noreferrer">Guidance</a>`
         : '';
       const explicitBrowsers = normaliseStringList(entry.browser, entry.browsers);
-      const fallbackBrowsers = normaliseStringList(entry.projectName, entry.project, entry.projects);
-      const browserValues = explicitBrowsers.length ? explicitBrowsers : fallbackBrowsers;
-      const browserList = renderCodeList(browserValues, '—');
+      const browserValues = explicitBrowsers.length ? explicitBrowsers : [MISSING_DATA_LABEL];
+      const browserList = renderCodeList(browserValues, MISSING_DATA_LABEL);
+      const explicitViewports = normaliseStringList(entry.viewport, entry.viewportName, entry.viewports);
+      const fallbackViewports = normaliseStringList(viewportFallback);
+      const viewportValues = explicitViewports.length ? explicitViewports : fallbackViewports;
+      const formattedViewports = formatViewportList(viewportValues);
       const viewportList = renderCodeList(
-        formatViewportList(
-          normaliseStringList(entry.viewport, entry.viewportName, entry.viewports, viewportFallback)
-        ),
-        '—'
+        formattedViewports.length ? formattedViewports : [MISSING_DATA_LABEL],
+        MISSING_DATA_LABEL
       );
       const culprit = deriveCulpritSummary(entry.nodes || []);
       const culpritCell = culprit
