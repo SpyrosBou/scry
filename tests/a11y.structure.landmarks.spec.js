@@ -289,6 +289,7 @@ async function runStructureAudit(page, siteConfig, pagePath) {
         createStructureFinding('No H1 heading found on the page.', '2.4.6', {
           impact: 'critical',
           summary: 'Missing H1 heading',
+          details: 'Detected 0 H1 headings on this page.',
         })
       );
     } else if (structure.h1Count > 1) {
@@ -299,6 +300,7 @@ async function runStructureAudit(page, siteConfig, pagePath) {
           {
             impact: 'critical',
             summary: 'Multiple H1 headings detected',
+            details: `Detected ${structure.h1Count} H1 headings on this page.`,
           }
         )
       );
@@ -309,6 +311,7 @@ async function runStructureAudit(page, siteConfig, pagePath) {
         createStructureFinding('Missing <main> landmark (or equivalent role="main").', '1.3.1', {
           impact: 'critical',
           summary: 'Missing main landmark',
+          details: 'No <main> or role="main" landmark detected.',
         })
       );
     }
@@ -320,6 +323,7 @@ async function runStructureAudit(page, siteConfig, pagePath) {
           '2.4.1',
           {
             summary: 'No navigation landmark detected',
+            details: 'Detected 0 <nav> or role="navigation" landmarks.',
           }
         )
       );
@@ -329,6 +333,7 @@ async function runStructureAudit(page, siteConfig, pagePath) {
       report.advisories.push(
         createStructureFinding('No header/banner landmark detected.', '1.3.1', {
           summary: 'No header landmark detected',
+          details: 'Detected 0 <header> or role="banner" landmarks.',
         })
       );
     }
@@ -337,6 +342,7 @@ async function runStructureAudit(page, siteConfig, pagePath) {
       report.advisories.push(
         createStructureFinding('No footer/contentinfo landmark detected.', '1.3.1', {
           summary: 'No footer landmark detected',
+          details: 'Detected 0 <footer> or role="contentinfo" landmarks.',
         })
       );
     }

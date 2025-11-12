@@ -4960,6 +4960,7 @@ const normaliseStructureIssueItem = (issue, defaultImpact) => {
   }
 
   const helpUrl = issue.helpUrl || issue.help || null;
+  const details = issue.details != null ? String(issue.details || '').trim() : '';
 
   const samples = [];
   if (Array.isArray(issue.samples)) {
@@ -4985,6 +4986,7 @@ const normaliseStructureIssueItem = (issue, defaultImpact) => {
     helpUrl,
     samples,
     nodes,
+    details,
   };
 };
 
@@ -5010,6 +5012,7 @@ const aggregateStructureIssues = (issues, defaultImpact) => {
         message: normalized.message,
         tags: normalized.tags,
         helpUrl: normalized.helpUrl,
+        details: normalized.details || null,
         samples: new Set(),
         nodes: [],
       });
@@ -5023,6 +5026,9 @@ const aggregateStructureIssues = (issues, defaultImpact) => {
     }
     if (normalized.helpUrl) {
       bucket.helpUrl = normalized.helpUrl;
+    }
+    if (normalized.details) {
+      bucket.details = normalized.details;
     }
     normalized.samples.forEach((sample) => {
       if (sample) bucket.samples.add(sample);
@@ -5043,6 +5049,7 @@ const aggregateStructureIssues = (issues, defaultImpact) => {
       rule: entry.message || entry.summary || 'Issue',
       tags: entry.tags,
       helpUrl: entry.helpUrl || null,
+      details: entry.details || null,
       nodes,
     };
   });
