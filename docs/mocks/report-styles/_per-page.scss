@@ -1,0 +1,295 @@
+/* -----------------------------------------------------------------------------
+ * Per-page accordion, toggle controls, and inline tables
+ * Keeps granular findings isolated from the summary views.
+ * -------------------------------------------------------------------------- */
+
+/* Toggle controls -------------------------------------------------------- */
+.summary-toggle-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 0.75rem;
+}
+
+.summary-per-page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+}
+
+.summary-per-page-header h3 {
+  margin: 0;
+}
+
+.summary-toggle-button {
+  border: 1px solid var(--accent);
+  background: var(--accent-soft);
+  color: var(--nav-status-info-text);
+  border-radius: 12px;
+  padding: 0.45rem 0.9rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.summary-toggle-button:hover {
+  background: rgba(38, 139, 210, 0.24);
+  box-shadow: 0 12px 22px rgba(38, 139, 210, 0.24);
+}
+
+.summary-toggle-button:focus-visible {
+  outline: 2px solid rgba(38, 139, 210, 0.45);
+  outline-offset: 2px;
+}
+
+/* Accordion container ---------------------------------------------------- */
+.summary-page {
+  border: 1px solid var(--border-default);
+  border-radius: 12px;
+  background: var(--surface-card);
+  box-shadow: var(--shadow-inset);
+  margin-bottom: 0.25rem;
+  transition:
+    background 0.3s ease,
+    border-color 0.3s ease,
+    box-shadow 0.3s ease;
+}
+
+.summary-page > summary {
+  padding: 0.5rem;
+  font-weight: 400;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  color: var(--text-strong);
+}
+
+.summary-page > summary::-webkit-details-marker {
+  display: none;
+}
+
+.summary-page[open] > summary {
+  border-bottom: 1px solid var(--border-default);
+}
+
+.summary-page__body {
+  padding: 1rem 1.25rem 1.35rem;
+  background: var(--surface-subtle);
+}
+
+.summary-page--ok {
+  border: 1px solid var(--summary-ok-border);
+  background: var(--summary-ok-bg);
+  box-shadow: inset 0 0 0 1px var(--summary-ok-shadow);
+}
+
+.summary-page--ok > summary {
+  color: var(--summary-ok-text);
+}
+
+.summary-page--ok[open] > summary {
+  border-bottom: 1px solid var(--summary-ok-border);
+}
+
+.summary-page--ok .summary-page__body {
+  background: var(--summary-ok-body);
+}
+
+.summary-page--fail {
+  border: 1px solid var(--summary-fail-border);
+  background: var(--summary-fail-bg);
+  box-shadow: inset 0 0 0 1px var(--summary-fail-shadow);
+}
+
+.summary-page--fail > summary {
+  color: var(--summary-fail-text);
+}
+
+.summary-page--fail[open] > summary {
+  border-bottom: 1px solid var(--summary-fail-border);
+}
+
+.summary-page--fail .summary-page__body {
+  background: var(--summary-fail-body);
+}
+
+.summary-page--advisory {
+  border: 1px solid var(--summary-advisory-border);
+  background: var(--summary-advisory-bg);
+  box-shadow: inset 0 0 0 1px var(--summary-advisory-shadow);
+}
+
+.summary-page--advisory[open] > summary {
+  border-bottom: 1px solid var(--summary-advisory-border);
+}
+
+.summary-page--advisory .summary-page__body {
+  background: var(--summary-advisory-body);
+}
+
+.summary-page--warn {
+  border: 1px solid var(--summary-warn-border);
+  background: var(--summary-warn-bg);
+  box-shadow: inset 0 0 0 1px var(--summary-warn-shadow);
+}
+
+.summary-page--warn > summary {
+  color: var(--summary-warn-text);
+}
+
+.summary-page--warn[open] > summary {
+  border-bottom: 1px solid var(--summary-warn-border);
+}
+
+.summary-page--warn .summary-page__body {
+  background: var(--summary-warn-body);
+}
+
+/* Nested accordion containers ------------------------------------------- */
+details.summary-accordion {
+  background: var(--surface-card);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: var(--shadow-inset);
+}
+
+details.summary-accordion + details.summary-accordion {
+  margin-top: 1rem;
+}
+
+details.summary-accordion summary {
+  padding: 1rem 1.25rem;
+  font-weight: 500;
+  color: var(--accent);
+  cursor: pointer;
+  background: linear-gradient(135deg, rgba(38, 139, 210, 0.18), rgba(253, 246, 227, 0));
+  outline: none;
+}
+
+details.summary-accordion[open] summary {
+  border-bottom: 1px solid var(--border-default);
+}
+
+.accordion-body {
+  padding: 1.25rem;
+  display: grid;
+  gap: 1.2rem;
+  background: var(--surface-panel);
+}
+
+/* Page card -------------------------------------------------------------- */
+.page-card {
+  background: var(--surface-card);
+  border-radius: 12px;
+  padding: 1.1rem 1.3rem;
+  box-shadow: var(--shadow-inset);
+  border: 1px solid var(--border-default);
+}
+
+.page-card header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.65rem;
+}
+
+.page-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.85rem;
+  margin-bottom: 0.75rem;
+}
+
+.page-card__header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.page-card__meta {
+  display: grid;
+  gap: 0.35rem;
+  margin-bottom: 0.85rem;
+}
+
+.page-card__meta .details {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+/* Page-level table ------------------------------------------------------- */
+.page-card__table {
+  margin: 0.85rem 0;
+}
+
+.page-card__table table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--surface-card);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: var(--shadow-floating);
+}
+
+.page-card__table th,
+.page-card__table td {
+  padding: 0.65rem 0.85rem;
+  border-bottom: 1px solid var(--border-default);
+  font-size: 0.9rem;
+  vertical-align: top;
+}
+
+.page-card__table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.delta-threshold {
+  font-weight: 500;
+}
+
+/* Visual & responsive previews ------------------------------------------ */
+.summary-report.summary-visual .visual-previews,
+.summary-report.summary-responsive .visual-previews {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  margin-top: 0.85rem;
+}
+
+.visual-previews figure {
+  margin: 0;
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
+  border-radius: 12px;
+  padding: 0.75rem;
+  display: grid;
+  gap: 0.5rem;
+  box-shadow: var(--shadow-floating);
+  transition:
+    background 0.3s ease,
+    border-color 0.3s ease,
+    box-shadow 0.3s ease;
+}
+
+.visual-previews img {
+  width: 100%;
+  height: auto;
+  border-radius: 12px;
+  border: 1px solid var(--border-default);
+  background: var(--surface-subtle);
+}
+
+.visual-previews figcaption {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}

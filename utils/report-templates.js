@@ -36,10 +36,8 @@ const createAccessibilityRenderers = require('./report-templates/groups/accessib
 
 const MISSING_DATA_LABEL = 'DATA MISSING';
 
-const renderRuleSnapshotsTable = (snapshots, { projectName, viewports } = {}) => {
+const renderRuleSnapshotsTable = (snapshots) => {
   if (!Array.isArray(snapshots) || snapshots.length === 0) return '';
-  const defaultBrowsers = normaliseStringList(projectName);
-  const defaultViewports = normaliseStringList(viewports);
   const rows = snapshots
     .map((snapshot) => {
       const impact = snapshot.impact || snapshot.category || 'info';
@@ -50,17 +48,14 @@ const renderRuleSnapshotsTable = (snapshots, { projectName, viewports } = {}) =>
       const snapshotBrowsers = normaliseStringList(snapshot.browsers, snapshot.projects);
       const browserValues = snapshotBrowsers.length ? snapshotBrowsers : [MISSING_DATA_LABEL];
       const browsers = renderCodeList(browserValues, MISSING_DATA_LABEL);
-      const viewportValues = viewports.length ? viewports : defaultViewports;
-      const viewportList = renderCodeList(
-        viewportValues.length ? viewportValues : [MISSING_DATA_LABEL],
-        MISSING_DATA_LABEL
-      );
+      const viewportValues = viewports.length ? viewports : [MISSING_DATA_LABEL];
+      const viewportList = renderCodeList(viewportValues, MISSING_DATA_LABEL);
       const detailsText = snapshot.description || snapshot.help || '';
       const detailsContent = detailsText
         ? escapeHtml(detailsText)
         : snapshot.helpUrl
           ? 'Guidance available'
-          : '—';
+          : MISSING_DATA_LABEL;
       const helpLink = snapshot.helpUrl
         ? `<br /><a class="details-link" href="${escapeHtml(
             snapshot.helpUrl
@@ -73,8 +68,8 @@ const renderRuleSnapshotsTable = (snapshots, { projectName, viewports } = {}) =>
           <td><span class="details-text">${detailsContent}</span>${helpLink}</td>
           <td>${browsers}</td>
           <td>${viewportList}</td>
-          <td>${pages.length ? renderCodeList(pages) : '—'}</td>
-          <td>${snapshot.nodes != null ? escapeHtml(formatCount(snapshot.nodes)) : '—'}</td>
+          <td>${pages.length ? renderCodeList(pages) : MISSING_DATA_LABEL}</td>
+          <td>${snapshot.nodes != null ? escapeHtml(formatCount(snapshot.nodes)) : MISSING_DATA_LABEL}</td>
           <td>${renderComplianceCell(wcagTags)}</td>
         </tr>
       `;
@@ -110,7 +105,7 @@ const normaliseStringList = (...inputs) => {
   return Array.from(set);
 };
 
-const renderCodeList = (values, fallback = '—') => {
+const renderCodeList = (values, fallback = MISSING_DATA_LABEL) => {
   const list = normaliseStringList(values);
   if (list.length === 0) return fallback;
   return list.map((value) => `<code>${escapeHtml(value)}</code>`).join('<br />');
@@ -1123,7 +1118,7 @@ const deriveCulpritSummary = (nodes) => {
 
 // Derive a brief, specific description of an issue for the "Details" column.
 const deriveIssueDetails = (entry) => {
-  if (!entry) return '—';
+  if (!entry) return MISSING_DATA_LABEL;
   // Prefer explicit details if provided by the spec
   const explicit = entry.details != null ? String(entry.details).trim() : '';
   if (explicit) return explicit;
@@ -1151,7 +1146,7 @@ const deriveIssueDetails = (entry) => {
     }
   }
 
-  return '—';
+  return MISSING_DATA_LABEL;
 };
 
 const formatMilliseconds = (value) => {
@@ -1269,23 +1264,29 @@ const formatRuleHeading = (label, count) =>
 const renderAccessibilityRuleTable = (
   title,
   rules,
-  { headingClass, sectionClass, projectName, defaultViewports } = {}
+  { headingClass, sectionClass, projectName } = {}
 ) => {
   if (!Array.isArray(rules) || rules.length === 0) return '';
-  const fallbackBrowsers = normaliseStringList(projectName);
-  const fallbackViewports = normaliseStringList(defaultViewports);
   const rows = rules
     .map((rule) => {
       const impactRaw = rule.impact || rule.category || 'info';
       const impactLabel = formatIssueImpactLabel(impactRaw);
-      const browserList = renderCodeList(
-        normaliseStringList(rule.browsers, rule.projects, rule.projectName, fallbackBrowsers),
-        '—'
+      const explicitBrowsers = normaliseStringList(
+        rule.browsers,
+        rule.browser,
+        rule.projects,
+        rule.projectName
       );
+      const browserList = renderCodeList(explicitBrowsers);
       const wcagTags =
         Array.isArray(rule.wcagTags) && rule.wcagTags.length > 0 ? rule.wcagTags : [];
-      const viewportsRaw = rule.viewports || rule.viewportsTested || fallbackViewports;
-      const viewportCell = renderCodeList(formatViewportList(viewportsRaw), '—');
+      const viewportsRaw =
+        rule.viewports && rule.viewports.length
+          ? rule.viewports
+          : rule.viewportsTested && rule.viewportsTested.length
+            ? rule.viewportsTested
+            : [MISSING_DATA_LABEL];
+      const viewportCell = renderCodeList(formatViewportList(viewportsRaw), MISSING_DATA_LABEL);
       const pageArray = Array.isArray(rule.pages) ? rule.pages : [];
       const normalisedPages = pageArray
         .map((page) => {
@@ -1306,14 +1307,14 @@ const renderAccessibilityRuleTable = (
       const hasManyPages = pageCount > 5 || normalisedPages.length > 5;
       const pageCell = hasManyPages
         ? `<span class="details-text">${escapeHtml(`${formatCount(pageCount)} pages`)}</span>`
-        : renderCodeList(normalisedPages, '—');
+        : renderCodeList(normalisedPages, MISSING_DATA_LABEL);
       const wcagHtml = renderComplianceCell(wcagTags);
       const detailsText = rule.description || rule.help || '';
       const detailsContent = detailsText
         ? escapeHtml(detailsText)
         : rule.helpUrl
           ? 'Guidance available'
-          : '—';
+          : MISSING_DATA_LABEL;
       const helpLink = rule.helpUrl
         ? `<br /><a class="details-link" href="${escapeHtml(
             rule.helpUrl
@@ -1979,16 +1980,7 @@ const renderSchemaRunEntry = (entry) => {
     : payload.overview
       ? renderSchemaMetrics(payload.overview)
       : '';
-  const rulesHtml = hasCustomHtml
-    ? ''
-    : renderRuleSnapshotsTable(payload.ruleSnapshots, {
-        projectName: metadata.projectName || entry.projectName,
-        viewports:
-          (Array.isArray(metadata.viewports) && metadata.viewports.length
-            ? metadata.viewports
-            : null) ||
-          (Array.isArray(payload.details?.viewports) ? payload.details.viewports : null),
-      });
+  const rulesHtml = hasCustomHtml ? '' : renderRuleSnapshotsTable(payload.ruleSnapshots);
 
   const body = [metaHtml, overviewHtml, rulesHtml].filter(Boolean).join('\n');
   if (!body) return '';
@@ -2109,7 +2101,6 @@ const renderWcagPageIssueTable = (entries, heading, options = {}) => {
   if (!Array.isArray(entries) || entries.length === 0) return '';
   const headingClass = options.headingClass ? ` class="${escapeHtml(options.headingClass)}"` : '';
   const includeWcagColumn = options.includeWcagColumn !== false;
-  const viewportFallback = options.viewportLabel || null;
   const rows = entries
     .map((entry) => {
       const impact = entry.impact || entry.category || 'info';
@@ -2124,7 +2115,7 @@ const renderWcagPageIssueTable = (entries, heading, options = {}) => {
         }
       }
       const detailsText = deriveIssueDetails(entry);
-      const detailsContent = detailsText ? escapeHtml(detailsText) : '—';
+      const detailsContent = detailsText ? escapeHtml(detailsText) : MISSING_DATA_LABEL;
       const helpLink = helpUrl
         ? `<br /><a class="details-link" href="${escapeHtml(
             helpUrl
@@ -2134,9 +2125,9 @@ const renderWcagPageIssueTable = (entries, heading, options = {}) => {
       const browserValues = explicitBrowsers.length ? explicitBrowsers : [MISSING_DATA_LABEL];
       const browserList = renderCodeList(browserValues, MISSING_DATA_LABEL);
       const explicitViewports = normaliseStringList(entry.viewport, entry.viewportName, entry.viewports);
-      const fallbackViewports = normaliseStringList(viewportFallback);
-      const viewportValues = explicitViewports.length ? explicitViewports : fallbackViewports;
-      const formattedViewports = formatViewportList(viewportValues);
+      const formattedViewports = formatViewportList(
+        explicitViewports.length ? explicitViewports : [MISSING_DATA_LABEL]
+      );
       const viewportList = renderCodeList(
         formattedViewports.length ? formattedViewports : [MISSING_DATA_LABEL],
         MISSING_DATA_LABEL
@@ -2148,7 +2139,7 @@ const renderWcagPageIssueTable = (entries, heading, options = {}) => {
               culprit.screenshot
             )}" title="View offending element">${culprit.display}</a>`
           : culprit.display
-        : '<span class="details">—</span>';
+        : `<span class="details">${MISSING_DATA_LABEL}</span>`;
       return `
         <tr class="impact-${escapeHtml((impact || 'info').toLowerCase())}">
           <td>${escapeHtml(impact || 'info')}</td>
@@ -2293,7 +2284,6 @@ const renderAccessibilityGroupHtml = (group) => {
           {
             sectionClass: 'summary-a11y--rule-table summary-a11y--rule-table-gating',
             projectName: projectLabel,
-            defaultViewports: viewportList,
           }
         ),
         renderAccessibilityRuleTable(
@@ -2302,7 +2292,6 @@ const renderAccessibilityGroupHtml = (group) => {
           {
             sectionClass: 'summary-a11y--rule-table summary-a11y--rule-table-advisory',
             projectName: projectLabel,
-            defaultViewports: viewportList,
           }
         ),
         renderAccessibilityRuleTable(
@@ -2312,7 +2301,6 @@ const renderAccessibilityGroupHtml = (group) => {
             headingClass: 'summary-heading-best-practice',
             sectionClass: 'summary-a11y--rule-table summary-a11y--rule-table-best-practice',
             projectName: projectLabel,
-            defaultViewports: viewportList,
           }
         ),
       ]

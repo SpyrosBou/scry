@@ -1,0 +1,224 @@
+/* Panel toggle wiring ---------------------------------------------------- */
+#view-summary:checked ~ .report-shell .panel[data-view='view-summary'],
+#view-accessibility-wcag:checked ~ .report-shell .panel[data-view='view-accessibility-wcag'],
+#view-accessibility-forms:checked ~ .report-shell .panel[data-view='view-accessibility-forms'],
+#view-accessibility-keyboard:checked
+  ~ .report-shell
+  .panel[data-view='view-accessibility-keyboard'],
+#view-accessibility-landmarks:checked
+  ~ .report-shell
+  .panel[data-view='view-accessibility-landmarks'],
+#view-functionality-links:checked ~ .report-shell .panel[data-view='view-functionality-links'],
+#view-functionality-interactive:checked
+  ~ .report-shell
+  .panel[data-view='view-functionality-interactive'],
+#view-functionality-infrastructure:checked
+  ~ .report-shell
+  .panel[data-view='view-functionality-infrastructure'],
+#view-responsive-layout:checked ~ .report-shell .panel[data-view='view-responsive-layout'],
+#view-visual-regression:checked ~ .report-shell .panel[data-view='view-visual-regression'] {
+  display: grid;
+}
+
+/* Sidebar selection states ---------------------------------------------- */
+#view-summary:checked ~ .report-shell .sidebar label[for='view-summary'],
+#view-accessibility-wcag:checked ~ .report-shell .sidebar label[for='view-accessibility-wcag'],
+#view-accessibility-forms:checked ~ .report-shell .sidebar label[for='view-accessibility-forms'],
+#view-accessibility-keyboard:checked
+  ~ .report-shell
+  .sidebar
+  label[for='view-accessibility-keyboard'],
+#view-accessibility-landmarks:checked
+  ~ .report-shell
+  .sidebar
+  label[for='view-accessibility-landmarks'],
+#view-functionality-links:checked ~ .report-shell .sidebar label[for='view-functionality-links'],
+#view-functionality-interactive:checked
+  ~ .report-shell
+  .sidebar
+  label[for='view-functionality-interactive'],
+#view-functionality-infrastructure:checked
+  ~ .report-shell
+  .sidebar
+  label[for='view-functionality-infrastructure'],
+#view-responsive-layout:checked ~ .report-shell .sidebar label[for='view-responsive-layout'],
+#view-visual-regression:checked ~ .report-shell .sidebar label[for='view-visual-regression'] {
+  box-shadow:
+    0 0 0 2px rgba(37, 99, 235, 0.18),
+    0 12px 28px rgba(30, 64, 175, 0.18);
+  outline: 1px solid rgba(37, 99, 235, 0.25);
+  outline-offset: -1px;
+  transform: none;
+}
+
+/* Nav item variants ------------------------------------------------------ */
+.sidebar .nav-item.status-summary {
+  background: var(--summary-highlight-bg);
+  color: var(--summary-highlight-text);
+  border: 1px solid var(--summary-highlight-border);
+  border-radius: 12px;
+  padding: 0.8rem 1rem;
+  box-shadow: var(--summary-highlight-shadow);
+}
+
+.sidebar .nav-item.status-summary:hover {
+  background: var(--summary-highlight-hover-bg);
+  box-shadow: var(--summary-highlight-hover-shadow);
+}
+
+.sidebar .nav-item.status-summary .nav-item__header {
+  width: 100%;
+}
+
+.sidebar .nav-item.status-summary .nav-status {
+  background: var(--summary-highlight-badge-bg);
+  color: var(--summary-highlight-text);
+}
+
+.sidebar .nav-item.status-info {
+  background: var(--nav-card-info-bg);
+  color: var(--nav-status-info-text);
+  border-left: 4px solid var(--nav-card-info-border);
+}
+
+.sidebar .nav-item.status-info:hover {
+  background: var(--nav-card-info-hover-bg);
+}
+
+.sidebar .nav-item.status-info .nav-status {
+  background: var(--nav-status-info-bg);
+  color: var(--nav-status-info-text);
+}
+
+:is(
+  #view-summary:checked ~ .report-shell .sidebar label[for='view-summary'].status-fail,
+  #view-accessibility-wcag:checked
+    ~ .report-shell
+    .sidebar
+    label[for='view-accessibility-wcag'].status-fail,
+  #view-accessibility-forms:checked
+    ~ .report-shell
+    .sidebar
+    label[for='view-accessibility-forms'].status-fail,
+  #view-accessibility-keyboard:checked
+    ~ .report-shell
+    .sidebar
+    label[for='view-accessibility-keyboard'].status-fail,
+  #view-accessibility-landmarks:checked
+    ~ .report-shell
+    .sidebar
+    label[for='view-accessibility-landmarks'].status-fail,
+  #view-functionality-links:checked
+    ~ .report-shell
+    .sidebar
+    label[for='view-functionality-links'].status-fail,
+  #view-functionality-interactive:checked
+    ~ .report-shell
+    .sidebar
+    label[for='view-functionality-interactive'].status-fail,
+  #view-functionality-infrastructure:checked
+    ~ .report-shell
+    .sidebar
+    label[for='view-functionality-infrastructure'].status-fail,
+  #view-responsive-layout:checked
+    ~ .report-shell
+    .sidebar
+    label[for='view-responsive-layout'].status-fail,
+  #view-visual-regression:checked
+    ~ .report-shell
+    .sidebar
+    label[for='view-visual-regression'].status-fail
+) {
+  background: var(--nav-card-fail-hover-bg);
+  color: var(--nav-status-fail-text);
+}
+
+:is(
+  #view-summary:checked ~ .report-shell .sidebar label[for='view-summary'].status-pass,
+  #view-accessibility-wcag:checked
+    ~ .report-shell
+    .sidebar
+    label[for='view-accessibility-wcag'].status-pass,
+  #view-accessibility-forms:checked
+    ~ .report-shell
+    .sidebar
+    label[for='view-accessibility-forms'].status-pass,
+  #view-accessibility-keyboard:checked
+    ~ .report-shell
+    .sidebar
+    label[for='view-accessibility-keyboard'].status-pass,
+  #view-accessibility-landmarks:checked
+    ~ .report-shell
+    .sidebar
+    label[for='view-accessibility-landmarks'].status-pass,
+  #view-functionality-links:checked
+    ~ .report-shell
+    .sidebar
+    label[for='view-functionality-links'].status-pass,
+  #view-functionality-interactive:checked
+    ~ .report-shell
+    .sidebar
+    label[for='view-functionality-interactive'].status-pass,
+  #view-functionality-infrastructure:checked
+    ~ .report-shell
+    .sidebar
+    label[for='view-functionality-infrastructure'].status-pass,
+  #view-responsive-layout:checked
+    ~ .report-shell
+    .sidebar
+    label[for='view-responsive-layout'].status-pass,
+  #view-visual-regression:checked
+    ~ .report-shell
+    .sidebar
+    label[for='view-visual-regression'].status-pass
+) {
+  background: var(--nav-card-pass-hover-bg);
+  color: var(--nav-status-pass-text);
+}
+
+:is(
+  #view-summary:checked ~ .report-shell .sidebar label[for='view-summary'].status-info,
+  #view-accessibility-wcag:checked
+    ~ .report-shell
+    .sidebar
+    label[for='view-accessibility-wcag'].status-info,
+  #view-accessibility-forms:checked
+    ~ .report-shell
+    .sidebar
+    label[for='view-accessibility-forms'].status-info,
+  #view-accessibility-keyboard:checked
+    ~ .report-shell
+    .sidebar
+    label[for='view-accessibility-keyboard'].status-info,
+  #view-accessibility-landmarks:checked
+    ~ .report-shell
+    .sidebar
+    label[for='view-accessibility-landmarks'].status-info,
+  #view-functionality-links:checked
+    ~ .report-shell
+    .sidebar
+    label[for='view-functionality-links'].status-info,
+  #view-functionality-interactive:checked
+    ~ .report-shell
+    .sidebar
+    label[for='view-functionality-interactive'].status-info,
+  #view-functionality-infrastructure:checked
+    ~ .report-shell
+    .sidebar
+    label[for='view-functionality-infrastructure'].status-info,
+  #view-responsive-layout:checked
+    ~ .report-shell
+    .sidebar
+    label[for='view-responsive-layout'].status-info,
+  #view-visual-regression:checked
+    ~ .report-shell
+    .sidebar
+    label[for='view-visual-regression'].status-info
+) {
+  background: var(--nav-card-info-hover-bg);
+  color: var(--nav-status-info-text);
+}
+/* -----------------------------------------------------------------------------
+ * View toggle wiring and navigation highlight states
+ * Keeps radio-driven UI logic isolated from component styles.
+ * -------------------------------------------------------------------------- */

@@ -1,0 +1,39 @@
+/* -----------------------------------------------------------------------------
+ * Base element styles and typography
+ * Covers resets and shared text treatments.
+ * -------------------------------------------------------------------------- */
+
+/* Reset ------------------------------------------------------------------- */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+/* Body copy --------------------------------------------------------------- */
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  color: var(--text-strong);
+  background-color: var(--bg-primary);
+  transition:
+    background-color 0.3s ease,
+    color 0.3s ease;
+}
+
+/* Shared heading font family ---------------------------------------------- */
+h1,
+h2,
+h3,
+h4,
+.summary-card__title,
+.group-title,
+.panel-info h2,
+.summary-report h3,
+.summary-per-page-header h3,
+.page-card__header h3,
+.test-group__title h2,
+.test-card__header h3,
+.sidebar-header h1 {
+  font-family: var(--font-heading);
+}

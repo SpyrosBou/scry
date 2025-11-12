@@ -1,0 +1,99 @@
+/* -----------------------------------------------------------------------------
+ * Status pills, WCAG tags, and helper utilities
+ * -------------------------------------------------------------------------- */
+
+.severity-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.65rem;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.severity-gating,
+.severity-fail {
+  background: var(--status-error-bg);
+  color: var(--status-error-text);
+}
+
+.severity-info {
+  background: var(--status-info-bg);
+  color: var(--status-info-text);
+}
+
+.wcag-tag {
+  display: inline-flex;
+  align-items: center;
+  background: linear-gradient(135deg, #2aa198, #268bd2);
+  color: var(--text-inverse);
+  font-weight: 500;
+  padding: 0.25rem 0.65rem;
+  border-radius: 12px;
+  box-shadow: 0 6px 16px rgba(38, 139, 210, 0.25);
+  letter-spacing: 0.03em;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+}
+
+.browser-tag {
+  display: inline-flex;
+  align-items: center;
+  margin: 0.15rem 0.3rem 0.15rem 0;
+  padding: 0.2rem 0.6rem;
+  background: var(--accent-soft);
+  border-radius: 12px;
+  color: var(--text-inverse);
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.65rem;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.checks {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.checks li {
+  padding: 0.4rem 0;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  font-size: 0.95rem;
+}
+
+.checks li:last-child {
+  border-bottom: none;
+}
+
+.checks li::before {
+  content: '\2716';
+  color: var(--status-error-text);
+  margin-right: 0.5rem;
+}
+
+.checks.empty {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.checks.empty::before {
+  content: none;
+}
+
+.descr {
+  color: var(--text-muted);
+  margin: 0.4rem 0 0;
+  font-size: 0.95rem;
+}

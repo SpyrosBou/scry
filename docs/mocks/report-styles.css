@@ -1,4 +1,14 @@
 @charset "UTF-8";
+/* -----------------------------------------------------------------------------
+ * Playwright report styles entry point
+ * Modules follow Sass @use guidance for clarity and reuse.
+ * -------------------------------------------------------------------------- */
+/* -----------------------------------------------------------------------------
+ * Theme tokens, shared maps, and generator mixins
+ * Inspired by the Sass module guidance on @use/@forward for scoping settings.
+ * -------------------------------------------------------------------------- */
+/* Light theme palette ------------------------------------------------------ */
+/* Dark theme palette ------------------------------------------------------- */
 :root {
   --bg-app: linear-gradient(180deg, #fdf6e3 0%, #eee8d5 100%);
   --bg-primary: #fdf6e3;
@@ -189,6 +199,9 @@
   --summary-impact-minor-bg: rgba(38, 139, 210, 0.24);
 }
 
+/* Status theme maps -------------------------------------------------------- */
+/* Utility mixins ----------------------------------------------------------- */
+/* Auto-generate component variants ---------------------------------------- */
 .status-error {
   background: var(--status-error-bg);
   color: var(--status-error-text);
@@ -284,12 +297,18 @@
   border-left: 4px solid var(--status-info-border);
 }
 
+/* -----------------------------------------------------------------------------
+ * Base element styles and typography
+ * Covers resets and shared text treatments.
+ * -------------------------------------------------------------------------- */
+/* Reset ------------------------------------------------------------------- */
 *,
 *::before,
 *::after {
   box-sizing: border-box;
 }
 
+/* Body copy --------------------------------------------------------------- */
 body {
   margin: 0;
   font-family: var(--font-body);
@@ -298,6 +317,7 @@ body {
   transition: background-color 0.3s ease, color 0.3s ease;
 }
 
+/* Shared heading font family ---------------------------------------------- */
 h1,
 h2,
 h3,
@@ -314,6 +334,7 @@ h4,
   font-family: var(--font-heading);
 }
 
+/* Report container ------------------------------------------------------- */
 .report-app {
   min-height: 100vh;
   background: var(--bg-app);
@@ -329,6 +350,7 @@ input[name=report-view] {
   pointer-events: none;
 }
 
+/* Shell layout ----------------------------------------------------------- */
 .report-shell {
   display: grid;
   grid-template-columns: 280px 1fr;
@@ -337,6 +359,7 @@ input[name=report-view] {
   margin: 0 auto 0 0;
 }
 
+/* Sidebar ---------------------------------------------------------------- */
 .sidebar {
   background: var(--surface-sidebar);
   border-radius: 12px;
@@ -363,6 +386,7 @@ input[name=report-view] {
   color: var(--accent);
 }
 
+/* Theme toggle ----------------------------------------------------------- */
 .theme-toggle {
   appearance: none;
   display: inline-flex;
@@ -428,6 +452,7 @@ body[data-theme=dark] .theme-toggle__icon--moon {
   display: inline;
 }
 
+/* Toolbar + metadata ----------------------------------------------------- */
 .report-toolbar {
   display: flex;
   justify-content: flex-end;
@@ -464,6 +489,7 @@ body[data-theme=dark] .theme-toggle__icon--moon {
   line-height: 1.4;
 }
 
+/* Navigation ------------------------------------------------------------- */
 .sidebar-nav {
   margin-top: 2.5rem;
   display: grid;
@@ -483,6 +509,7 @@ body[data-theme=dark] .theme-toggle__icon--moon {
   color: var(--text-subtle);
 }
 
+/* Navigation cards ------------------------------------------------------- */
 .nav-item {
   display: flex;
   flex-direction: column;
@@ -568,10 +595,12 @@ body[data-theme=dark] .theme-toggle__icon--moon {
   width: 100%;
 }
 
+/* Report content panels -------------------------------------------------- */
 .report-content {
   display: grid;
 }
 
+/* Panel surface ---------------------------------------------------------- */
 .panel {
   display: none;
   background: var(--surface-panel);
@@ -583,6 +612,16 @@ body[data-theme=dark] .theme-toggle__icon--moon {
   transition: background 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
 }
 
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
 .panel-header {
   display: flex;
   justify-content: space-between;
@@ -641,6 +680,15 @@ body[data-theme=dark] .theme-toggle__icon--moon {
   gap: 1rem;
 }
 
+/* -----------------------------------------------------------------------------
+ * Application shell, sidebar, and panel scaffolding
+ * Keeps structural layout separate from component styling.
+ * -------------------------------------------------------------------------- */
+/* -----------------------------------------------------------------------------
+ * Test navigation, filter controls, and per-spec attempt cards
+ * Groups interactive fixtures away from general layout.
+ * -------------------------------------------------------------------------- */
+/* Test panel layout ------------------------------------------------------ */
 .panel-body--tests {
   grid-template-columns: minmax(260px, 320px) 1fr;
   gap: 1.75rem;
@@ -651,6 +699,7 @@ body[data-theme=dark] .theme-toggle__icon--moon {
   grid-column: 1/-1;
 }
 
+/* Filter controls -------------------------------------------------------- */
 .filters {
   display: flex;
   flex-wrap: wrap;
@@ -733,6 +782,7 @@ body[data-theme=dark] .theme-toggle__icon--moon {
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
+/* Accessibility helper --------------------------------------------------- */
 .visually-hidden {
   position: absolute;
   width: 1px;
@@ -745,6 +795,7 @@ body[data-theme=dark] .theme-toggle__icon--moon {
   border: 0;
 }
 
+/* Test navigation -------------------------------------------------------- */
 .test-navigation {
   display: grid;
   gap: 1rem;
@@ -813,6 +864,7 @@ body[data-theme=dark] .theme-toggle__icon--moon {
   text-decoration: none;
 }
 
+/* Test group stack ------------------------------------------------------- */
 .test-groups {
   display: grid;
   gap: 1.5rem;
@@ -862,6 +914,7 @@ body[data-theme=dark] .theme-toggle__icon--moon {
   gap: 1.15rem;
 }
 
+/* Individual test card --------------------------------------------------- */
 .test-card {
   background: var(--surface-card);
   border-radius: 12px;
@@ -955,6 +1008,7 @@ body[data-theme=dark] .theme-toggle__icon--moon {
   font-size: 1rem;
 }
 
+/* Attempt detail accordion ----------------------------------------------- */
 .attempt-card {
   border-radius: 12px;
   border: 1px solid var(--border-default);
@@ -1025,11 +1079,17 @@ body[data-theme=dark] .theme-toggle__icon--moon {
     order: 3;
   }
 }
+/* -----------------------------------------------------------------------------
+ * Summary metrics, suites, tables, and report cards
+ * Keeps high-level reporting UI cohesive.
+ * -------------------------------------------------------------------------- */
+/* Panel sections --------------------------------------------------------- */
 .panel-section {
   display: grid;
   gap: 1.2rem;
 }
 
+/* KPI card grid ---------------------------------------------------------- */
 .summary-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
@@ -1081,6 +1141,7 @@ body[data-theme=dark] .theme-toggle__icon--moon {
   color: var(--text-muted);
 }
 
+/* Suite overview cards --------------------------------------------------- */
 .suite-overview {
   display: grid;
   gap: 1.1rem;
@@ -1146,6 +1207,7 @@ body[data-theme=dark] .theme-toggle__icon--moon {
   color: var(--text-muted);
 }
 
+/* Summary tables --------------------------------------------------------- */
 .summary-table {
   width: 100%;
   border-collapse: collapse;
@@ -1186,6 +1248,7 @@ body[data-theme=dark] .theme-toggle__icon--moon {
   color: var(--text-strong);
 }
 
+/* Summary report blocks -------------------------------------------------- */
 .summary-report {
   background: var(--surface-card);
   border-radius: 12px;
@@ -1308,6 +1371,7 @@ body[data-theme=dark] .theme-toggle__icon--moon {
   border: 1px solid var(--code-border);
 }
 
+/* Schema metrics --------------------------------------------------------- */
 .schema-metrics {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
@@ -1340,6 +1404,7 @@ body[data-theme=dark] .theme-toggle__icon--moon {
   color: var(--text-strong);
 }
 
+/* Insight tiles ---------------------------------------------------------- */
 .insight-tiles {
   display: grid;
   gap: clamp(0.75rem, 2vw, 1.15rem);
@@ -1582,6 +1647,11 @@ ul.status-summary li {
   color: var(--text-strong);
 }
 
+/* -----------------------------------------------------------------------------
+ * Per-page accordion, toggle controls, and inline tables
+ * Keeps granular findings isolated from the summary views.
+ * -------------------------------------------------------------------------- */
+/* Toggle controls -------------------------------------------------------- */
 .summary-toggle-controls {
   display: flex;
   flex-wrap: wrap;
@@ -1624,6 +1694,7 @@ ul.status-summary li {
   outline-offset: 2px;
 }
 
+/* Accordion container ---------------------------------------------------- */
 .summary-page {
   border: 1px solid var(--border-default);
   border-radius: 12px;
@@ -1725,6 +1796,54 @@ ul.status-summary li {
   background: var(--summary-warn-body);
 }
 
+/* Nested accordion containers ------------------------------------------- */
+details.summary-accordion {
+  background: var(--surface-card);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: var(--shadow-inset);
+}
+
+details.summary-accordion + details.summary-accordion {
+  margin-top: 1rem;
+}
+
+details.summary-accordion summary {
+  padding: 1rem 1.25rem;
+  font-weight: 500;
+  color: var(--accent);
+  cursor: pointer;
+  background: linear-gradient(135deg, rgba(38, 139, 210, 0.18), rgba(253, 246, 227, 0));
+  outline: none;
+}
+
+details.summary-accordion[open] summary {
+  border-bottom: 1px solid var(--border-default);
+}
+
+.accordion-body {
+  padding: 1.25rem;
+  display: grid;
+  gap: 1.2rem;
+  background: var(--surface-panel);
+}
+
+/* Page card -------------------------------------------------------------- */
+.page-card {
+  background: var(--surface-card);
+  border-radius: 12px;
+  padding: 1.1rem 1.3rem;
+  box-shadow: var(--shadow-inset);
+  border: 1px solid var(--border-default);
+}
+
+.page-card header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.65rem;
+}
+
 .page-card__header {
   display: flex;
   align-items: center;
@@ -1750,6 +1869,7 @@ ul.status-summary li {
   font-size: 0.9rem;
 }
 
+/* Page-level table ------------------------------------------------------- */
 .page-card__table {
   margin: 0.85rem 0;
 }
@@ -1779,6 +1899,7 @@ ul.status-summary li {
   font-weight: 500;
 }
 
+/* Visual & responsive previews ------------------------------------------ */
 .summary-report.summary-visual .visual-previews,
 .summary-report.summary-responsive .visual-previews {
   display: grid;
@@ -1812,6 +1933,9 @@ ul.status-summary li {
   color: var(--text-muted);
 }
 
+/* -----------------------------------------------------------------------------
+ * Status pills, WCAG tags, and helper utilities
+ * -------------------------------------------------------------------------- */
 .severity-pill {
   display: inline-flex;
   align-items: center;
@@ -1858,52 +1982,6 @@ ul.status-summary li {
   color: var(--text-inverse);
   font-size: 0.8rem;
   font-weight: 500;
-}
-
-details.summary-accordion {
-  background: var(--surface-card);
-  border-radius: 12px;
-  overflow: hidden;
-  box-shadow: var(--shadow-inset);
-}
-
-details.summary-accordion + details.summary-accordion {
-  margin-top: 1rem;
-}
-
-details.summary-accordion summary {
-  padding: 1rem 1.25rem;
-  font-weight: 500;
-  color: var(--accent);
-  cursor: pointer;
-  background: linear-gradient(135deg, rgba(38, 139, 210, 0.18), rgba(253, 246, 227, 0));
-  outline: none;
-}
-
-details.summary-accordion[open] summary {
-  border-bottom: 1px solid var(--border-default);
-}
-
-.accordion-body {
-  padding: 1.25rem;
-  display: grid;
-  gap: 1.2rem;
-  background: var(--surface-panel);
-}
-
-.page-card {
-  background: var(--surface-card);
-  border-radius: 12px;
-  padding: 1.1rem 1.3rem;
-  box-shadow: var(--shadow-inset);
-  border: 1px solid var(--border-default);
-}
-
-.page-card header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 0.65rem;
 }
 
 .status-pill {
@@ -1954,16 +2032,7 @@ details.summary-accordion[open] summary {
   font-size: 0.95rem;
 }
 
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
+/* Panel toggle wiring ---------------------------------------------------- */
 #view-summary:checked ~ .report-shell .panel[data-view=view-summary],
 #view-accessibility-wcag:checked ~ .report-shell .panel[data-view=view-accessibility-wcag],
 #view-accessibility-forms:checked ~ .report-shell .panel[data-view=view-accessibility-forms],
@@ -1977,6 +2046,7 @@ details.summary-accordion[open] summary {
   display: grid;
 }
 
+/* Sidebar selection states ---------------------------------------------- */
 #view-summary:checked ~ .report-shell .sidebar label[for=view-summary],
 #view-accessibility-wcag:checked ~ .report-shell .sidebar label[for=view-accessibility-wcag],
 #view-accessibility-forms:checked ~ .report-shell .sidebar label[for=view-accessibility-forms],
@@ -1993,6 +2063,7 @@ details.summary-accordion[open] summary {
   transform: none;
 }
 
+/* Nav item variants ------------------------------------------------------ */
 .sidebar .nav-item.status-summary {
   background: var(--summary-highlight-bg);
   color: var(--summary-highlight-text);
@@ -2073,6 +2144,10 @@ details.summary-accordion[open] summary {
   color: var(--nav-status-info-text);
 }
 
+/* -----------------------------------------------------------------------------
+ * View toggle wiring and navigation highlight states
+ * Keeps radio-driven UI logic isolated from component styles.
+ * -------------------------------------------------------------------------- */
 @media (max-width: 1080px) {
   .report-shell {
     grid-template-columns: 1fr;
@@ -2104,3 +2179,6 @@ details.summary-accordion[open] summary {
     grid-template-columns: 1fr;
   }
 }
+/* -----------------------------------------------------------------------------
+ * Responsive fallbacks for layout adjustments
+ * -------------------------------------------------------------------------- */

@@ -1,0 +1,41 @@
+@media (max-width: 1080px) {
+  .report-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    position: static;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .report-content {
+    order: 2;
+  }
+}
+
+@media (max-width: 720px) {
+  .report-app {
+    padding: 2rem 1rem 3rem;
+  }
+
+  .panel {
+    padding: 1.8rem 1.25rem;
+  }
+
+  .panel-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .summary-grid {
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  }
+
+  .suite-grid {
+    grid-template-columns: 1fr;
+  }
+}
+/* -----------------------------------------------------------------------------
+ * Responsive fallbacks for layout adjustments
+ * -------------------------------------------------------------------------- */
