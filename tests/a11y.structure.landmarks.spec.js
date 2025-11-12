@@ -159,6 +159,17 @@ test.describe('Accessibility: Structural landmarks', () => {
     const gatingTotal = reports.reduce((sum, report) => sum + report.gating.length, 0);
     const { siteLabel, viewportLabel } = resolveReportMetadata(siteConfig, testInfo);
     applyViewportMetadata(reports, { viewportLabel, siteLabel });
+    for (const record of reports) {
+      if (!record || typeof record !== 'object') continue;
+      record.projectName = viewportLabel;
+      record.browser = record.browser || viewportLabel;
+      record.viewport = record.viewport || viewportLabel;
+      record.viewports =
+        Array.isArray(record.viewports) && record.viewports.length > 0
+          ? record.viewports
+          : [viewportLabel];
+      record.siteName = record.siteName || siteLabel;
+    }
 
     const runPayload = createRunSummaryPayload({
       baseName: `a11y-structure-summary-${slugify(siteLabel)}`,
