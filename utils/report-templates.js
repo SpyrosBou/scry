@@ -6161,17 +6161,37 @@ const renderStructurePageCard = (summary) => {
     ? `<details><summary>Heading outline (${headingOutline.length} headings)</summary><ul class="details">${headingOutlineList}</ul></details>`
     : '';
 
+  const hydrateStructureIssue = (entry) => {
+    if (!entry || typeof entry !== 'object') return entry;
+    const resolvedViewports = Array.isArray(entry.viewports) && entry.viewports.length
+      ? entry.viewports
+      : Array.isArray(summary.viewports) && summary.viewports.length
+        ? summary.viewports
+        : summary.viewport
+          ? [summary.viewport]
+          : [];
+    return {
+      ...entry,
+      browser: entry.browser || summary.browser || summary.projectName,
+      projectName: entry.projectName || summary.projectName,
+      viewport: entry.viewport || summary.viewport,
+      viewports: resolvedViewports,
+    };
+  };
+
   const gatingSection = gatingEntries.length
     ? renderPerPageIssuesTable(
         gatingEntries,
-        `Gating structural issues (${formatCount(gatingEntries.length)})`
+        `Gating structural issues (${formatCount(gatingEntries.length)})`,
+        { hydrate: hydrateStructureIssue }
       )
     : '<p class="details">No gating issues detected.</p>';
 
   const warningsSection = warningEntries.length
     ? renderPerPageIssuesTable(
         warningEntries,
-        `Structural warnings (${formatCount(warningEntries.length)})`
+        `Structural warnings (${formatCount(warningEntries.length)})`,
+        { hydrate: hydrateStructureIssue }
       )
     : '<p class="details">No structural warnings detected.</p>';
 
@@ -6179,7 +6199,7 @@ const renderStructurePageCard = (summary) => {
     ? renderPerPageIssuesTable(
         advisoryEntries,
         `Structural advisories (${formatCount(advisoryEntries.length)})`,
-        { headingClass: 'summary-heading-best-practice' }
+        { headingClass: 'summary-heading-best-practice', hydrate: hydrateStructureIssue }
       )
     : '<p class="details">No structural advisories detected.</p>';
 
