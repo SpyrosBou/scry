@@ -440,10 +440,10 @@ const waitForPageReports = async (projectName, expectedCount, timeoutMs = 300000
 
 test.describe('Functionality: Accessibility (WCAG)', () => {
   test.describe.parallel('Page scans', () => {
-    let errorContext;
+    let _errorContext;
 
     test.beforeEach(async ({ errorContext: sharedErrorContext }) => {
-      errorContext = sharedErrorContext;
+      _errorContext = sharedErrorContext;
     });
 
     accessibilityPages.forEach((testPage, index) => {

@@ -1,4 +1,7 @@
-const { resolveReportMetadata, applyViewportMetadata: applyMetadata } = require('./report-metadata');
+const {
+  resolveReportMetadata,
+  applyViewportMetadata: applyMetadata,
+} = require('./report-metadata');
 
 const DEFAULT_ACCESSIBILITY_SAMPLE = 'all';
 

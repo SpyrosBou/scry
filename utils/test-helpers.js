@@ -1,5 +1,5 @@
 /* eslint-env node, browser */
-/* global window, navigator */
+/* global window */
 /**
  * Enhanced Test Helpers for Playwright WordPress Testing Suite
  *
@@ -135,11 +135,7 @@ async function debugBrowserState(page, context, testName) {
       nodeVersion: process.version,
       platform: process.platform,
       arch: process.arch,
-      userAgent: context
-        ? await context
-            .userAgent()
-            .catch(() => 'unknown')
-        : 'unknown',
+      userAgent: context ? await context.userAgent().catch(() => 'unknown') : 'unknown',
     },
   };
 

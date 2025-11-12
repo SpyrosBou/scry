@@ -49,7 +49,10 @@ const resolveUrl = (input, base) => {
   }
 };
 
-const normaliseHost = (value) => String(value || '').trim().toLowerCase();
+const normaliseHost = (value) =>
+  String(value || '')
+    .trim()
+    .toLowerCase();
 const stripWww = (host) => normaliseHost(host).replace(/^www\./, '');
 const hostsShareBaseLabel = (a, b) => {
   if (!a || !b) return false;
@@ -372,10 +375,7 @@ class TestRunner {
               siteConfig.discover &&
               siteConfig.discover.sitemapUrl
             ) {
-              const sitemapUrlObj = resolveUrl(
-                siteConfig.discover.sitemapUrl,
-                siteConfig.baseUrl
-              );
+              const sitemapUrlObj = resolveUrl(siteConfig.discover.sitemapUrl, siteConfig.baseUrl);
               if (sitemapUrlObj) {
                 const previousHost = sitemapUrlObj.host;
                 if (
@@ -429,9 +429,7 @@ class TestRunner {
                     };
                   }
                   fs.writeFileSync(sitePath, `${JSON.stringify(parsed, null, 2)}\n`);
-                  console.log(
-                    `📄 Updated sites/${siteName}.json with canonical host information.`
-                  );
+                  console.log(`📄 Updated sites/${siteName}.json with canonical host information.`);
                 } catch (writeError) {
                   console.log(
                     `⚠️  Unable to persist canonical host changes: ${writeError.message}`

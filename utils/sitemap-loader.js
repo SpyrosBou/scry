@@ -11,7 +11,10 @@ const fetchFn = globalThis.fetch
 const DEFAULT_MAX_PAGES = Number.POSITIVE_INFINITY;
 const DEFAULT_MAX_DEPTH = Number.POSITIVE_INFINITY;
 
-const normaliseHost = (value) => String(value || '').trim().toLowerCase();
+const normaliseHost = (value) =>
+  String(value || '')
+    .trim()
+    .toLowerCase();
 const stripWww = (host) => normaliseHost(host).replace(/^www\./, '');
 const hostsShareBaseLabel = (a, b) => {
   if (!a || !b) return false;
@@ -200,7 +203,14 @@ async function collectUrls(url, options, visited, depth) {
   }
 }
 
-function filterAndNormalize(urls, baseUrl, includePatterns, excludePatterns, maxPages, options = {}) {
+function filterAndNormalize(
+  urls,
+  baseUrl,
+  includePatterns,
+  excludePatterns,
+  maxPages,
+  options = {}
+) {
   const normalized = [];
   const mismatchedHosts = new Map();
   const baseHost = (() => {
