@@ -336,7 +336,7 @@ test.describe('Functionality: Core Infrastructure', () => {
   let errorContext;
   let wpPageObjects;
 
-  test.beforeEach(async ({ page, context, errorContext: sharedErrorContext }, testInfo) => {
+  test.beforeEach(async ({ page, errorContext: sharedErrorContext }) => {
     const siteName = process.env.SITE_NAME;
     if (!siteName) throw new Error('SITE_NAME environment variable is required');
 

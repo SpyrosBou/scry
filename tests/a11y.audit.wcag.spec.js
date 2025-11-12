@@ -440,12 +440,6 @@ const waitForPageReports = async (projectName, expectedCount, timeoutMs = 300000
 
 test.describe('Functionality: Accessibility (WCAG)', () => {
   test.describe.parallel('Page scans', () => {
-    let _errorContext;
-
-    test.beforeEach(async ({ errorContext: sharedErrorContext }) => {
-      _errorContext = sharedErrorContext;
-    });
-
     accessibilityPages.forEach((testPage, index) => {
       test(`WCAG 2.1 A/AA scan ${index + 1}/${totalPages}: ${testPage}`, async ({ page }, testInfo) => {
         test.setTimeout(7200000);
@@ -475,8 +469,6 @@ test.describe('Functionality: Accessibility (WCAG)', () => {
           pageReport.notes.push(`Navigation failed: ${error.message}`);
           console.error(`⚠️  Navigation failed for ${testPage}: ${error.message}`);
 
-          const navigationSlug = `${slugify(testPage)}-navigation-error`;
-          
           await persistPageReport(testInfo.project.name, index, pageReport);
           if (A11Y_MODE !== 'audit') {
             throw new Error(`Navigation failed for ${testPage}: ${error.message}`);
@@ -490,8 +482,6 @@ test.describe('Functionality: Accessibility (WCAG)', () => {
           pageReport.notes.push(`Received HTTP status ${response.status()}; scan skipped.`);
           console.error(`⚠️  HTTP ${response.status()} while loading ${testPage}; skipping scan.`);
 
-          const httpSlug = `${slugify(testPage)}-http-error`;
-          
           await persistPageReport(testInfo.project.name, index, pageReport);
           if (A11Y_MODE !== 'audit') {
             throw new Error(`HTTP ${response.status()} received for ${testPage}`);
@@ -508,8 +498,6 @@ test.describe('Functionality: Accessibility (WCAG)', () => {
           pageReport.notes.push(stability.message);
           console.warn(`⚠️  ${stability.message} for ${testPage}`);
 
-          const stabilitySlug = `${slugify(testPage)}-stability`;
-          
           await persistPageReport(testInfo.project.name, index, pageReport);
           return;
         }
@@ -547,8 +535,7 @@ test.describe('Functionality: Accessibility (WCAG)', () => {
 
           if (gatingViolations.length > 0) {
             pageReport.status = 'violations';
-            const pageSlug = slugify(testPage);
-                        const message = `❌ ${gatingViolations.length} accessibility violations (gating: ${failOnLabel}) on ${testPage}`;
+            const message = `❌ ${gatingViolations.length} accessibility violations (gating: ${failOnLabel}) on ${testPage}`;
             if (A11Y_MODE === 'audit') {
               console.warn(message);
             } else {
@@ -573,15 +560,15 @@ test.describe('Functionality: Accessibility (WCAG)', () => {
             pageReport.status === 'passed' &&
             (advisoryViolations.length > 0 || bestPracticeViolations.length > 0)
           ) {
-            const pageSlug = slugify(testPage);
-                      }
+            console.warn(
+              `ℹ️  ${advisoryViolations.length + bestPracticeViolations.length} non-gating finding(s) captured for ${testPage}`
+            );
+          }
         } catch (error) {
           pageReport.status = 'scan-error';
           pageReport.notes.push(`Axe scan failed: ${error.message}`);
           console.error(`⚠️  Accessibility scan failed for ${testPage}: ${error.message}`);
-
-          const errorSlug = `${slugify(testPage)}-scan-error`;
-                  } finally {
+        } finally {
           if (pageReport.status === 'skipped') {
             pageReport.status = 'passed';
           }
@@ -593,7 +580,7 @@ test.describe('Functionality: Accessibility (WCAG)', () => {
   });
 
   test.describe.serial('Accessibility summary', () => {
-    test('Aggregate results', async ({}, testInfo) => {
+    test('Aggregate results', async (_fixtures, testInfo) => {
       test.setTimeout(300000);
 
       const reports = await waitForPageReports(testInfo.project.name, totalPages);

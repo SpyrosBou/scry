@@ -2,7 +2,7 @@
 
 Automated Playwright-powered testing harness for auditing WordPress websites across functionality, responsiveness, accessibility, and visual regression criteria. The suite standardises how sites are exercised, captures rich HTML (HyperText Markup Language) reports, and keeps a historical record of findings for ongoing quality assurance.
 
-> Last updated for version 2025.02.18-attachment-guard (commit 654b5b8).
+> Last updated for version 2025.02.18-attachment-guard (commit 8e0cf74).
 
 ## Key Capabilities
 - Generates Solarized-themed HTML reports with parity to the approved reporting mocks.
@@ -130,7 +130,8 @@ Helpful environment variables:
   ```
 
 ## Linting and Tests
-- Lint all JavaScript sources with `npm run lint` (or `npm run lint:fix` to auto-format where possible). The flat config now warns on unused `eslint-disable` directives so lingering suppressions can be cleaned up quickly.
+- Lint all JavaScript sources with `npm run lint` (or `npm run lint:fix` to auto-format where possible). The flat config now warns on unused `eslint-disable` directives so lingering suppressions can be cleaned up quickly and includes Playwright spec overrides with browser globals.
+- Enforce shared helper/config formatting with `npm run prettier:check` (or `npm run prettier:write`) so the scriptable JS modules tracked by `.prettierrc` stay aligned.
 - Execute Node unit tests with `npm run test:unit`.
 - Use suite shortcuts such as `npm run test:visual -- --site=<name> [--pages=<n|all>]` to mirror reporter commands.
 

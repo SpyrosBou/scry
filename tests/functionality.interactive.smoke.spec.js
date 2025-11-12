@@ -4,7 +4,7 @@ const {
   safeNavigate,
   waitForPageStability,
 } = require('../utils/test-helpers');
-const { TestDataFactory, createTestData } = require('../utils/test-data-factory');
+const { createTestData } = require('../utils/test-data-factory');
 const { WordPressPageObjects } = require('../utils/wordpress-page-objects');
 const { attachSchemaSummary } = require('../utils/reporting-utils');
 const { createRunSummaryPayload, createPageSummaryPayload } = require('../utils/report-schema');
@@ -15,13 +15,7 @@ const slugify = (value) =>
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '') || 'root';
 
-const buildInteractiveSchemaPayloads = ({
-  pages,
-  consoleErrors,
-  resourceErrors,
-  resourceBudget,
-  projectName,
-}) => {
+const buildInteractiveSchemaPayloads = ({ pages, resourceBudget, projectName }) => {
   if (!Array.isArray(pages) || pages.length === 0) return null;
 
   const enrichedPages = pages.map((entry) => {
@@ -149,15 +143,13 @@ const buildInteractiveSchemaPayloads = ({
 
 test.describe('Functionality: Interactive Elements', () => {
   let siteConfig;
-  let errorContext;
   let wpPageObjects;
 
-  test.beforeEach(async ({ page, context, errorContext: sharedErrorContext }, testInfo) => {
+  test.beforeEach(async ({ page }) => {
     const siteName = process.env.SITE_NAME;
     if (!siteName) throw new Error('SITE_NAME environment variable is required');
     siteConfig = SiteLoader.loadSite(siteName);
     SiteLoader.validateSiteConfig(siteConfig);
-    errorContext = sharedErrorContext;
     wpPageObjects = new WordPressPageObjects(page, siteConfig);
   });
 
@@ -173,7 +165,7 @@ test.describe('Functionality: Interactive Elements', () => {
     const ignoreMatchers = [...defaultIgnored, ...siteIgnored].map((pattern) => {
       try {
         return new RegExp(pattern, 'i');
-      } catch (error) {
+      } catch (_error) {
         const escaped = pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         return new RegExp(escaped, 'i');
       }
@@ -329,7 +321,7 @@ test.describe('Functionality: Interactive Elements', () => {
     }
   });
 
-  test('Form interactions and validation (if configured)', async ({ page }) => {
+  test('Form interactions and validation (if configured)', async () => {
     test.setTimeout(7200000);
     if (!siteConfig.forms || siteConfig.forms.length === 0) {
       console.log('ℹ️  No forms configured for testing');

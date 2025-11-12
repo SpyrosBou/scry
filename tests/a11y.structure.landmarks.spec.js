@@ -127,15 +127,13 @@ const evaluateStructure = async (page) => {
 
 test.describe('Accessibility: Structural landmarks', () => {
   let siteConfig;
-  let errorContext;
 
-  test.beforeEach(async ({ page, context, errorContext: sharedErrorContext }, testInfo) => {
+  test.beforeEach(() => {
     const siteName = process.env.SITE_NAME;
     if (!siteName) throw new Error('SITE_NAME environment variable is required');
 
     siteConfig = SiteLoader.loadSite(siteName);
     SiteLoader.validateSiteConfig(siteConfig);
-    errorContext = sharedErrorContext;
   });
 
   test('Landmarks and headings meet baseline accessibility expectations', async ({ browser }, testInfo) => {

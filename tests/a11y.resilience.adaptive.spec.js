@@ -354,15 +354,13 @@ async function runIframeAudit(page, siteConfig, pagePath) {
 
 test.describe('Accessibility: Resilience checks', () => {
   let siteConfig;
-  let errorContext;
 
-  test.beforeEach(async ({ page, context, errorContext: sharedErrorContext }, testInfo) => {
+  test.beforeEach(() => {
     const siteName = process.env.SITE_NAME;
     if (!siteName) throw new Error('SITE_NAME environment variable is required');
 
     siteConfig = SiteLoader.loadSite(siteName);
     SiteLoader.validateSiteConfig(siteConfig);
-    errorContext = sharedErrorContext;
   });
 
   test('Respects prefers-reduced-motion', async ({ browser }, testInfo) => {

@@ -11,6 +11,8 @@
     "discover": "node scripts/discover-pages.js",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
+    "prettier:check": "prettier --check \"*.js\" \"*.json\" \"scripts/**/*.js\" \"utils/**/*.js\"",
+    "prettier:write": "prettier --write \"*.js\" \"*.json\" \"scripts/**/*.js\" \"utils/**/*.js\"",
     "lint:teardown": "node scripts/check-browser-teardown.js",
     "test:unit": "node --test tests/unit/**/*.test.js",
     "reports:read": "node scripts/read-reports.js",

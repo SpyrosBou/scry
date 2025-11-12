@@ -196,15 +196,13 @@ const evaluatePostSubmitState = async (formLocator, fieldSelectors) => {
 
 test.describe('Accessibility: Forms', () => {
   let siteConfig;
-  let errorContext;
 
-  test.beforeEach(async ({ page, context, errorContext: sharedErrorContext }, testInfo) => {
+  test.beforeEach(() => {
     const siteName = process.env.SITE_NAME;
     if (!siteName) throw new Error('SITE_NAME environment variable is required');
 
     siteConfig = SiteLoader.loadSite(siteName);
     SiteLoader.validateSiteConfig(siteConfig);
-    errorContext = sharedErrorContext;
   });
 
   test('Forms provide accessible labelling and validation feedback', async ({ page }, testInfo) => {

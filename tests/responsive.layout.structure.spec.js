@@ -244,15 +244,13 @@ const resolveResponsiveViewports = () => {
 
 test.describe('Responsive Structure & UX', () => {
   let siteConfig;
-  let errorContext;
   let wp;
 
-  test.beforeEach(async ({ page, context, errorContext: sharedErrorContext }, testInfo) => {
+  test.beforeEach(async ({ page }) => {
     const siteName = process.env.SITE_NAME;
     if (!siteName) throw new Error('SITE_NAME environment variable is required');
     siteConfig = SiteLoader.loadSite(siteName);
     SiteLoader.validateSiteConfig(siteConfig);
-    errorContext = sharedErrorContext;
     wp = new WordPressPageObjects(page, siteConfig);
   });
 
@@ -343,7 +341,9 @@ test.describe('Responsive Structure & UX', () => {
                         timeout: 3000,
                       });
                       await page.waitForTimeout(400);
-                    } catch (_) {}
+                    } catch (_toggleError) {
+                      summaryEntry.info.push('Mobile navigation toggle interaction did not complete.');
+                    }
                     break;
                   }
                 }
@@ -392,7 +392,9 @@ test.describe('Responsive Structure & UX', () => {
                     for (let i = 0; i < Math.min(fields.length, 3); i++) {
                       try {
                         await fields[i].tap({ timeout: 1500 });
-                      } catch (_) {}
+                      } catch (_tapError) {
+                        summaryEntry.info.push('Form field tap interaction failed during responsive audit.');
+                      }
                     }
                   }
                 }

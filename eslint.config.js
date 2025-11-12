@@ -12,7 +12,8 @@ const nodeSources = [
   'docs/**/*.js',
 ];
 
-const testSources = ['tests/unit/**/*.test.js'];
+const unitTestSources = ['tests/unit/**/*.test.js'];
+const playwrightSpecs = ['tests/**/*.spec.js'];
 
 const baseLanguageOptions = {
   ecmaVersion: 2022,
@@ -25,6 +26,14 @@ const baseLanguageOptions = {
 const baseRules = {
   'no-unused-vars': ['warn', { argsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' }],
   'no-console': 'off',
+};
+
+const browserLanguageOptions = {
+  ...baseLanguageOptions,
+  globals: {
+    ...globals.node,
+    ...globals.browser,
+  },
 };
 
 /** @type {import('eslint').Linter.FlatConfig[]} */
@@ -49,14 +58,8 @@ module.exports = [
       reportUnusedDisableDirectives: 'warn',
     },
   },
-  {
-    ...js.configs.recommended,
-    files: [...nodeSources, ...testSources],
-  },
-  {
-    ...prettierConfig,
-    files: nodeSources,
-  },
+  js.configs.recommended,
+  prettierConfig,
   {
     files: nodeSources,
     languageOptions: baseLanguageOptions,
@@ -69,13 +72,22 @@ module.exports = [
     },
   },
   {
-    files: testSources,
+    files: unitTestSources,
     languageOptions: baseLanguageOptions,
     plugins: {
       prettier: prettierPlugin,
     },
     rules: {
       ...baseRules,
+      'prettier/prettier': 'off',
+    },
+  },
+  {
+    files: playwrightSpecs,
+    languageOptions: browserLanguageOptions,
+    rules: {
+      ...baseRules,
+      'no-empty-pattern': 'off',
       'prettier/prettier': 'off',
     },
   },
