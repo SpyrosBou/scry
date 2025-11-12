@@ -39,10 +39,12 @@ const collectRuleSnapshots = (entries, category) => {
   if (!Array.isArray(entries) || entries.length === 0) return [];
   const aggregate = new Map();
 
-  entries.forEach(({ page, project, browser, entries: violations }) => {
+  entries.forEach(({ page, project, browser, viewports, entries: violations }) => {
     const projectKey = project || 'default';
     const browserLabel = browser || DATA_MISSING_LABEL;
-    const viewport = browser || DATA_MISSING_LABEL;
+    const viewportSet = new Set(
+      Array.isArray(viewports) && viewports.length ? viewports : [browserLabel]
+    );
     const pageKey = `${projectKey}::${page}`;
     violations.forEach((violation) => {
       const ruleId = violation.id || 'unknown-rule';
@@ -63,7 +65,7 @@ const collectRuleSnapshots = (entries, category) => {
       }
       const record = aggregate.get(key);
       record.pages.add(pageKey);
-      record.viewports.add(viewport);
+      viewportSet.forEach((value) => record.viewports.add(value || DATA_MISSING_LABEL));
       record.browsers.add(browserLabel);
       record.nodes += violation.nodes?.length || 0;
       if (!record.description && (violation.description || violation.help || violation.message)) {
@@ -106,7 +108,11 @@ const buildAccessibilityRunSchemaPayload = ({
   const viewportSet = new Set(
     reports.map((report) => report.browser || report.viewport || DATA_MISSING_LABEL)
   );
-  const toUniqueKey = (entry) => `${entry.project || 'default'}::${entry.page}`;
+  const toUniqueKey = (entry) => {
+    const siteKey = entry.project || 'default';
+    const viewportKey = entry.browser || entry.viewport || DATA_MISSING_LABEL;
+    return `${siteKey}::${viewportKey}::${entry.page}`;
+  };
   const gatingPages = new Set(aggregatedViolations.map(toUniqueKey));
   const advisoryPages = new Set(aggregatedAdvisories.map(toUniqueKey));
   const bestPracticePages = new Set(aggregatedBestPractices.map(toUniqueKey));
@@ -227,7 +233,7 @@ const buildAccessibilityPageSchemaPayloads = (reports, metadataExtras = {}) =>
         };
 
         return createPageSummaryPayload({
-          baseName: `a11y-page-${slugify(report.projectName || 'default')}-${slugify(report.page)}`,
+          baseName: `a11y-page-${slugify(report.projectName || 'default')}-${slugify(summaryViewport || 'viewport')}-${slugify(report.page)}`,
           title: pageSummaryTitle(report.page, 'WCAG issues overview'),
           page: report.page,
           viewport: summaryViewport || DATA_MISSING_LABEL,
@@ -361,11 +367,18 @@ const deriveAggregatedFindings = (reports) => {
 
   for (const report of reports) {
     const browserLabel = report.browser || report.viewport || DATA_MISSING_LABEL;
+    const viewports =
+      Array.isArray(report.viewports) && report.viewports.length
+        ? report.viewports.slice()
+        : report.viewport
+          ? [report.viewport]
+          : [];
     if (Array.isArray(report.violations) && report.violations.length > 0) {
       aggregatedViolations.push({
         page: report.page,
         project: report.projectName || 'default',
         browser: browserLabel,
+        viewports,
         entries: report.violations,
       });
     }
@@ -374,6 +387,7 @@ const deriveAggregatedFindings = (reports) => {
         page: report.page,
         project: report.projectName || 'default',
         browser: browserLabel,
+        viewports,
         entries: report.advisory,
       });
     }
@@ -382,6 +396,7 @@ const deriveAggregatedFindings = (reports) => {
         page: report.page,
         project: report.projectName || 'default',
         browser: browserLabel,
+        viewports,
         entries: report.bestPractice,
       });
     }
