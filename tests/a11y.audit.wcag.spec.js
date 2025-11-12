@@ -1,3 +1,4 @@
+const path = require('path');
 const { test, expect } = require('../utils/test-fixtures');
 const {
   safeNavigate,
@@ -288,7 +289,21 @@ const SUPPRESS_BEST_PRACTICE_RULES = new Set([
 ]);
 const { createAggregationStore } = require('../utils/report-aggregation-store');
 
-const aggregationStore = createAggregationStore();
+const AGGREGATION_PERSIST_ROOT = path.join(process.cwd(), 'test-results', '.a11y-aggregation');
+const aggregationStore = createAggregationStore({
+  persistRoot: AGGREGATION_PERSIST_ROOT,
+  runToken: RUN_TOKEN,
+});
+
+const waitForReports = async (projectName, expectedCount, timeoutMs = 30000) => {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const reports = aggregationStore.readProjectReports(projectName);
+    if (reports.length >= expectedCount) return reports;
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  return aggregationStore.readProjectReports(projectName);
+};
 let globalSummaryAttached = false;
 
 const deriveAggregatedFindings = (reports) => {
@@ -529,94 +544,98 @@ test.describe('Functionality: Accessibility (WCAG)', () => {
     test('Aggregate results', async ({}, testInfo) => {
       test.setTimeout(300000);
 
-      const reports = aggregationStore.readProjectReports(testInfo.project.name);
-      if (reports.length < totalPages) {
-        throw new Error(
-          `Accessibility summary expected ${totalPages} page report(s) for ${testInfo.project.name}, found ${reports.length}`
-        );
-      }
-      if (reports.length === 0) {
-        console.warn('ℹ️  Accessibility suite executed with no configured pages.');
-        return;
-      }
-      const { siteLabel, viewportLabel } = resolveAccessibilityMetadata(siteConfig, testInfo);
-      applyViewportMetadata(reports, viewportLabel, siteLabel);
+      try {
+        const reports = await waitForReports(testInfo.project.name, totalPages);
+        if (reports.length < totalPages) {
+          throw new Error(
+            `Accessibility summary expected ${totalPages} page report(s) for ${testInfo.project.name}, found ${reports.length}`
+          );
+        }
+        if (reports.length === 0) {
+          console.warn('ℹ️  Accessibility suite executed with no configured pages.');
+          return;
+        }
+        const { siteLabel, viewportLabel } = resolveAccessibilityMetadata(siteConfig, testInfo);
+        applyViewportMetadata(reports, viewportLabel, siteLabel);
 
-      const { aggregatedViolations, aggregatedAdvisories, aggregatedBestPractices } =
-        deriveAggregatedFindings(reports);
+        const { aggregatedViolations, aggregatedAdvisories, aggregatedBestPractices } =
+          deriveAggregatedFindings(reports);
 
-      const schemaRunPayload = buildAccessibilityRunSchemaPayload({
-        reports,
-        aggregatedViolations,
-        aggregatedAdvisories,
-        aggregatedBestPractices,
-        failOnLabel,
-        baseName: testInfo.project.name,
-        title: `WCAG findings – ${testInfo.project.name}`,
-        metadata: {
-          scope: 'project',
+        const schemaRunPayload = buildAccessibilityRunSchemaPayload({
+          reports,
+          aggregatedViolations,
+          aggregatedAdvisories,
+          aggregatedBestPractices,
+          failOnLabel,
+          baseName: testInfo.project.name,
+          title: `WCAG findings – ${testInfo.project.name}`,
+          metadata: {
+            scope: 'project',
+            projectName: siteLabel,
+            siteName: siteLabel,
+            summaryType: 'wcag',
+            suppressPageEntries: true,
+            viewports: [viewportLabel],
+          },
+        });
+        if (schemaRunPayload) {
+          await attachSchemaSummary(testInfo, schemaRunPayload);
+        }
+
+        const schemaPagePayloads = buildAccessibilityPageSchemaPayloads(reports, {
+          summaryType: 'wcag',
+          gatingLabel: failOnLabel,
           projectName: siteLabel,
           siteName: siteLabel,
-          summaryType: 'wcag',
-          suppressPageEntries: true,
           viewports: [viewportLabel],
-        },
-      });
-      if (schemaRunPayload) {
-        await attachSchemaSummary(testInfo, schemaRunPayload);
-      }
-
-      const schemaPagePayloads = buildAccessibilityPageSchemaPayloads(reports, {
-        summaryType: 'wcag',
-        gatingLabel: failOnLabel,
-        projectName: siteLabel,
-        siteName: siteLabel,
-        viewports: [viewportLabel],
-      });
-      for (const payload of schemaPagePayloads) {
-        await attachSchemaSummary(testInfo, payload);
-      }
-
-      await maybeAttachGlobalSummary({
-        testInfo,
-        totalPagesExpected: totalPages,
-        failOnLabel,
-      });
-
-      const totalViolations = aggregatedViolations.reduce(
-        (sum, entry) => sum + (entry.entries?.length || 0),
-        0
-      );
-      const totalAdvisory = aggregatedAdvisories.reduce(
-        (sum, entry) => sum + (entry.entries?.length || 0),
-        0
-      );
-      const totalBestPractice = aggregatedBestPractices.reduce(
-        (sum, entry) => sum + (entry.entries?.length || 0),
-        0
-      );
-
-      if (totalAdvisory > 0) {
-        console.warn(
-          `ℹ️ Non-gating WCAG findings detected (${totalAdvisory} item(s)); review the report summary for details.`
-        );
-      }
-
-      if (totalBestPractice > 0) {
-        console.warn(
-          `ℹ️ Best-practice advisory findings (no WCAG tag) detected (${totalBestPractice} item(s)); review the report summary for details.`
-        );
-      }
-
-      if (totalViolations > 0) {
-        if (A11Y_MODE === 'audit') {
-          console.warn('ℹ️ Accessibility audit summary available in the run report (summary section).');
-        } else {
-          expect(
-            totalViolations,
-            `Accessibility violations detected (gating: ${failOnLabel}). See the report summary for a structured breakdown.`
-          ).toBe(0);
+        });
+        for (const payload of schemaPagePayloads) {
+          await attachSchemaSummary(testInfo, payload);
         }
+
+        await maybeAttachGlobalSummary({
+          testInfo,
+          totalPagesExpected: totalPages,
+          failOnLabel,
+        });
+
+        const totalViolations = aggregatedViolations.reduce(
+          (sum, entry) => sum + (entry.entries?.length || 0),
+          0
+        );
+        const totalAdvisory = aggregatedAdvisories.reduce(
+          (sum, entry) => sum + (entry.entries?.length || 0),
+          0
+        );
+        const totalBestPractice = aggregatedBestPractices.reduce(
+          (sum, entry) => sum + (entry.entries?.length || 0),
+          0
+        );
+
+        if (totalAdvisory > 0) {
+          console.warn(
+            `ℹ️ Non-gating WCAG findings detected (${totalAdvisory} item(s)); review the report summary for details.`
+          );
+        }
+
+        if (totalBestPractice > 0) {
+          console.warn(
+            `ℹ️ Best-practice advisory findings (no WCAG tag) detected (${totalBestPractice} item(s)); review the report summary for details.`
+          );
+        }
+
+        if (totalViolations > 0) {
+          if (A11Y_MODE === 'audit') {
+            console.warn('ℹ️ Accessibility audit summary available in the run report (summary section).');
+          } else {
+            expect(
+              totalViolations,
+              `Accessibility violations detected (gating: ${failOnLabel}). See the report summary for a structured breakdown.`
+            ).toBe(0);
+          }
+        }
+      } finally {
+        aggregationStore.reset({ includePersisted: true });
       }
     });
   });
