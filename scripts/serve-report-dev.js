@@ -40,7 +40,7 @@ const TEMPLATE_WATCH_PATTERNS = [
   TEMPLATE_ENTRY,
   path.join(__dirname, '..', 'utils', 'report-templates', '**', '*.js'),
   path.join(__dirname, '..', 'utils', 'reporting-utils.js'),
-  path.join(__dirname, '..', 'docs', 'mocks', '**', '*.scss'),
+  path.join(__dirname, '..', 'styles', 'report', '**', '*.scss'),
 ];
 
 const MIME_TYPES = {

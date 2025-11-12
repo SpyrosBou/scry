@@ -4,7 +4,7 @@ const path = require('path');
 const sass = require('sass');
 
 const rootDir = path.resolve(__dirname, '..');
-const sourcePath = path.join(rootDir, 'docs', 'mocks', 'report-styles.scss');
+const sourcePath = path.join(rootDir, 'styles', 'report', 'report-styles.scss');
 const targetPath = path.join(rootDir, 'docs', 'mocks', 'report-styles.css');
 
 function compileStyles() {

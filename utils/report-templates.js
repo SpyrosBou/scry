@@ -51,11 +51,7 @@ const renderRuleSnapshotsTable = (snapshots) => {
       const viewportValues = viewports.length ? viewports : [MISSING_DATA_LABEL];
       const viewportList = renderCodeList(viewportValues, MISSING_DATA_LABEL);
       const detailsText = snapshot.description || snapshot.help || '';
-      const detailsContent = detailsText
-        ? escapeHtml(detailsText)
-        : snapshot.helpUrl
-          ? 'Guidance available'
-          : MISSING_DATA_LABEL;
+      const detailsContent = detailsText ? escapeHtml(detailsText) : MISSING_DATA_LABEL;
       const helpLink = snapshot.helpUrl
         ? `<br /><a class="details-link" href="${escapeHtml(
             snapshot.helpUrl
@@ -1261,11 +1257,7 @@ const WCAG_PER_PAGE_TOGGLE_SCRIPT = `
 const formatRuleHeading = (label, count) =>
   count ? `${label} (${formatCount(count)} unique rules)` : label;
 
-const renderAccessibilityRuleTable = (
-  title,
-  rules,
-  { headingClass, sectionClass, projectName } = {}
-) => {
+const renderAccessibilityRuleTable = (title, rules, { headingClass, sectionClass } = {}) => {
   if (!Array.isArray(rules) || rules.length === 0) return '';
   const rows = rules
     .map((rule) => {
@@ -1292,15 +1284,7 @@ const renderAccessibilityRuleTable = (
         .map((page) => {
           if (typeof page !== 'string') return page;
           const trimmed = page.trim();
-          if (!trimmed) return '';
-          if (projectName && trimmed.startsWith(`${projectName}::`)) {
-            return trimmed.slice(projectName.length + 2);
-          }
-          const doubleColonIndex = trimmed.indexOf('::');
-          if (doubleColonIndex > 0) {
-            return trimmed.slice(doubleColonIndex + 2);
-          }
-          return trimmed;
+          return trimmed || null;
         })
         .filter(Boolean);
       const pageCount = Number.isFinite(rule.pageCount) ? rule.pageCount : normalisedPages.length;
@@ -1310,11 +1294,7 @@ const renderAccessibilityRuleTable = (
         : renderCodeList(normalisedPages, MISSING_DATA_LABEL);
       const wcagHtml = renderComplianceCell(wcagTags);
       const detailsText = rule.description || rule.help || '';
-      const detailsContent = detailsText
-        ? escapeHtml(detailsText)
-        : rule.helpUrl
-          ? 'Guidance available'
-          : MISSING_DATA_LABEL;
+      const detailsContent = detailsText ? escapeHtml(detailsText) : MISSING_DATA_LABEL;
       const helpLink = rule.helpUrl
         ? `<br /><a class="details-link" href="${escapeHtml(
             rule.helpUrl

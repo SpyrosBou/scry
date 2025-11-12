@@ -86,7 +86,7 @@ Helpful environment variables:
 - Use `npm run reports:read [count]` to open the most recent report(s) without hunting filenames.
 - Regenerate an interactive report from stored data via `npm run reports:regenerate`.
 - Status summary pills in the HTML report now display zero counts (e.g., “0 blockers”) so stakeholders can distinguish a clean run from missing data.
-- When tweaking `docs/mocks/report-styles.scss`, run `npm run styles:build` to refresh the precompiled CSS that the runtime embeds—Sass no longer compiles on import.
+- When tweaking `styles/report/report-styles.scss`, run `npm run styles:build` to refresh the precompiled CSS that the runtime embeds—Sass no longer compiles on import.
 - Clean up old artifacts with `npm run clean:reports`, `npm run clean:manifests`, or `npm run clean:test-results`.
 - If a suite ran but didn’t emit schema summaries (for example, all pages returned non‑200), the report now force‑renders a placeholder panel for that suite so it’s still visible in the sidebar and “Suites at a glance”. The “Test details” panel will contain logs to diagnose why the suite produced no data.
 - WCAG column scoping: the “WCAG level” column appears only in accessibility tables (WCAG audit, keyboard, reflow, reduced‑motion, iframe, and structural a11y). Other suites (links, interactive, availability, performance, responsive) don’t render this column.
@@ -150,7 +150,7 @@ Helpful environment variables:
 
 ## Roadmap and References
 - Reporting parity progress: `docs/reporting-redesign-roadmap.md`
-- Design tokens and styling: `docs/mocks/report-styles.scss`
+- Design tokens and styling: `styles/report/report-styles.scss`
 - Full mock report reference: `docs/mocks/full-run-report.html`
 - Schema inventory (planned): tracked in `docs/reporting-redesign-roadmap.md` until `docs/report-schema-inventory.md` lands.
 

@@ -5,7 +5,7 @@ The mock HTML report remains our source of truth. This roadmap captures what is 
 ## What’s already done
 - New shell (sidebar navigation, summary hero, suite cards) is in production templates.
 - WCAG, keyboard, structure, forms, iframe, reduced-motion, reflow, internal links, infrastructure, and interactive panels now render with schema-driven layouts that mirror the mock copy and component structure.
-- Reporter compiles `docs/mocks/report-styles.scss` at build time; all styling lives in Solarized theme tokens with light/dark support.
+- Reporter compiles `styles/report/report-styles.scss` at build time; all styling lives in Solarized theme tokens with light/dark support.
 - Navigation scripts (`reports:read`, `reports:regenerate`) allow us to reopen past runs during development.
 - Schema validator enforces required finding arrays (`gating`, `warnings`, `advisories`, `notes`) and is covered by unit tests.
 
@@ -41,7 +41,7 @@ The mock HTML report remains our source of truth. This roadmap captures what is 
 
 ### 2. Styling & theming
 - Finalise Solarized token values once all panels are migrated; ensure status colours, badges, and card shadows read correctly in both themes.
-- Keep `docs/mocks/report-styles.scss` as the single source of design tokens—no inline style escapes in templates.
+- Keep `styles/report/report-styles.scss` as the single source of design tokens—no inline style escapes in templates.
 - Clean out legacy selector aliases once responsive/visual parity lands (several `.summary-*` fallbacks remain for the old markup).
 
 ### 3. Schema & data documentation

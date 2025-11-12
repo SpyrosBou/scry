@@ -1,8 +1,4 @@
-const fs = require('fs');
-const fsp = fs.promises;
-const path = require('path');
 const { test, expect } = require('../utils/test-fixtures');
-const SiteLoader = require('../utils/site-loader');
 const {
   safeNavigate,
   waitForPageStability,
@@ -20,6 +16,8 @@ const {
   applyViewportMetadata,
 } = require('../utils/a11y-shared');
 const { createRunSummaryPayload, createPageSummaryPayload } = require('../utils/report-schema');
+const { getActiveSiteContext } = require('../utils/test-context');
+const { slugifyIdentifier } = require('../utils/reporting-helpers');
 
 test.use({ trace: 'off', video: 'off' });
 
@@ -28,12 +26,6 @@ const DATA_MISSING_LABEL = 'DATA MISSING';
 
 const formatPageLabel = (page) => (page === '/' ? 'Homepage' : page);
 const pageSummaryTitle = (page, suffix) => `${formatPageLabel(page)} — ${suffix}`;
-
-const slugify = (value) =>
-  String(value || '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '') || 'root';
 
 const collectRuleSnapshots = (entries, category) => {
   if (!Array.isArray(entries) || entries.length === 0) return [];
@@ -233,7 +225,7 @@ const buildAccessibilityPageSchemaPayloads = (reports, metadataExtras = {}) =>
         };
 
         return createPageSummaryPayload({
-          baseName: `a11y-page-${slugify(report.projectName || 'default')}-${slugify(summaryViewport || 'viewport')}-${slugify(report.page)}`,
+          baseName: `a11y-page-${slugifyIdentifier(report.projectName || 'default')}-${slugifyIdentifier(summaryViewport || 'viewport')}-${slugifyIdentifier(report.page)}`,
           title: pageSummaryTitle(report.page, 'WCAG issues overview'),
           page: report.page,
           viewport: summaryViewport || DATA_MISSING_LABEL,
@@ -249,10 +241,7 @@ const buildAccessibilityPageSchemaPayloads = (reports, metadataExtras = {}) =>
       })
     : [];
 
-const siteName = process.env.SITE_NAME;
-if (!siteName) throw new Error('SITE_NAME environment variable is required');
-const siteConfig = SiteLoader.loadSite(siteName);
-SiteLoader.validateSiteConfig(siteConfig);
+const { siteName, siteConfig } = getActiveSiteContext();
 
 const accessibilitySampleSetting = resolveSampleSetting(siteConfig, {
   envKey: 'A11Y_SAMPLE',
@@ -289,75 +278,31 @@ const failOnSet = new Set(failOn.map((impact) => String(impact).toLowerCase()));
 const failOnLabel = failOn.map((impact) => String(impact).toUpperCase()).join('/');
 const A11Y_MODE = siteConfig.a11yMode === 'audit' ? 'audit' : 'gate';
 
-const a11yResultsBaseDir = path.join(
-  process.cwd(),
-  'test-results',
-  '__a11y',
-  slugify(siteConfig.name || siteName)
-);
-
-// Some Axe best-practice rules overlap with richer, dedicated specs in this
-// suite. Suppress them from the WCAG audit's best-practice list to avoid
-// duplicate surfacing across reports. Heading order is covered in
-// a11y.structure.landmarks with detailed per-occurrence context and outline.
+// Some Axe best-practice rules overlap ...
 const SUPPRESS_BEST_PRACTICE_RULES = new Set([
   'heading-order',
 ]);
-const globalSummaryDir = path.join(a11yResultsBaseDir, '__global');
-const resolveGlobalSummaryFlagPath = () =>
-  path.join(globalSummaryDir, `${RUN_TOKEN}-summary.json`);
+const projectReportStore = new Map();
+let globalSummaryAttached = false;
 
-const resolveProjectResultsDir = (projectName) =>
-  path.join(a11yResultsBaseDir, slugify(projectName || 'default'));
-
-const resolvePageReportPath = (projectName, index, testPage) => {
-  const projectDir = resolveProjectResultsDir(projectName);
-  const fileName = `${String(index + 1).padStart(4, '0')}-${slugify(testPage)}.json`;
-  return { projectDir, filePath: path.join(projectDir, fileName) };
-};
-
-const persistPageReport = async (projectName, index, report) => {
-  const { projectDir, filePath } = resolvePageReportPath(projectName, index, report.page);
-  await fsp.mkdir(projectDir, { recursive: true });
-  await fsp.writeFile(filePath, JSON.stringify(report, null, 2), 'utf8');
-  return filePath;
-};
-
-const readAllPageReports = async (projectName) => {
-  const projectDir = resolveProjectResultsDir(projectName);
-  try {
-    const entries = await fsp.readdir(projectDir);
-    const files = entries.filter((entry) => entry.endsWith('.json')).sort();
-    const reports = [];
-    for (const file of files) {
-      const content = await fsp.readFile(path.join(projectDir, file), 'utf8');
-      reports.push(JSON.parse(content));
-    }
-    return reports;
-  } catch (error) {
-    if (error.code === 'ENOENT') return [];
-    throw error;
+const getProjectBucket = (projectName) => {
+  const key = projectName || 'default';
+  if (!projectReportStore.has(key)) {
+    projectReportStore.set(key, new Map());
   }
+  return projectReportStore.get(key);
 };
 
-const resolveAvailableProjectNames = async () => {
-  try {
-    const entries = await fsp.readdir(a11yResultsBaseDir, { withFileTypes: true });
-    const candidates = entries
-      .filter((entry) => entry.isDirectory() && entry.name !== '__global')
-      .map((entry) => entry.name);
+const recordPageReport = (projectName, report) => {
+  const bucket = getProjectBucket(projectName);
+  const indexKey = report.index ?? bucket.size + 1;
+  bucket.set(indexKey, { ...report });
+};
 
-    const projects = [];
-    for (const name of candidates) {
-      const reports = await readAllPageReports(name);
-      if (reports.some((report) => report.runToken === RUN_TOKEN)) {
-        projects.push(name);
-      }
-    }
-    return projects.length > 0 ? projects : candidates;
-  } catch (_error) {
-    return [];
-  }
+const readProjectReports = (projectName) => {
+  const bucket = projectReportStore.get(projectName || 'default');
+  if (!bucket) return [];
+  return Array.from(bucket.values()).sort((a, b) => (a.index || 0) - (b.index || 0));
 };
 
 const deriveAggregatedFindings = (reports) => {
@@ -405,34 +350,19 @@ const deriveAggregatedFindings = (reports) => {
   return { aggregatedViolations, aggregatedAdvisories, aggregatedBestPractices };
 };
 
-const maybeAttachGlobalSummary = async ({
-  testInfo,
-  totalPagesExpected,
-  failOnLabel,
-}) => {
-  const flagPath = resolveGlobalSummaryFlagPath();
-  try {
-    await fsp.access(flagPath);
-    return false;
-  } catch (_error) {
-    // flag not set; continue
-  }
-
-  const projectNames = await resolveAvailableProjectNames();
-  if (projectNames.length === 0) {
-    return false;
-  }
+const maybeAttachGlobalSummary = async ({ testInfo, totalPagesExpected, failOnLabel }) => {
+  if (globalSummaryAttached) return false;
+  const projectNames = Array.from(projectReportStore.keys());
+  if (projectNames.length === 0) return false;
   const combinedReports = [];
 
   for (const projectName of projectNames) {
-    const reports = (await readAllPageReports(projectName))
-      .filter((report) => report.runToken === RUN_TOKEN && typeof report.index === 'number')
-      .sort((a, b) => (a.index || 0) - (b.index || 0));
-
+    const reports = readProjectReports(projectName).filter(
+      (report) => report.runToken === RUN_TOKEN && typeof report.index === 'number'
+    );
     if (reports.length < totalPagesExpected) {
-      return false; // other projects still processing; try later
+      return false;
     }
-
     combinedReports.push(...reports.slice(0, totalPagesExpected));
   }
 
@@ -460,29 +390,8 @@ const maybeAttachGlobalSummary = async ({
     await attachSchemaSummary(testInfo, schemaRunPayload);
   }
 
-  await fsp.mkdir(globalSummaryDir, { recursive: true });
-  await fsp.writeFile(
-    flagPath,
-    JSON.stringify({ attachedAt: new Date().toISOString(), project: testInfo.project.name }, null, 2),
-    'utf8'
-  );
-
+  globalSummaryAttached = true;
   return true;
-};
-
-const waitForPageReports = async (projectName, expectedCount, timeoutMs = 300000, pollMs = 1000) => {
-  if (expectedCount === 0) return [];
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() <= deadline) {
-    const reports = (await readAllPageReports(projectName))
-      .filter((report) => report.runToken === RUN_TOKEN && typeof report.index === 'number')
-      .sort((a, b) => (a.index || 0) - (b.index || 0));
-    if (reports.length >= expectedCount) {
-      return reports.slice(0, expectedCount);
-    }
-    await new Promise((resolve) => setTimeout(resolve, pollMs));
-  }
-  throw new Error(`Timed out waiting for ${expectedCount} accessibility page report(s).`);
 };
 
 test.describe('Functionality: Accessibility (WCAG)', () => {
@@ -520,10 +429,10 @@ test.describe('Functionality: Accessibility (WCAG)', () => {
           pageReport.notes.push(`Navigation failed: ${error.message}`);
           console.error(`⚠️  Navigation failed for ${testPage}: ${error.message}`);
 
-          await persistPageReport(testInfo.project.name, index, pageReport);
-          if (A11Y_MODE !== 'audit') {
-            throw new Error(`Navigation failed for ${testPage}: ${error.message}`);
-          }
+        recordPageReport(testInfo.project.name, pageReport);
+        if (A11Y_MODE !== 'audit') {
+          throw new Error(`Navigation failed for ${testPage}: ${error.message}`);
+        }
           return;
         }
 
@@ -533,7 +442,7 @@ test.describe('Functionality: Accessibility (WCAG)', () => {
           pageReport.notes.push(`Received HTTP status ${response.status()}; scan skipped.`);
           console.error(`⚠️  HTTP ${response.status()} while loading ${testPage}; skipping scan.`);
 
-          await persistPageReport(testInfo.project.name, index, pageReport);
+          recordPageReport(testInfo.project.name, pageReport);
           if (A11Y_MODE !== 'audit') {
             throw new Error(`HTTP ${response.status()} received for ${testPage}`);
           }
@@ -549,7 +458,7 @@ test.describe('Functionality: Accessibility (WCAG)', () => {
           pageReport.notes.push(stability.message);
           console.warn(`⚠️  ${stability.message} for ${testPage}`);
 
-          await persistPageReport(testInfo.project.name, index, pageReport);
+          recordPageReport(testInfo.project.name, pageReport);
           return;
         }
 
@@ -625,7 +534,7 @@ test.describe('Functionality: Accessibility (WCAG)', () => {
           }
         }
 
-        await persistPageReport(testInfo.project.name, index, pageReport);
+        recordPageReport(testInfo.project.name, pageReport);
       });
     });
   });
@@ -634,7 +543,12 @@ test.describe('Functionality: Accessibility (WCAG)', () => {
     test('Aggregate results', async ({}, testInfo) => {
       test.setTimeout(300000);
 
-      const reports = await waitForPageReports(testInfo.project.name, totalPages);
+      const reports = readProjectReports(testInfo.project.name);
+      if (reports.length < totalPages) {
+        throw new Error(
+          `Accessibility summary expected ${totalPages} page report(s) for ${testInfo.project.name}, found ${reports.length}`
+        );
+      }
       if (reports.length === 0) {
         console.warn('ℹ️  Accessibility suite executed with no configured pages.');
         return;
@@ -651,7 +565,7 @@ test.describe('Functionality: Accessibility (WCAG)', () => {
         aggregatedAdvisories,
         aggregatedBestPractices,
         failOnLabel,
-        baseName: `a11y-summary-${slugify(testInfo.project.name)}`,
+        baseName: `a11y-summary-${slugifyIdentifier(testInfo.project.name)}`,
         title: `WCAG findings – ${testInfo.project.name}`,
         metadata: {
           scope: 'project',
