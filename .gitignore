@@ -19,6 +19,7 @@ reports/
 *.jpeg
 *.webm
 *.zip
+baseline_snapshots/
 
 # Exception: Include baseline screenshots for visual regression testing
 tests/baseline-snapshots/**/*.png
