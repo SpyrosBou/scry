@@ -6,13 +6,12 @@ const {
 const { createTestData } = require('../utils/test-data-factory');
 const { WordPressPageObjects } = require('../utils/wordpress-page-objects');
 const { attachSchemaSummary } = require('../utils/reporting-utils');
-const { getActiveSiteContext } = require('../utils/test-context');
 const {
   buildRunSummaryPayload,
   buildPageSummaryPayload,
 } = require('../utils/report-summary-builder');
 
-const { siteConfig } = getActiveSiteContext();
+let siteConfig;
 
 const buildInteractiveSchemaPayloads = ({ pages, resourceBudget, projectName }) => {
   if (!Array.isArray(pages) || pages.length === 0) return null;
@@ -143,6 +142,10 @@ const buildInteractiveSchemaPayloads = ({ pages, resourceBudget, projectName }) 
 };
 
 test.describe('Functionality: Interactive Elements', () => {
+  test.beforeAll(async ({ siteConfig: resolvedConfig }) => {
+    siteConfig = resolvedConfig;
+  });
+
   let wpPageObjects;
 
   test.beforeEach(async ({ page }) => {

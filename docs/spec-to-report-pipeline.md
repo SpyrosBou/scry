@@ -9,7 +9,7 @@ This note captures how Playwright specs feed data into the custom HTML reporter 
 - `utils/test-runner.js:194-228` builds the run manifest (pages, specs, projects, limits) and `utils/test-runner.js:165-191` persists it to `reports/run-manifests/` when the payload is large, otherwise inlines it via `SITE_RUN_MANIFEST_INLINE`. Environment variables `SITE_NAME`, `SITE_BASE_URL`, `SITE_TEST_PAGES`, etc., are injected into the Playwright process so specs know what to exercise.
 
 ## 2. Spec Responsibilities
-- Tests import the shared fixtures from `utils/test-fixtures.js:4-15`, which wrap `@playwright/test` to provide automatic setup/teardown and expose `test.info()` for attachments.
+- Tests import the shared fixtures from `utils/test-fixtures.js:4-24`, which now expose `siteContext`/`siteConfig`/`siteName` so suites never have to read environment variables directly, in addition to wrapping `@playwright/test` with the `errorContext` helper for setup/teardown and providing `test.info()`.
 - Active site metadata is resolved once via `utils/test-context.js:1-21` so specs can grab `{ siteName, siteConfig }` without re-reading `process.env`.
 - Each suite (example: `tests/functionality.interactive.smoke.spec.js`) iterates the manifest’s `testPages`, executes the checks (console/resource errors, form submissions, accessibility sweeps, etc.), and aggregates per-page/per-run metrics.
 - When a suite needs to expose structured insights on the dashboard it uses helpers from `utils/reporting-utils.js`:
