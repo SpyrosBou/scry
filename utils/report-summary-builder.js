@@ -12,7 +12,10 @@ const buildRunSummaryPayload = ({
   ruleSnapshots = [],
   details = null,
 }) => {
-  const baseName = createSummaryBaseName(prefix, key || metadata.projectName || metadata.siteName || 'run');
+  const baseName = createSummaryBaseName(
+    prefix,
+    key || metadata.projectName || metadata.siteName || 'run'
+  );
   const payload = createRunSummaryPayload({
     baseName,
     title,

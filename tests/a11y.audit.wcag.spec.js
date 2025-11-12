@@ -245,7 +245,7 @@ const buildAccessibilityPageSchemaPayloads = (reports, metadataExtras = {}) =>
       })
     : [];
 
-const { siteName, siteConfig } = getActiveSiteContext();
+const { siteConfig } = getActiveSiteContext();
 
 const accessibilitySampleSetting = resolveSampleSetting(siteConfig, {
   envKey: 'A11Y_SAMPLE',
