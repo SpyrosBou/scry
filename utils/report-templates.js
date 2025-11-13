@@ -189,6 +189,7 @@ const deriveCulpritSummary = (nodes) => {
         selector: candidateSelector,
         screenshot: screenshot ? String(screenshot) : null,
         score: adjustedScore,
+        display: formatLabel(candidateSelector),
       };
     }
   }
@@ -205,13 +206,14 @@ const deriveCulpritSummary = (nodes) => {
         selector: fallbackSelector,
         screenshot: screenshot ? String(screenshot) : null,
         score: scoreSelector(fallbackSelector) || 0,
+        display: formatLabel(fallbackSelector),
       };
     }
   }
 
   if (!best || !best.selector) return null;
 
-  const display = formatLabel(best.selector);
+  const display = best.display || formatLabel(best.selector);
   if (!display) return null;
 
   return {
@@ -1196,7 +1198,7 @@ const renderWcagPageIssueTable = (entries, heading, options = {}) => {
         ? culprit.screenshot
           ? `<a class="culprit-link screenshot-link" href="#" data-image="${escapeHtml(
               culprit.screenshot
-            )}" title="View offending element">${culprit.display}</a>`
+            )}" title="View offending element" aria-label="View offending element">${culprit.display}</a>`
           : culprit.display
         : `<span class="details">${MISSING_DATA_LABEL}</span>`;
       return `
