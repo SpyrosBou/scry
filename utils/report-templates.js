@@ -1368,7 +1368,17 @@ const renderAccessibilityGroupHtml = (group) => {
         .filter(Boolean)
         .join('\n');
 
-      const perPageHtml = renderWcagPerPageSection(details.pages || [], {
+      const perPageEntries = (bucket.pageEntries || [])
+        .map((entry) => entry.payload || {})
+        .filter((payload) => payload.kind === KIND_PAGE_SUMMARY || payload.summary);
+      const perPageSource =
+        perPageEntries.length > 0
+          ? perPageEntries
+          : Array.isArray(details.pages)
+            ? details.pages
+            : [];
+
+      const perPageHtml = renderWcagPerPageSection(perPageSource, {
         viewportLabel,
         failThreshold: details.failThreshold || overview.failThreshold || metadata.failOn,
       });
@@ -2451,7 +2461,7 @@ const buildSuitePanels = (schemaGroups, summaryMap, options = {}) => {
     if (!hasGroups && !expected) continue;
 
     const specNames = new Set();
-    const filteredGroups = hasGroups
+    let filteredGroups = hasGroups
       ? definition.summaryType === 'wcag'
         ? groups.filter((group) => {
             const runEntries = group.runEntries || [];
@@ -2462,6 +2472,38 @@ const buildSuitePanels = (schemaGroups, summaryMap, options = {}) => {
           ? groups.filter((group) => (group.runEntries || []).length > 0)
           : groups
       : [];
+
+    if (definition.summaryType === 'wcag' && hasGroups && filteredGroups.length > 0) {
+      const pageOnlyGroups = groups.filter((group) => {
+        const runEntries = group.runEntries || [];
+        const pageEntries = group.pageEntries || [];
+        return runEntries.length === 0 && pageEntries.length > 0;
+      });
+
+      if (pageOnlyGroups.length > 0) {
+        const projectGroupsByName = new Map();
+        filteredGroups.forEach((group) => {
+          const runEntry = (group.runEntries || [])[0];
+          const meta = runEntry?.payload?.metadata || {};
+          const projectName = meta.projectName || group.projectName || 'default';
+          if (!projectGroupsByName.has(projectName)) {
+            projectGroupsByName.set(projectName, group);
+          }
+        });
+
+        pageOnlyGroups.forEach((group) => {
+          const entry = (group.pageEntries || [])[0];
+          const meta = entry?.payload?.metadata || {};
+          const projectName = meta.projectName || entry?.projectName || 'default';
+          const targetGroup = projectGroupsByName.get(projectName);
+          if (targetGroup) {
+            targetGroup.pageEntries = (targetGroup.pageEntries || []).concat(
+              group.pageEntries || []
+            );
+          }
+        });
+      }
+    }
 
     if (filteredGroups.length === 0 && expected) {
       // Force-render an empty panel to reflect that the suite ran but emitted no summaries
