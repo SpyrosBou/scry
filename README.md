@@ -153,7 +153,7 @@ Helpful environment variables:
 - Update documentation (`README.md`, `docs/`) alongside any user-facing changes or new workflows.
 - Adhere to Conventional Commits, one logical change per commit, and keep commit messages under 72 characters.
 
-> README last updated for commit `27a8ec42af358b3b6b98aa5ca765c389883f81a2`.
+> README last updated for commit `4efa6cd3c6709ac87f21cc5142ceb17a7cbf2265`.
 
 ## Roadmap and References
 - Reporting parity progress: `docs/reporting-redesign-roadmap.md`
