@@ -11,6 +11,11 @@ Automated Playwright-powered testing harness for auditing WordPress websites acr
 - Discovers site pages from sitemaps and manages baseline snapshots for intentional UI (User Interface) changes.
 - Provides cleanup and regeneration scripts to keep artifacts tidy during development.
 
+## Package-Lite Distribution
+- `../a11y-testing` contains an accessibility-focused copy of this repo for lightweight handoffs. The folder mirrors the main codebase (minus `.git`) so teams that emphasise WCAG (Web Content Accessibility Guidelines) sweeps can stay focused.
+- All helper utilities, manifests, and scripts remain intact in that folder, so you can still run `node run-tests.js --site <name> --pages <n|all> --accessibility`.
+- When you update shared helpers or docs, mirror any relevant accessibility guidance inside `../a11y-testing` so both distributions stay aligned.
+
 ## Getting Started
 
 ### Prerequisites
@@ -148,7 +153,7 @@ Helpful environment variables:
 - Update documentation (`README.md`, `docs/`) alongside any user-facing changes or new workflows.
 - Adhere to Conventional Commits, one logical change per commit, and keep commit messages under 72 characters.
 
-> README last updated for commit `6ac78370368170f04655a830ebd5974242e360c5`.
+> README last updated for commit `27a8ec42af358b3b6b98aa5ca765c389883f81a2`.
 
 ## Roadmap and References
 - Reporting parity progress: `docs/reporting-redesign-roadmap.md`
