@@ -490,37 +490,34 @@ test.describe('Functionality: Accessibility (WCAG)', () => {
               !violationHasWcagCoverage(violation)
           ).filter((violation) => !SUPPRESS_BEST_PRACTICE_RULES.has(violation.id));
 
-          const enrichNodes = async (entries) => {
-            const result = [];
-            for (const violation of entries) {
-              const nodes = Array.isArray(violation.nodes) ? violation.nodes : [];
-              const enrichedNodes = await Promise.all(
-                nodes.map(async (node) => {
-                  if (node && node.screenshotDataUri) return node;
-                  try {
-                    if (node?.any || node?.all || node?.none) {
-                      // axe nodes already have screenshot/target metadata
-                      return node;
-                    }
-                    const locator = node?.target?.length
-                      ? page.locator(node.target[0])
-                      : null;
-                    if (locator) {
-                      const buffer = await locator.screenshot();
-                      return {
-                        ...node,
-                        screenshotDataUri: `data:image/png;base64,${buffer.toString('base64')}`,
-                      };
-                    }
-                  } catch (_) {
-                    /* ignore */
-                  }
-                  return node;
-                })
-              );
-              result.push({ ...violation, nodes: enrichedNodes });
+          const captureNodeScreenshot = async (node) => {
+            const selector = Array.isArray(node?.target) ? node.target[0] : null;
+            if (!selector) return null;
+            try {
+              const buffer = await page.locator(selector).first().screenshot({ timeout: 2000 });
+              return `data:image/png;base64,${buffer.toString('base64')}`;
+            } catch (_error) {
+              return null;
             }
-            return result;
+          };
+
+          const enrichNodes = async (entries) => {
+            return Promise.all(
+              entries.map(async (violation) => {
+                const nodes = Array.isArray(violation.nodes) ? violation.nodes : [];
+                const enrichedNodes = await Promise.all(
+                  nodes.map(async (node) => {
+                    if (node && node.screenshotDataUri) return node;
+                    const screenshotDataUri = await captureNodeScreenshot(node);
+                    if (screenshotDataUri) {
+                      return { ...node, screenshotDataUri };
+                    }
+                    return node;
+                  })
+                );
+                return { ...violation, nodes: enrichedNodes };
+              })
+            );
           };
 
           pageReport.violations = await enrichNodes(gatingViolations);
