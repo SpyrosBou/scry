@@ -306,17 +306,39 @@ async function runStructureAudit(page, siteConfig, pagePath) {
       );
     }
 
+    let cachedPageScreenshot = null;
+    const capturePageScreenshot = async () => {
+      if (cachedPageScreenshot !== null) return cachedPageScreenshot;
+      try {
+        const buffer = await page.screenshot({ fullPage: true });
+        cachedPageScreenshot = `data:image/png;base64,${buffer.toString('base64')}`;
+      } catch (_error) {
+        cachedPageScreenshot = null;
+      }
+      return cachedPageScreenshot;
+    };
+    const buildPageNode = async (label) => {
+      const screenshotDataUri = await capturePageScreenshot();
+      return {
+        target: label ? [label] : undefined,
+        screenshotDataUri: screenshotDataUri || undefined,
+      };
+    };
+
     if (!structure.hasMain) {
+      const nodes = [await buildPageNode('Document main region')];
       report.gating.push(
         createStructureFinding('Missing <main> landmark (or equivalent role="main").', '1.3.1', {
           impact: 'critical',
           summary: 'Missing main landmark',
           details: 'No <main> or role="main" landmark detected.',
+          nodes,
         })
       );
     }
 
     if (!structure.navigationCount) {
+      const nodes = [await buildPageNode('Primary navigation region')];
       report.advisories.push(
         createStructureFinding(
           'No navigation landmark detected. Ensure primary navigation is wrapped in <nav>.',
@@ -324,25 +346,30 @@ async function runStructureAudit(page, siteConfig, pagePath) {
           {
             summary: 'No navigation landmark detected',
             details: 'Detected 0 <nav> or role="navigation" landmarks.',
+            nodes,
           }
         )
       );
     }
 
     if (!structure.headerCount) {
+      const nodes = [await buildPageNode('Header/banner region')];
       report.advisories.push(
         createStructureFinding('No header/banner landmark detected.', '1.3.1', {
           summary: 'No header landmark detected',
           details: 'Detected 0 <header> or role="banner" landmarks.',
+          nodes,
         })
       );
     }
 
     if (!structure.footerCount) {
+      const nodes = [await buildPageNode('Footer/contentinfo region')];
       report.advisories.push(
         createStructureFinding('No footer/contentinfo landmark detected.', '1.3.1', {
           summary: 'No footer landmark detected',
           details: 'Detected 0 <footer> or role="contentinfo" landmarks.',
+          nodes,
         })
       );
     }

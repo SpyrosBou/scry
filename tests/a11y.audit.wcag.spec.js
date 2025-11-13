@@ -490,9 +490,42 @@ test.describe('Functionality: Accessibility (WCAG)', () => {
               !violationHasWcagCoverage(violation)
           ).filter((violation) => !SUPPRESS_BEST_PRACTICE_RULES.has(violation.id));
 
-          pageReport.violations = gatingViolations;
-          pageReport.advisory = advisoryViolations;
-          pageReport.bestPractice = bestPracticeViolations;
+          const enrichNodes = async (entries) => {
+            const result = [];
+            for (const violation of entries) {
+              const nodes = Array.isArray(violation.nodes) ? violation.nodes : [];
+              const enrichedNodes = await Promise.all(
+                nodes.map(async (node) => {
+                  if (node && node.screenshotDataUri) return node;
+                  try {
+                    if (node?.any || node?.all || node?.none) {
+                      // axe nodes already have screenshot/target metadata
+                      return node;
+                    }
+                    const locator = node?.target?.length
+                      ? page.locator(node.target[0])
+                      : null;
+                    if (locator) {
+                      const buffer = await locator.screenshot();
+                      return {
+                        ...node,
+                        screenshotDataUri: `data:image/png;base64,${buffer.toString('base64')}`,
+                      };
+                    }
+                  } catch (_) {
+                    /* ignore */
+                  }
+                  return node;
+                })
+              );
+              result.push({ ...violation, nodes: enrichedNodes });
+            }
+            return result;
+          };
+
+          pageReport.violations = await enrichNodes(gatingViolations);
+          pageReport.advisory = await enrichNodes(advisoryViolations);
+          pageReport.bestPractice = await enrichNodes(bestPracticeViolations);
 
           if (gatingViolations.length > 0) {
             pageReport.status = 'violations';

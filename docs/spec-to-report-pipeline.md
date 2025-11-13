@@ -9,14 +9,16 @@ This note captures how Playwright specs feed data into the custom HTML reporter 
 - `utils/test-runner.js:194-228` builds the run manifest (pages, specs, projects, limits) and `utils/test-runner.js:165-191` persists it to `reports/run-manifests/` when the payload is large, otherwise inlines it via `SITE_RUN_MANIFEST_INLINE`. Environment variables `SITE_NAME`, `SITE_BASE_URL`, `SITE_TEST_PAGES`, etc., are injected into the Playwright process so specs know what to exercise.
 
 ## 2. Spec Responsibilities
-- Tests import the shared fixtures from `utils/test-fixtures.js:4-24`, which now expose `siteContext`/`siteConfig`/`siteName` so suites never have to read environment variables directly, in addition to wrapping `@playwright/test` with the `errorContext` helper for setup/teardown and providing `test.info()`.
-- Active site metadata is resolved once via `utils/test-context.js:1-21` so specs can grab `{ siteName, siteConfig }` without re-reading `process.env`.
-- Each suite (example: `tests/functionality.interactive.smoke.spec.js`) iterates the manifest’s `testPages`, executes the checks (console/resource errors, form submissions, accessibility sweeps, etc.), and aggregates per-page/per-run metrics.
-- When a suite needs to expose structured insights on the dashboard it uses helpers from `utils/reporting-utils.js`:
-  - `attachSummary()` (`utils/reporting-utils.js:143-196`) emits HTML/Markdown descriptions as attachments named `*.summary.*`.
-  - `attachSchemaSummary()` (`utils/reporting-utils.js:198-214`) validates JSON payloads produced by `createRunSummaryPayload()` / `createPageSummaryPayload()` (`utils/report-schema.js:6-40`) and attaches them as `*.summary.schema.json`.
-- Accessibility-heavy suites (e.g., `tests/a11y.audit.wcag.spec.js`) keep per-page reports in memory (see the `projectReportStore` block around lines 300-360) and attach project/run summaries once all page scans finish—no intermediate files or polling required.
-- These attachments are standard Playwright artifacts, so no spec code needs to know about the reporter internals beyond supplying the schema payloads and summary blocks.
+- Tests import the shared fixtures from `utils/test-fixtures.js:4-24`, which expose `siteContext` / `siteConfig` / `siteName` so suites never read env vars directly, and wrap Playwright’s `test` with `errorContext` for consistent setup/teardown + `testInfo` access.
+- Active site metadata is resolved once via `utils/test-context.js:1-21`, so every spec can call `getActiveSiteContext()` without touching `process.env`.
+- Each suite (example: `tests/functionality.interactive.smoke.spec.js`) iterates the manifest’s `testPages`, runs its checks (console/resource errors, forms, WCAG, responsive, etc.), and aggregates per-page/per-run metrics before yielding control back to the reporter.
+- When a suite needs to expose structured insights it uses the helpers from `utils/reporting-utils.js`:
+  - `attachSummary()` (`utils/reporting-utils.js:143-196`) emits HTML/Markdown blocks (named `*.summary.*`).
+  - `attachSchemaSummary()` (`utils/reporting-utils.js:198-214`) validates payloads produced by `createRunSummaryPayload()` / `createPageSummaryPayload()` (`utils/report-schema.js:6-40`) before attaching them as `*.summary.schema.json`.
+- **Keyboard + WCAG specs**: `tests/a11y.audit.wcag.spec.js` streams each page’s Axe run into an aggregation store (`utils/report-aggregation-store.js`). Every worker writes its page report to `test-results/.a11y-aggregation/<run-token>/` so the serial “Aggregate results” test can rehydrate all 5 reports, emit the run/page schema payloads, and clean up. During the scan we enrich each violation/advisory with culprits (target selector + screenshot) so `renderPerPageIssuesTable()` can show “View offending element”.
+- **Structural semantics spec**: `tests/a11y.structure.landmarks.spec.js` captures the site structure (H1 count, landmark presence, heading skips). When a landmark is missing we snapshot the page once, add it to the finding as a node, and attach both project- and per-page schema summaries so the reporter can render structural gating/advisory tables with clickable culprits.
+- **Responsive + infrastructure specs** follow the same contract: gather per-page summaries, call `applyViewportMetadata()` so each entry records browser/viewport/site labels, then call `attachSchemaSummary()` for run + page payloads.
+- All of these artifacts are standard Playwright attachments—no spec needs to understand the HTML reporter, it just supplies JSON + optional HTML/Markdown.
 
 ## 3. Reporter Internals
 - `playwright.config.js:38-54` globally registers `./utils/custom-html-reporter` plus the default `list` reporter (and `blob` on CI), so every run triggers the custom reporter.
