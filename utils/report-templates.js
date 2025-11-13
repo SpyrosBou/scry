@@ -4095,7 +4095,7 @@ const aggregateStructureIssues = (issues, defaultImpact) => {
   });
 };
 
-const renderKeyboardPageCard = (summary, { projectLabel } = {}) => {
+const renderKeyboardPageCard = (summary, { projectLabel, viewportLabel } = {}) => {
   if (!summary) return '';
 
   const gating = Array.isArray(summary.gatingIssues)
@@ -4108,7 +4108,18 @@ const renderKeyboardPageCard = (summary, { projectLabel } = {}) => {
   const focusSequence = Array.isArray(summary.focusSequence) ? summary.focusSequence : [];
   const notes = Array.isArray(summary.notes) ? summary.notes.filter(Boolean) : [];
 
-  const viewportName = ensureDisplayValue(summary.projectName || summary.viewport || projectLabel);
+  const effectiveViewport =
+    summary.viewport || viewportLabel || summary.projectName || projectLabel;
+  const viewportName = ensureDisplayValue(effectiveViewport || projectLabel);
+  const browserLabel = summary.browser || viewportLabel || projectLabel || 'Chrome';
+  const viewportsList =
+    Array.isArray(summary.viewports) && summary.viewports.length
+      ? summary.viewports
+      : effectiveViewport
+        ? [effectiveViewport]
+        : [];
+  const projectNameLabel = summary.projectName || projectLabel || browserLabel;
+  const siteNameLabel = summary.siteName || projectNameLabel;
   const focusableCount = Number.isFinite(summary.focusableCount) ? summary.focusableCount : null;
   const visitedCount = Number.isFinite(summary.visitedCount) ? summary.visitedCount : null;
   const coveragePercent =
@@ -4193,6 +4204,21 @@ const renderKeyboardPageCard = (summary, { projectLabel } = {}) => {
     })
     .join('');
 
+  const hydrateIssueMetadata = (issue = {}) => {
+    const next = { ...issue };
+    if (!next.browser) next.browser = browserLabel;
+    if (!next.browsers || next.browsers.length === 0) {
+      next.browsers = browserLabel ? [browserLabel] : undefined;
+    }
+    if (!next.viewport) next.viewport = effectiveViewport || browserLabel;
+    if (!next.viewports || next.viewports.length === 0) {
+      next.viewports = viewportsList.length ? viewportsList : next.viewport ? [next.viewport] : [];
+    }
+    if (!next.projectName) next.projectName = projectNameLabel;
+    if (!next.siteName) next.siteName = siteNameLabel;
+    return next;
+  };
+
   const executionEntries = executionFailures.map((message) =>
     makeKeyboardIssueEntry(message, 'critical')
   );
@@ -4206,6 +4232,7 @@ const renderKeyboardPageCard = (summary, { projectLabel } = {}) => {
     }),
     {
       emptyHtml: '',
+      hydrate: hydrateIssueMetadata,
     }
   );
 
@@ -4214,13 +4241,14 @@ const renderKeyboardPageCard = (summary, { projectLabel } = {}) => {
     formatUniqueRulesHeading('Gating keyboard issues', gatingEntries.length),
     {
       emptyHtml: '<p class="details">No gating issues detected.</p>',
+      hydrate: hydrateIssueMetadata,
     }
   );
 
   const advisorySection = renderKeyboardPageIssuesTable(
     advisoryEntries,
     formatUniqueRulesHeading('Advisories', advisoryEntries.length),
-    { headingClass: 'summary-heading-best-practice' }
+    { headingClass: 'summary-heading-best-practice', hydrate: hydrateIssueMetadata }
   );
 
   const notesHtml = notes.length
@@ -4496,7 +4524,10 @@ const renderKeyboardGroupHtml = (group) => {
           summaryClass: 'summary-page--keyboard',
           containerClass: 'summary-report summary-a11y summary-a11y--per-page',
           renderCard: (entrySummary) =>
-            renderKeyboardPageCard(entrySummary, { projectLabel: viewportLabel }),
+            renderKeyboardPageCard(entrySummary, {
+              projectLabel,
+              viewportLabel,
+            }),
           formatSummaryLabel: (entrySummary) => formatPageLabel(entrySummary?.page || 'Page'),
         },
       });
