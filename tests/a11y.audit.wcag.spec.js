@@ -25,6 +25,7 @@ const { getActiveSiteContext } = require('../utils/test-context');
 test.use({ trace: 'off', video: 'off' });
 
 const STABILITY_TIMEOUT_MS = 20000;
+const AGGREGATION_WAIT_TIMEOUT_MS = Math.max(120000, STABILITY_TIMEOUT_MS * 4);
 const DATA_MISSING_LABEL = 'DATA MISSING';
 
 const formatPageLabel = (page) => (page === '/' ? 'Homepage' : page);
@@ -295,7 +296,11 @@ const aggregationStore = createAggregationStore({
   runToken: RUN_TOKEN,
 });
 
-const waitForReports = async (projectName, expectedCount, timeoutMs = 30000) => {
+const waitForReports = async (
+  projectName,
+  expectedCount,
+  timeoutMs = AGGREGATION_WAIT_TIMEOUT_MS
+) => {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     const reports = aggregationStore.readProjectReports(projectName);
