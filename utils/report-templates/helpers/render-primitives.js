@@ -676,6 +676,9 @@ const renderWcagBadgesLinked = (tags) => {
   if (derived && derived.helpUrl) {
     return `<a href="${escapeHtml(derived.helpUrl)}" target="_blank" rel="noopener noreferrer">${badges}</a>`;
   }
+  if (Array.isArray(tags) && tags.length > 0) {
+    return `<a href="https://www.w3.org/TR/WCAG21/" target="_blank" rel="noopener noreferrer">${badges}</a>`;
+  }
   return badges;
 };
 
