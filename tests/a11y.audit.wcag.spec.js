@@ -490,6 +490,18 @@ test.describe('Functionality: Accessibility (WCAG)', () => {
               !violationHasWcagCoverage(violation)
           ).filter((violation) => !SUPPRESS_BEST_PRACTICE_RULES.has(violation.id));
 
+          let cachedPageScreenshot = null;
+          const capturePageScreenshot = async () => {
+            if (cachedPageScreenshot !== null) return cachedPageScreenshot;
+            try {
+              const buffer = await page.screenshot({ fullPage: true });
+              cachedPageScreenshot = `data:image/png;base64,${buffer.toString('base64')}`;
+            } catch (_error) {
+              cachedPageScreenshot = null;
+            }
+            return cachedPageScreenshot;
+          };
+
           const captureNodeScreenshot = async (node) => {
             const selector = Array.isArray(node?.target) ? node.target[0] : null;
             if (!selector) return null;
@@ -497,7 +509,7 @@ test.describe('Functionality: Accessibility (WCAG)', () => {
               const buffer = await page.locator(selector).first().screenshot({ timeout: 2000 });
               return `data:image/png;base64,${buffer.toString('base64')}`;
             } catch (_error) {
-              return null;
+              return await capturePageScreenshot();
             }
           };
 
