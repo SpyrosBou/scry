@@ -16,6 +16,7 @@ const {
   resolveAccessibilityMetadata,
   applyViewportMetadata,
 } = require('../utils/a11y-shared');
+const { waitForReports: waitForReportsHelper } = require('../utils/a11y-aggregation-waiter');
 const {
   buildRunSummaryPayload,
   buildPageSummaryPayload,
@@ -156,34 +157,40 @@ const buildAccessibilityRunSchemaPayload = ({
     ruleSnapshots,
   });
 
-  payload.details = {
-    pages: reports.map((report) => ({
+  const summariseReport = (report) => {
+    const summaryViewport = report.viewport || report.browser || null;
+    const summaryViewports =
+      Array.isArray(report.viewports) && report.viewports.length
+        ? report.viewports
+        : summaryViewport
+          ? [summaryViewport]
+          : [];
+
+    return {
       page: report.page,
       status: report.status,
       projectName: report.projectName || 'default',
       siteName: report.siteName || report.projectName || null,
       browser: report.browser || null,
-      viewport: report.viewport || null,
-      viewports:
-        Array.isArray(report.viewports) && report.viewports.length
-          ? report.viewports
-          : report.viewport
-            ? [report.viewport]
-            : [],
-      gatingViolations: (report.violations || []).length,
-      advisoryFindings: (report.advisory || []).length,
-      bestPracticeFindings: (report.bestPractice || []).length,
+      viewport: summaryViewport,
+      viewports: summaryViewports,
+      gatingViolations: Array.isArray(report.violations) ? report.violations.length : 0,
+      advisoryFindings: Array.isArray(report.advisory) ? report.advisory.length : 0,
+      bestPracticeFindings: Array.isArray(report.bestPractice) ? report.bestPractice.length : 0,
       stability: report.stability || null,
       httpStatus: report.httpStatus ?? 200,
       notes: Array.isArray(report.notes) ? report.notes : [],
-      gatingLabel: report.gatingLabel || metadata.failOn || 'WCAG A/AA/AAA',
-      violations: report.violations || [],
-      advisories: report.advisory || [],
-      bestPractices: report.bestPractice || [],
-    })),
-    aggregatedViolations,
-    aggregatedAdvisories,
-    aggregatedBestPractices,
+      gatingLabel: report.gatingLabel || metadata?.failOn || failOnLabel || 'WCAG A/AA/AAA',
+    };
+  };
+
+  payload.details = {
+    pages: reports.map(summariseReport),
+    totals: {
+      gatingViolations: totalViolations,
+      advisoryFindings: totalAdvisories,
+      bestPracticeFindings: totalBestPractices,
+    },
     failThreshold: failOnLabel,
     viewports: Array.from(viewportSet),
   };
@@ -296,19 +303,13 @@ const aggregationStore = createAggregationStore({
   runToken: RUN_TOKEN,
 });
 
-const waitForReports = async (
-  projectName,
-  expectedCount,
-  timeoutMs = AGGREGATION_WAIT_TIMEOUT_MS
-) => {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    const reports = aggregationStore.readProjectReports(projectName);
-    if (reports.length >= expectedCount) return reports;
-    await new Promise((resolve) => setTimeout(resolve, 250));
-  }
-  return aggregationStore.readProjectReports(projectName);
-};
+const waitForReports = (projectName, expectedCount) =>
+  waitForReportsHelper({
+    store: aggregationStore,
+    projectName,
+    expectedCount,
+    timeoutMs: AGGREGATION_WAIT_TIMEOUT_MS,
+  });
 let globalSummaryAttached = false;
 
 const deriveAggregatedFindings = (reports) => {
