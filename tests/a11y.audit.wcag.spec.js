@@ -494,7 +494,7 @@ test.describe('Functionality: Accessibility (WCAG)', () => {
           const capturePageScreenshot = async () => {
             if (cachedPageScreenshot !== null) return cachedPageScreenshot;
             try {
-              const buffer = await page.screenshot({ fullPage: true });
+              const buffer = await page.screenshot({ fullPage: true, animations: 'disabled' });
               cachedPageScreenshot = `data:image/png;base64,${buffer.toString('base64')}`;
             } catch (_error) {
               cachedPageScreenshot = null;
@@ -502,15 +502,87 @@ test.describe('Functionality: Accessibility (WCAG)', () => {
             return cachedPageScreenshot;
           };
 
-          const captureNodeScreenshot = async (node) => {
-            const selector = Array.isArray(node?.target) ? node.target[0] : null;
-            if (!selector) return null;
-            try {
-              const buffer = await page.locator(selector).first().screenshot({ timeout: 2000 });
-              return `data:image/png;base64,${buffer.toString('base64')}`;
-            } catch (_error) {
-              return await capturePageScreenshot();
+          const clampClip = (clip, viewport) => {
+            if (!viewport) return null;
+            const clamped = { ...clip };
+            clamped.x = Math.max(0, clamped.x);
+            clamped.y = Math.max(0, clamped.y);
+            clamped.width = Math.min(clamped.width, Math.max(0, viewport.width - clamped.x));
+            clamped.height = Math.min(clamped.height, Math.max(0, viewport.height - clamped.y));
+            if (clamped.width <= 0 || clamped.height <= 0) return null;
+            return clamped;
+          };
+
+          const captureLocatorContext = async (locator) => {
+            let viewport = page.viewportSize();
+            if (!viewport) {
+              viewport = await page.evaluate(() => ({
+                width: window.innerWidth || document.documentElement.clientWidth || 0,
+                height: window.innerHeight || document.documentElement.clientHeight || 0,
+              }));
             }
+            const boundingBox = await locator.boundingBox().catch(() => null);
+            if (!boundingBox || !viewport) return null;
+            const padding = 16;
+            const clip = clampClip(
+              {
+                x: boundingBox.x - padding,
+                y: boundingBox.y - padding,
+                width: boundingBox.width + padding * 2,
+                height: boundingBox.height + padding * 2,
+              },
+              viewport
+            );
+            if (!clip) return null;
+            const buffer = await page.screenshot({ clip, animations: 'disabled' });
+            return buffer;
+          };
+
+          const captureNodeScreenshot = async (node) => {
+            const selectorList = Array.isArray(node?.target) ? node.target : [];
+            for (const rawSelector of selectorList) {
+              const selector = String(rawSelector || '').trim();
+              if (!selector) continue;
+              const locator = page.locator(selector).first();
+              try {
+                await locator.waitFor({ state: 'visible', timeout: 2000 });
+              } catch (_error) {
+                continue;
+              }
+
+              try {
+                const buffer = await locator.screenshot({
+                  timeout: 2000,
+                  animations: 'disabled',
+                  caret: 'hide',
+                  scale: 'css',
+                });
+                return {
+                  screenshot: `data:image/png;base64,${buffer.toString('base64')}`,
+                  fallback: 'node',
+                  selector,
+                };
+              } catch (_error) {
+                try {
+                  const contextBuffer = await captureLocatorContext(locator);
+                  if (contextBuffer) {
+                    return {
+                      screenshot: `data:image/png;base64,${contextBuffer.toString('base64')}`,
+                      fallback: 'context',
+                      selector,
+                    };
+                  }
+                } catch (_contextError) {
+                  // continue trying other selectors
+                }
+              }
+            }
+
+            const pageScreenshot = await capturePageScreenshot();
+            if (pageScreenshot) {
+              return { screenshot: pageScreenshot, fallback: 'page', selector: null };
+            }
+            return null;
           };
 
           const enrichNodes = async (entries) => {
@@ -520,9 +592,14 @@ test.describe('Functionality: Accessibility (WCAG)', () => {
                 const enrichedNodes = await Promise.all(
                   nodes.map(async (node) => {
                     if (node && node.screenshotDataUri) return node;
-                    const screenshotDataUri = await captureNodeScreenshot(node);
-                    if (screenshotDataUri) {
-                      return { ...node, screenshotDataUri };
+                    const capture = await captureNodeScreenshot(node);
+                    if (capture?.screenshot) {
+                      return {
+                        ...node,
+                        screenshotDataUri: capture.screenshot,
+                        screenshotFallback: capture.fallback,
+                        screenshotSelector: capture.selector || undefined,
+                      };
                     }
                     return node;
                   })
