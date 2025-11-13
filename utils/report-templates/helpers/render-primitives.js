@@ -603,6 +603,8 @@ const deriveWcagHelpLink = (tags) => {
       return {
         helpUrl: `https://www.w3.org/WAI/WCAG21/Understanding/${slug}.html`,
         helpLabel: `Understanding ${section}`,
+        criterionUrl: `https://www.w3.org/TR/WCAG21/#sc-${section.replace(/\./g, '-')}`,
+        criterionLabel: `WCAG ${section}`,
       };
     }
     if (!fallbackSection) fallbackSection = section;
@@ -613,6 +615,8 @@ const deriveWcagHelpLink = (tags) => {
     return {
       helpUrl: `https://www.w3.org/TR/WCAG21/#sc-${anchor}`,
       helpLabel: `WCAG ${fallbackSection}`,
+      criterionUrl: `https://www.w3.org/TR/WCAG21/#sc-${anchor}`,
+      criterionLabel: `WCAG ${fallbackSection}`,
     };
   }
 
@@ -666,6 +670,9 @@ const renderWcagTagBadges = (tags) => {
 const renderWcagBadgesLinked = (tags) => {
   const badges = renderWcagTagBadges(tags);
   const derived = deriveWcagHelpLink(tags || []);
+  if (derived && derived.criterionUrl) {
+    return `<a href="${escapeHtml(derived.criterionUrl)}" target="_blank" rel="noopener noreferrer">${badges}</a>`;
+  }
   if (derived && derived.helpUrl) {
     return `<a href="${escapeHtml(derived.helpUrl)}" target="_blank" rel="noopener noreferrer">${badges}</a>`;
   }
