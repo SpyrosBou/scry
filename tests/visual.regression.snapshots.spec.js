@@ -80,21 +80,66 @@ const parseDiffMetrics = (message) => {
 const buildVisualSchemaPayloads = ({ summaries, viewportName, projectName }) => {
   if (!Array.isArray(summaries) || summaries.length === 0) return null;
 
-  const diffs = summaries.filter((entry) => entry.result !== 'pass');
-  const passes = summaries.length - diffs.length;
+  const enrichedSummaries = summaries.map((entry) => {
+    const diffMetrics = entry.diffMetrics || {};
+    const pixelDiff = Number.isFinite(diffMetrics.pixelDiff) ? diffMetrics.pixelDiff : null;
+    const pixelRatio = Number.isFinite(diffMetrics.pixelRatio) ? diffMetrics.pixelRatio : null;
+    const deltaPercent =
+      pixelRatio !== null ? Math.round(pixelRatio * 10000) / 100 : null;
+    const thresholdPercent =
+      typeof entry.threshold === 'number'
+        ? Math.round(entry.threshold * 10000) / 100
+        : null;
+    const gating =
+      entry.result === 'diff'
+        ? [
+            deltaPercent !== null && thresholdPercent !== null
+              ? `Visual delta ${deltaPercent}% exceeds ${thresholdPercent}% threshold.`
+              : 'Visual difference exceeded configured threshold.',
+          ]
+        : [];
+    const notes = [];
+    if (entry.result === 'pass') {
+      notes.push('Screenshot matched baseline within configured threshold.');
+    } else if (entry.error) {
+      notes.push(entry.error);
+    }
+    const artifactRefs = {
+      baseline: entry.artifacts?.baseline?.name || null,
+      actual: entry.artifacts?.actual?.name || null,
+      diff: entry.artifacts?.diff?.name || null,
+    };
+    return {
+      ...entry,
+      diffMetrics,
+      pixelDiff,
+      pixelRatio,
+      deltaPercent,
+      thresholdPercent,
+      gating,
+      warnings: [],
+      advisories: [],
+      notes,
+      artifactRefs,
+    };
+  });
+
+  const diffs = enrichedSummaries.filter((entry) => entry.result !== 'pass');
+  const passes = enrichedSummaries.length - diffs.length;
   const thresholds = Array.from(
     new Set(
-      summaries
+      enrichedSummaries
         .map((entry) => (typeof entry.threshold === 'number' ? entry.threshold : null))
         .filter((value) => value !== null)
     )
   );
 
-  const pixelDiffs = diffs
-    .map((entry) => entry.diffMetrics?.pixelDiff)
-    .filter((value) => Number.isFinite(value));
+  const pixelDiffs = diffs.map((entry) => entry.pixelDiff).filter((value) => Number.isFinite(value));
   const pixelRatios = diffs
-    .map((entry) => entry.diffMetrics?.pixelRatio)
+    .map((entry) => entry.pixelRatio)
+    .filter((value) => Number.isFinite(value));
+  const deltaPercents = diffs
+    .map((entry) => entry.deltaPercent)
     .filter((value) => Number.isFinite(value));
 
   const runPayload = createRunSummaryPayload({
@@ -102,12 +147,14 @@ const buildVisualSchemaPayloads = ({ summaries, viewportName, projectName }) => 
     title: `Visual regression summary — ${viewportName}`,
     overview: {
       viewport: viewportName,
-      totalPages: summaries.length,
+      totalPages: enrichedSummaries.length,
       passes,
       diffs: diffs.length,
       thresholdsUsed: thresholds,
       maxPixelDiff: pixelDiffs.length > 0 ? Math.max(...pixelDiffs) : null,
       maxPixelRatio: pixelRatios.length > 0 ? Math.max(...pixelRatios) : null,
+      maxDeltaPercent: deltaPercents.length > 0 ? Math.max(...deltaPercents) : null,
+      pagesWithGatingIssues: diffs.length,
       diffPages: diffs.map((entry) => entry.page),
     },
     metadata: {
@@ -119,9 +166,23 @@ const buildVisualSchemaPayloads = ({ summaries, viewportName, projectName }) => 
     },
   });
 
-  const pagePayloads = summaries.map((entry) => {
-    const diffMetrics = entry.diffMetrics || {};
-    const artifacts = entry.artifacts || {};
+  runPayload.details = {
+    pages: enrichedSummaries.map((entry) => ({
+      page: entry.page,
+      viewport: viewportName,
+      result: entry.result,
+      gating: entry.gating,
+      warnings: entry.warnings,
+      advisories: entry.advisories,
+      notes: entry.notes,
+      deltaPercent: entry.deltaPercent,
+      thresholdPercent: entry.thresholdPercent,
+      pixelDiff: entry.pixelDiff,
+      artifacts: entry.artifactRefs,
+    })),
+  };
+
+  const pagePayloads = enrichedSummaries.map((entry) => {
     return createPageSummaryPayload({
       baseName: `visual-${slugify(projectName)}-${slugify(viewportName)}-${slugify(entry.page)}`,
       title: `Visual regression – ${entry.page} (${viewportName})`,
@@ -130,17 +191,19 @@ const buildVisualSchemaPayloads = ({ summaries, viewportName, projectName }) => 
       summary: {
         result: entry.result,
         threshold: entry.threshold,
-        pixelDiff: Number.isFinite(diffMetrics.pixelDiff) ? diffMetrics.pixelDiff : null,
-        pixelRatio: Number.isFinite(diffMetrics.pixelRatio) ? diffMetrics.pixelRatio : null,
-        expectedSize: diffMetrics.expectedSize || null,
-        actualSize: diffMetrics.actualSize || null,
-        artifacts: {
-          baseline: artifacts.baseline?.name || null,
-          actual: artifacts.actual?.name || null,
-          diff: artifacts.diff?.name || null,
-        },
+        thresholdPercent: entry.thresholdPercent,
+        pixelDiff: entry.pixelDiff,
+        pixelRatio: entry.pixelRatio,
+        deltaPercent: entry.deltaPercent,
+        expectedSize: entry.diffMetrics.expectedSize || null,
+        actualSize: entry.diffMetrics.actualSize || null,
+        artifacts: entry.artifactRefs,
         screenshot: entry.screenshot || null,
         error: entry.error || null,
+        gating: entry.gating,
+        warnings: entry.warnings,
+        advisories: entry.advisories,
+        notes: entry.notes,
       },
       metadata: {
         spec: 'visual.regression.snapshots',

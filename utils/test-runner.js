@@ -393,11 +393,19 @@ class TestRunner {
 
       appliedPageLimit = null;
       if (options.limit != null) {
-        const limitNumber = Number.parseInt(options.limit, 10);
-        if (Number.isFinite(limitNumber) && limitNumber > 0) {
-          siteConfig.testPages = siteConfig.testPages.slice(0, limitNumber);
-          appliedPageLimit = limitNumber;
-          console.log(`ℹ️  Page cap applied: first ${limitNumber} page(s) will be tested.`);
+        const rawLimit = String(options.limit).trim().toLowerCase();
+        const unlimitedTokens = new Set(['all', 'infinite', 'infinity']);
+        if (rawLimit !== '' && !unlimitedTokens.has(rawLimit)) {
+          const limitNumber = Number.parseInt(rawLimit, 10);
+          if (Number.isFinite(limitNumber) && limitNumber > 0) {
+            siteConfig.testPages = siteConfig.testPages.slice(0, limitNumber);
+            appliedPageLimit = limitNumber;
+            console.log(`ℹ️  Page cap applied: first ${limitNumber} page(s) will be tested.`);
+          } else {
+            console.log('⚠️  Ignoring invalid page cap; all pages will be tested.');
+          }
+        } else {
+          console.log('ℹ️  Page cap disabled; all available pages will be tested.');
         }
       }
 
@@ -510,7 +518,7 @@ class TestRunner {
             .map((entry) => entry.trim())
             .filter(Boolean);
     if (usingDefaultProject && projectSpecifier.toLowerCase() !== 'all') {
-      console.log('ℹ️  Defaulting to Chrome project (override with --project)');
+      console.log('ℹ️  Defaulting to Chrome project (override with --browsers)');
     } else if (projectSpecifier.toLowerCase() === 'all') {
       console.log('ℹ️  Running across all configured Playwright projects');
     }
@@ -533,6 +541,13 @@ class TestRunner {
         manifest: manifestInfo.manifest,
         manifestPath: manifestInfo.manifestPath,
       });
+    }
+
+    // Support planning without executing tests
+    if (options.dryRun) {
+      console.log('🧪 Dry run enabled: printing manifest/spec selection only.');
+      console.log('No tests will be executed.');
+      return { code: 0, siteName };
     }
 
     if (manifestInfo.manifestPath) {
@@ -628,7 +643,7 @@ class TestRunner {
         } else {
           console.log('❌ Test run completed with issues.');
         }
-        console.log('📰 View report: npm run read-reports');
+        console.log('📰 View report: npm run reports:read');
         console.log('📁 Reports directory: ./reports/');
         console.log('📸 Test artifacts: ./test-results/');
 

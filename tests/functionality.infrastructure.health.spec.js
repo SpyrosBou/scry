@@ -18,26 +18,56 @@ const buildAvailabilitySchemaPayloads = (results, projectName) => {
   if (!Array.isArray(results) || results.length === 0) return null;
 
   const runBaseName = `infra-availability-${slugify(projectName)}`;
-  const pagesWithWarnings = results.filter((entry) =>
-    entry.notes.some((note) => note.type === 'warning')
-  ).length;
-  const pagesWithErrors = results.filter((entry) => (entry.status || 0) >= 400).length;
-  const missingElements = results.reduce((total, entry) => {
-    if (!entry.elements) return total;
-    return (
-      total +
-      Object.values(entry.elements).filter((value) => value === false).length
-    );
-  }, 0);
+  const enrichedResults = results.map((entry) => {
+    const warnings = entry.notes
+      .filter((note) => note.type === 'warning')
+      .map((note) => note.message);
+    const notes = entry.notes
+      .filter((note) => note.type !== 'warning')
+      .map((note) => note.message);
+    const gating = [];
+    if (entry.status === null || entry.status === undefined) {
+      gating.push('No HTTP response status captured for this request.');
+    } else if (entry.status >= 500) {
+      gating.push(`Server responded with ${entry.status}; page unavailable.`);
+    }
+    const missingStructural = [];
+    if (entry.elements) {
+      Object.entries(entry.elements).forEach(([key, value]) => {
+        if (value === false) {
+          const message = `${key} landmark missing`;
+          missingStructural.push(message);
+          gating.push(message);
+        }
+      });
+    }
+    return {
+      page: entry.page,
+      status: entry.status,
+      elements: entry.elements || null,
+      gating,
+      warnings,
+      advisories: [],
+      notes,
+      missingStructural,
+    };
+  });
+  const pagesWithWarnings = enrichedResults.filter((entry) => entry.warnings.length > 0).length;
+  const pagesWithErrors = enrichedResults.filter((entry) => (entry.status || 0) >= 400).length;
+  const missingElements = enrichedResults.reduce(
+    (total, entry) => total + entry.missingStructural.length,
+    0
+  );
 
   const runPayload = createRunSummaryPayload({
     baseName: runBaseName,
     title: 'Availability & uptime summary',
     overview: {
-      totalPages: results.length,
+      totalPages: enrichedResults.length,
       pagesWithErrors,
       pagesWithWarnings,
       missingStructureElements: missingElements,
+      pagesWithGatingIssues: enrichedResults.filter((entry) => entry.gating.length > 0).length,
     },
     metadata: {
       spec: 'functionality.infrastructure.health',
@@ -49,20 +79,18 @@ const buildAvailabilitySchemaPayloads = (results, projectName) => {
   });
 
   runPayload.details = {
-    pages: results.map((entry) => ({
+    pages: enrichedResults.map((entry) => ({
       page: entry.page,
       status: entry.status,
       elements: entry.elements || null,
-      warnings: entry.notes
-        .filter((note) => note.type === 'warning')
-        .map((note) => note.message),
-      info: entry.notes
-        .filter((note) => note.type === 'info')
-        .map((note) => note.message),
+      gating: entry.gating,
+      warnings: entry.warnings,
+      advisories: entry.advisories,
+      notes: entry.notes,
     })),
   };
 
-  const pagePayloads = results.map((entry) =>
+  const pagePayloads = enrichedResults.map((entry) =>
     createPageSummaryPayload({
       baseName: runBaseName,
       title: `Availability – ${entry.page}`,
@@ -71,8 +99,10 @@ const buildAvailabilitySchemaPayloads = (results, projectName) => {
       summary: {
         status: entry.status,
         elements: entry.elements || null,
-        warnings: entry.notes.filter((note) => note.type === 'warning').map((note) => note.message),
-        info: entry.notes.filter((note) => note.type === 'info').map((note) => note.message),
+        gating: entry.gating,
+        warnings: entry.warnings,
+        advisories: entry.advisories,
+        notes: entry.notes,
       },
       metadata: {
         spec: 'functionality.infrastructure.health',
@@ -89,19 +119,58 @@ const buildHttpSchemaPayloads = (results, projectName) => {
   if (!Array.isArray(results) || results.length === 0) return null;
 
   const runBaseName = `infra-http-${slugify(projectName)}`;
-  const redirects = results.filter((entry) => entry.status >= 300 && entry.status < 400).length;
-  const errors = results.filter((entry) => entry.status >= 400).length;
-  const failedChecks = results.filter((entry) => entry.checks.some((check) => !check.passed)).length;
+  const enrichedResults = results.map((entry) => {
+    const failedChecks = entry.checks
+      .filter((check) => !check.passed)
+      .map((check) => ({
+        label: check.label,
+        details: check.details || null,
+      }));
+    const gating = [];
+    const warnings = [];
+    if (entry.status >= 500) {
+      gating.push(`Received ${entry.status} ${entry.statusText || ''}`.trim());
+    } else if (entry.status >= 400) {
+      warnings.push(`Client error ${entry.status} ${entry.statusText || ''}`.trim());
+    }
+    if (failedChecks.length > 0) {
+      gating.push(...failedChecks.map((check) => `Failed check: ${check.label}`));
+    }
+    if (entry.error) {
+      gating.push(entry.error);
+    }
+    const notes = [];
+    if (entry.status >= 300 && entry.status < 400 && entry.location) {
+      notes.push(`Redirects to ${entry.location}`);
+    }
+    return {
+      page: entry.page,
+      status: entry.status,
+      statusText: entry.statusText,
+      redirectLocation: entry.location || null,
+      failedChecks,
+      gating,
+      warnings,
+      advisories: [],
+      notes,
+    };
+  });
+  const redirects = enrichedResults.filter(
+    (entry) => entry.status >= 300 && entry.status < 400
+  ).length;
+  const errors = enrichedResults.filter((entry) => entry.status >= 400).length;
+  const failedChecks = enrichedResults.filter((entry) => entry.failedChecks.length > 0).length;
 
   const runPayload = createRunSummaryPayload({
     baseName: runBaseName,
     title: 'HTTP response validation summary',
     overview: {
-      totalPages: results.length,
-      success2xx: results.filter((entry) => entry.status === 200).length,
+      totalPages: enrichedResults.length,
+      success2xx: enrichedResults.filter((entry) => entry.status === 200).length,
       redirects,
       errors,
       pagesWithFailedChecks: failedChecks,
+      pagesWithGatingIssues: enrichedResults.filter((entry) => entry.gating.length > 0).length,
     },
     metadata: {
       spec: 'functionality.infrastructure.health',
@@ -113,21 +182,20 @@ const buildHttpSchemaPayloads = (results, projectName) => {
   });
 
   runPayload.details = {
-    pages: results.map((entry) => ({
+    pages: enrichedResults.map((entry) => ({
       page: entry.page,
       status: entry.status,
       statusText: entry.statusText,
-      redirectLocation: entry.location || null,
-      failedChecks: entry.checks
-        .filter((check) => !check.passed)
-        .map((check) => ({
-          label: check.label,
-          details: check.details || null,
-        })),
+      redirectLocation: entry.redirectLocation,
+      failedChecks: entry.failedChecks,
+      gating: entry.gating,
+      warnings: entry.warnings,
+      advisories: entry.advisories,
+      notes: entry.notes,
     })),
   };
 
-  const pagePayloads = results.map((entry) =>
+  const pagePayloads = enrichedResults.map((entry) =>
     createPageSummaryPayload({
       baseName: runBaseName,
       title: `HTTP validation – ${entry.page}`,
@@ -136,11 +204,12 @@ const buildHttpSchemaPayloads = (results, projectName) => {
       summary: {
         status: entry.status,
         statusText: entry.statusText,
-        redirectLocation: entry.location || null,
-        failedChecks: entry.checks.filter((check) => !check.passed).map((check) => ({
-          label: check.label,
-          details: check.details || null,
-        })),
+        redirectLocation: entry.redirectLocation,
+        failedChecks: entry.failedChecks,
+        gating: entry.gating,
+        warnings: entry.warnings,
+        advisories: entry.advisories,
+        notes: entry.notes,
       },
       metadata: {
         spec: 'functionality.infrastructure.health',
@@ -165,14 +234,52 @@ const buildPerformanceSchemaPayloads = (data, breaches, projectName) => {
     return Math.round(numeric);
   };
 
+  const breachMap = new Map();
+  breaches.forEach((entry) => {
+    const list = breachMap.get(entry.page) || [];
+    list.push({ metric: entry.metric, value: entry.value, budget: entry.budget });
+    breachMap.set(entry.page, list);
+  });
+
   const runBaseName = `infra-performance-${slugify(projectName)}`;
+  const pageSummaries = data.map((entry) => {
+    const breachesForPage = breachMap.get(entry.page) || [];
+    const gating = breachesForPage.map(
+      (breach) =>
+        `${breach.metric} exceeded budget (${Math.round(breach.value)}ms > ${Math.round(
+          breach.budget
+        )}ms)`
+    );
+    const notes = [];
+    const loadTime = roundMetric(entry.loadTime);
+    if (Number.isFinite(loadTime)) {
+      notes.push(`Observed load time: ${loadTime}ms`);
+    }
+    return {
+      page: entry.page,
+      metrics: {
+        loadTimeMs: roundMetric(entry.loadTime),
+        domContentLoadedMs: roundMetric(entry.domContentLoaded),
+        loadCompleteMs: roundMetric(entry.loadComplete),
+        firstContentfulPaintMs: roundMetric(entry.firstContentfulPaint),
+        firstPaintMs: roundMetric(entry.firstPaint),
+      },
+      breaches: breachesForPage,
+      gating,
+      warnings: [],
+      advisories: [],
+      notes,
+    };
+  });
+
   const runPayload = createRunSummaryPayload({
     baseName: runBaseName,
     title: 'Performance monitoring summary',
     overview: {
-      pagesSampled: data.length,
+      pagesSampled: pageSummaries.length,
       averageLoadTimeMs: Math.round(averageLoadTime),
       budgetBreaches: breaches.length,
+      pagesWithGatingIssues: pageSummaries.filter((entry) => entry.gating.length > 0).length,
     },
     metadata: {
       spec: 'functionality.infrastructure.health',
@@ -183,26 +290,35 @@ const buildPerformanceSchemaPayloads = (data, breaches, projectName) => {
     },
   });
 
-  const breachMap = new Map();
-  breaches.forEach((entry) => {
-    const list = breachMap.get(entry.page) || [];
-    list.push({ metric: entry.metric, value: entry.value, budget: entry.budget });
-    breachMap.set(entry.page, list);
-  });
+  runPayload.details = {
+    pages: pageSummaries.map((entry) => ({
+      page: entry.page,
+      gating: entry.gating,
+      warnings: entry.warnings,
+      advisories: entry.advisories,
+      notes: entry.notes,
+      budgetBreaches: entry.breaches,
+      metrics: entry.metrics,
+    })),
+  };
 
-  const pagePayloads = data.map((entry) =>
+  const pagePayloads = pageSummaries.map((entry) =>
     createPageSummaryPayload({
       baseName: runBaseName,
       title: `Performance – ${entry.page}`,
       page: entry.page,
       viewport: projectName,
       summary: {
-        loadTimeMs: roundMetric(entry.loadTime),
-        domContentLoadedMs: roundMetric(entry.domContentLoaded),
-        loadCompleteMs: roundMetric(entry.loadComplete),
-        firstContentfulPaintMs: roundMetric(entry.firstContentfulPaint),
-        firstPaintMs: roundMetric(entry.firstPaint),
-        budgetBreaches: breachMap.get(entry.page) || [],
+        loadTimeMs: entry.metrics.loadTimeMs,
+        domContentLoadedMs: entry.metrics.domContentLoadedMs,
+        loadCompleteMs: entry.metrics.loadCompleteMs,
+        firstContentfulPaintMs: entry.metrics.firstContentfulPaintMs,
+        firstPaintMs: entry.metrics.firstPaintMs,
+        budgetBreaches: entry.breaches,
+        gating: entry.gating,
+        warnings: entry.warnings,
+        advisories: entry.advisories,
+        notes: entry.notes,
       },
       metadata: {
         spec: 'functionality.infrastructure.health',

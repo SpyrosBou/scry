@@ -1,97 +1,15 @@
 const { test } = require('@playwright/test');
 const { assertReportSummaryPayload } = require('./report-schema-validator');
 
-const SUMMARY_STYLES = `
-<style>
-  .schema-group__project-block { margin: 1.5rem 0; }
-  .schema-group__project-block > header { margin-bottom: 0.5rem; }
-  .schema-group__project-block > header h3 { margin: 0; font-size: 1.25rem; font-weight: 600; color: #111827; background: none; padding: 0; }
-  .summary-report { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
-  .summary-report h2 { margin-bottom: 0.25rem; font-size: 1.75rem; background: #000; color: #fff; padding: 0.35rem 0.6rem; border-radius: 6px; display: inline-block; }
-  .summary-report h3 { margin: 0.75rem 0 0.35rem; font-size: 1.35rem; background: #000; color: #fff; padding: 0.25rem 0.5rem; border-radius: 6px; display: inline-block; }
-  .summary-report .summary-heading-best-practice { background: #e0f2fe; color: #0c4a6e; border: 1px solid #bae6fd; }
-  .summary-report section { margin: 0.75rem 0; }
-  .summary-report table { border-collapse: collapse; width: 100%; margin: 0.5rem 0; }
-  .summary-report th,
-  .summary-report td { border: 1px solid #d0d7de; padding: 6px 8px; text-align: left; vertical-align: top; }
-  .summary-report th { background: #f6f8fa; }
-  .summary-report details { margin: 0.5rem 0; }
-  .summary-report details > summary { cursor: pointer; }
-  .summary-report tr.status-ok td { background: #edf7ed; }
-  .summary-report tr.status-redirect td { background: #fff4ce; }
-  .summary-report tr.status-error td { background: #ffe5e5; }
-  .summary-report tr.impact-critical td { background: #ffe5e5; }
-  .summary-report tr.impact-serious td { background: #fff4ce; }
-  .summary-report ul { margin: 0.25rem 0; padding-left: 1.2rem; }
-  .summary-report li { margin: 0.15rem 0; }
-  .summary-report li.check-pass::marker { color: #137333; }
-  .summary-report li.check-fail::marker { color: #d93025; }
-  .summary-report .details { color: #4e5969; }
-  .summary-report .note { margin-top: 0.25rem; font-size: 0.85rem; color: #344054; }
-  .summary-report code { background: #f1f5f9; padding: 1px 4px; border-radius: 3px; }
-  .summary-report .legend { margin: 0.5rem 0; }
-  .summary-report .badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 0.85rem; margin-right: 0.4rem; border: 1px solid #d0d7de; }
-  .summary-report .badge.ok { background: #edf7ed; }
-  .summary-report .badge.redirect { background: #fff4ce; }
-  .summary-report .badge.error { background: #ffe5e5; }
-  .summary-report .badge-critical { background: #ffe5e5; }
-  .summary-report .badge-serious { background: #fff4ce; }
-  .summary-report .badge-neutral { background: #eef2f6; }
-  .summary-report .badge-wcag { background: #e0e7ff; border-color: #c7d2fe; color: #1e3a8a; }
-  .summary-report .status-summary { list-style: none; padding: 0; margin: 0.5rem 0 0; display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; }
-  .summary-report .status-summary li { display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; }
-  .summary-report .status-pill { display: inline-flex; align-items: center; gap: 0.35rem; border-radius: 999px; padding: 2px 10px; font-size: 0.8rem; font-weight: 600; border: 1px solid #d0d7de; background: #f6f8fa; color: #1d2939; text-transform: capitalize; }
-  .summary-report .status-pill.success { background: #edf7ed; border-color: #cce4cc; color: #1d7a1d; }
-  .summary-report .status-pill.error { background: #ffe5e5; border-color: #f3b5b3; color: #b42318; }
-  .summary-report .status-pill.warning { background: #fff4ce; border-color: #f7d070; color: #6a4d00; }
-  .summary-report .status-pill.neutral { background: #eef2f6; border-color: #d0d7de; color: #344054; }
-  .summary-report .status-pill.info { background: #e0f2fe; border-color: #bae6fd; color: #0c4a6e; }
-  .summary-report .page-card { border: 1px solid #d0d7de; border-radius: 8px; padding: 0.85rem 1rem; margin: 1rem 0; background: #fff; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05); }
-  .summary-report .page-card__header { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; margin-bottom: 0.5rem; }
-  .summary-report .page-card__header h3 { margin: 0; font-size: 1.1rem; }
-  .summary-report .page-card__meta { margin-bottom: 0.5rem; }
-  .summary-report .page-card__meta p { margin: 0.25rem 0; }
-  .summary-report .page-card__table { margin-top: 0.75rem; }
-  .summary-report .details { color: #475467; font-size: 0.88rem; margin: 0.25rem 0; }
-  .summary-report ul.details { margin: 0.25rem 0 0.5rem 1.1rem; padding-left: 1.1rem; }
-  .summary-report ul.details li { margin: 0.2rem 0; }
-  .summary-report .visual-previews { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 0.5rem; }
-  .summary-report .visual-previews figure { margin: 0; background: #f8fafc; border: 1px solid #d0d7de; border-radius: 6px; padding: 8px; display: flex; flex-direction: column; gap: 6px; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08); }
-  .summary-report .visual-previews img { width: 100%; height: auto; border-radius: 4px; border: 1px solid #cbd5f5; background: #0f172a; }
-  .summary-report .visual-previews figcaption { font-size: 0.85rem; font-weight: 600; color: #111827; text-transform: uppercase; letter-spacing: 0.04em; }
-  .summary-report .visual-previews__item--diff { grid-column: 1 / -1; }
-  .summary-report .visual-previews__item--diff figcaption { color: #b42318; }
-  .summary-report .visual-previews__empty { color: #475467; font-size: 0.85rem; }
-  .summary-report .schema-group { border: 1px solid #d0d7de; border-radius: 8px; padding: 1rem; margin: 1rem 0; background: #fff; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05); }
-  .summary-report .schema-group header { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1rem; margin-bottom: 0.75rem; }
-  .summary-report .schema-group header h2,
-  .summary-report .schema-group header h3 { background: none; color: #111827; padding: 0; margin: 0; }
-  .summary-report .schema-meta { font-size: 0.85rem; color: #475467; display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; }
-  .summary-report .schema-overview { display: grid; gap: 0.75rem; margin: 0.75rem 0; }
-  .summary-report .schema-metrics { display: grid; gap: 0.4rem; margin: 0; padding: 0; }
-  .summary-report .schema-metrics__item { display: grid; grid-template-columns: minmax(0, 180px) minmax(0, 1fr); gap: 0.5rem; align-items: start; font-size: 0.9rem; }
-  .summary-report .schema-metrics__item dt { font-weight: 600; color: #1d2939; }
-  .summary-report .schema-metrics__item dd { margin: 0; color: #475467; word-break: break-word; }
-  .summary-report .schema-table { width: 100%; border-collapse: collapse; margin: 0.75rem 0; }
-  .summary-report .schema-table th,
-  .summary-report .schema-table td { border: 1px solid #d0d7de; padding: 6px 8px; text-align: left; vertical-align: top; font-size: 0.9rem; }
-  .summary-report .schema-table th { background: #f6f8fa; font-weight: 600; }
-  .summary-report .schema-page-accordion { margin: 0.5rem 0; }
-  .summary-report .schema-value { color: #475467; }
-  .summary-report .schema-value--empty { color: #98a2b3; font-style: italic; }
-  .summary-report .schema-list { margin: 0.25rem 0 0.25rem 1.1rem; padding-left: 1.1rem; }
-  .summary-report .schema-list li { margin: 0.15rem 0; }
-</style>
-`;
+const SUMMARY_STYLES = '';
 
 const PER_PAGE_TOGGLE_SCRIPT = `
 (function () {
   const scriptEl = document.currentScript;
   if (!scriptEl) return;
   const listSection = scriptEl.previousElementSibling;
-  const controlsSection = listSection && listSection.previousElementSibling;
-  if (!listSection || !controlsSection) return;
-  const accordions = Array.from(listSection.querySelectorAll('details'));
+  if (!listSection) return;
+  const accordions = Array.from(listSection.querySelectorAll('details.summary-page'));
   if (accordions.length === 0) return;
 
   const setOpenState = (open) => {
@@ -100,7 +18,7 @@ const PER_PAGE_TOGGLE_SCRIPT = `
     });
   };
 
-  controlsSection.querySelectorAll('[data-toggle]').forEach((button) => {
+  listSection.querySelectorAll('[data-toggle]').forEach((button) => {
     button.addEventListener('click', () => {
       setOpenState(button.dataset.toggle === 'expand');
     });
@@ -121,6 +39,7 @@ const renderPerPageAccordion = (items, options = {}) => {
     showLabel = 'Show all',
     hideLabel = 'Hide all',
     summaryClass = '',
+    containerClass = 'summary-report summary-a11y',
     renderCard,
     formatSummaryLabel,
   } = options;
@@ -138,8 +57,10 @@ const renderPerPageAccordion = (items, options = {}) => {
       const cardHtml = renderCard(entry);
       if (!cardHtml) return '';
       const summaryLabel = escapeHtml(labelFormatter(entry));
+      const extraSummaryClass =
+        entry && entry._summaryClass ? ` ${escapeHtml(entry._summaryClass)}` : '';
       return `
-        <details class="${summaryClassName}">
+        <details class="${summaryClassName}${extraSummaryClass}">
           <summary>${summaryLabel}</summary>
           <div class="summary-page__body">
             ${cardHtml}
@@ -152,15 +73,17 @@ const renderPerPageAccordion = (items, options = {}) => {
 
   if (!detailsHtml.trim()) return '';
 
+  const escapedContainerClass = escapeHtml(containerClass);
+
   return `
-    <section class="summary-report summary-a11y" data-per-page="controls">
-      <h3>${escapeHtml(heading)}</h3>
-      <div class="summary-toggle-controls">
-        <button type="button" class="summary-toggle-button" data-toggle="expand">${escapeHtml(showLabel)}</button>
-        <button type="button" class="summary-toggle-button" data-toggle="collapse">${escapeHtml(hideLabel)}</button>
+    <section class="${escapedContainerClass}" data-per-page="list">
+      <div class="summary-per-page-header">
+        <h3>${escapeHtml(heading)}</h3>
+        <div class="summary-toggle-controls">
+          <button type="button" class="summary-toggle-button" data-toggle="expand">${escapeHtml(showLabel)}</button>
+          <button type="button" class="summary-toggle-button" data-toggle="collapse">${escapeHtml(hideLabel)}</button>
+        </div>
       </div>
-    </section>
-    <section class="summary-report summary-a11y" data-per-page="list">
       ${detailsHtml}
     </section>
     <script>${PER_PAGE_TOGGLE_SCRIPT}</script>

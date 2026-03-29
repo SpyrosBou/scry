@@ -221,9 +221,11 @@ test.describe('Accessibility: Forms', () => {
         formName: formConfig.name || 'Unnamed form',
         page: formConfig.page || '/',
         gating: [],
+        warnings: [],
         advisories: [],
         fields: [],
         selectorUsed: null,
+        notes: [],
       };
       reports.push(report);
 
@@ -346,6 +348,11 @@ test.describe('Accessibility: Forms', () => {
             fieldReport.issues.push(`Inline errors: ${postField.inlineErrors.join('; ')}`);
           }
         }
+
+        report.notes.push(`Validated ${report.fields.length} configured fields on this form.`);
+        if (report.selectorUsed) {
+          report.notes.push(`Resolved form using selector "${report.selectorUsed}".`);
+        }
       });
     }
 
@@ -372,17 +379,19 @@ test.describe('Accessibility: Forms', () => {
         scope: 'project',
       },
     });
-    runPayload.details = {
-      forms: reports.map((report) => ({
-        formName: report.formName,
-        page: report.page,
-        selectorUsed: report.selectorUsed,
-        gating: report.gating,
-        advisories: report.advisories,
-        fields: report.fields,
-      })),
-      wcagReferences: FORMS_WCAG_REFERENCES,
-    };
+  runPayload.details = {
+    forms: reports.map((report) => ({
+      formName: report.formName,
+      page: report.page,
+      selectorUsed: report.selectorUsed,
+      gating: report.gating,
+      warnings: report.warnings,
+      advisories: report.advisories,
+      fields: report.fields,
+      notes: report.notes,
+    })),
+    wcagReferences: FORMS_WCAG_REFERENCES,
+  };
     await attachSchemaSummary(testInfo, runPayload);
 
     for (const report of reports) {
@@ -395,8 +404,11 @@ test.describe('Accessibility: Forms', () => {
           formName: report.formName,
           selectorUsed: report.selectorUsed,
           gatingIssues: report.gating,
+          gating: report.gating,
+          warnings: report.warnings,
           advisories: report.advisories,
           fields: report.fields,
+          notes: report.notes,
         },
         metadata: {
           spec: 'a11y.forms.validation',

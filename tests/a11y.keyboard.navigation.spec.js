@@ -17,11 +17,11 @@ const {
 } = require('../utils/a11y-shared');
 
 const KEYBOARD_WCAG_REFERENCES = [
-  { id: '2.1.1', name: 'Keyboard' },
-  { id: '2.1.2', name: 'No Keyboard Trap' },
-  { id: '2.4.1', name: 'Bypass Blocks' },
-  { id: '2.4.3', name: 'Focus Order' },
-  { id: '2.4.7', name: 'Focus Visible' },
+  { id: '2.1.1', name: 'Keyboard', level: 'A' },
+  { id: '2.1.2', name: 'No Keyboard Trap', level: 'A' },
+  { id: '2.4.1', name: 'Bypass Blocks', level: 'A' },
+  { id: '2.4.3', name: 'Focus Order', level: 'A' },
+  { id: '2.4.7', name: 'Focus Visible', level: 'AA' },
 ];
 
 const DEFAULT_MAX_TAB_ITERATIONS = 20;
@@ -229,7 +229,8 @@ const detectFocusIndicator = async (page, elementHandle) => {
       { threshold: 0.2 }
     );
     const diffRatio = pixelDiff / (focusedPng.width * focusedPng.height);
-    return { hasIndicator: diffRatio >= FOCUS_DIFF_THRESHOLD, diffRatio };
+    const screenshotDataUri = `data:image/png;base64,${focusedBuffer.toString('base64')}`;
+    return { hasIndicator: diffRatio >= FOCUS_DIFF_THRESHOLD, diffRatio, screenshotDataUri };
   } catch (_) {
     return { hasIndicator: false, diffRatio: 0 };
   }
@@ -240,6 +241,43 @@ const slugify = (value) =>
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '') || 'page';
+
+const findKeyboardReference = (id) =>
+  KEYBOARD_WCAG_REFERENCES.find((reference) => reference.id === id) || null;
+
+const formatKeyboardBadgeLabel = (reference) => {
+  if (!reference || !reference.id) return null;
+  const level = reference.level ? reference.level.toUpperCase() : '';
+  return `WCAG ${reference.id}${level ? ` ${level}` : ''}`.trim();
+};
+
+const createKeyboardAdvisory = (message, wcagId, extras = {}) => {
+  const { tags: extraTags, impact = 'minor', ...rest } = extras;
+  const reference = findKeyboardReference(wcagId) || { id: wcagId };
+  const badge = formatKeyboardBadgeLabel(reference);
+  const tags = Array.isArray(extraTags) ? extraTags.filter(Boolean) : [];
+  if (badge) tags.unshift(badge);
+  if (reference.id && reference.name) {
+    tags.push(`${reference.id} ${reference.name}`);
+  }
+  const uniqueTags = Array.from(new Set(tags));
+  return {
+    message,
+    impact,
+    wcag: badge || null,
+    tags: uniqueTags,
+    ...rest,
+  };
+};
+
+const describeFocusTarget = (snapshot) => {
+  const tag = snapshot?.tag || 'element';
+  const idPart = snapshot?.id ? `#${snapshot.id}` : '';
+  const descriptor = `${tag}${idPart}`.trim() || tag;
+  const label = (snapshot?.label || '').trim() || 'unnamed element';
+  const sample = label ? `${descriptor} — ${label}` : descriptor;
+  return { descriptor, label, sample };
+};
 
 test.describe('Accessibility: Keyboard navigation', () => {
   let siteConfig;
@@ -273,8 +311,10 @@ test.describe('Accessibility: Keyboard navigation', () => {
           visitedCount: 0,
           skipLink: null,
           gating: [],
+          warnings: [],
           advisories: [],
           sequence: [],
+          notes: [],
         };
         reports.push(report);
 
@@ -308,7 +348,11 @@ test.describe('Accessibility: Keyboard navigation', () => {
 
         report.skipLink = await page.evaluate(skipLinkMetadataScript);
         if (!report.skipLink) {
-          report.advisories.push('Skip navigation link not detected near top of document.');
+          report.advisories.push(
+            createKeyboardAdvisory('Skip navigation link not detected near top of document.', '2.4.1', {
+              summary: 'Skip navigation link not detected near top of document.',
+            })
+          );
         }
 
         await page.evaluate(() => {
@@ -337,9 +381,11 @@ test.describe('Accessibility: Keyboard navigation', () => {
 
           const activeElementHandle = await page.evaluateHandle(() => document.activeElement);
           let hasIndicator = false;
+          let nodeScreenshot = null;
           if (activeElementHandle && activeElementHandle.asElement()) {
             const result = await detectFocusIndicator(page, activeElementHandle.asElement());
             hasIndicator = result.hasIndicator;
+            nodeScreenshot = result.screenshotDataUri || null;
           }
           if (activeElementHandle) await activeElementHandle.dispose();
 
@@ -349,8 +395,18 @@ test.describe('Accessibility: Keyboard navigation', () => {
             );
           }
           if (!hasIndicator) {
+            const focusTarget = describeFocusTarget(snapshot);
             report.advisories.push(
-              `Unable to detect focus indicator change for ${snapshot.tag} ${snapshot.id ? `#${snapshot.id}` : ''} (${snapshot.label || 'unnamed element'}).`
+              createKeyboardAdvisory(
+                `Unable to detect focus indicator change for ${focusTarget.descriptor} (${focusTarget.label}).`,
+                '2.4.7',
+                {
+                  summary: 'Unable to detect focus indicator change',
+                  samples: [
+                    { label: focusTarget.sample, screenshotDataUri: nodeScreenshot },
+                  ],
+                }
+              )
             );
           }
 
@@ -379,6 +435,15 @@ test.describe('Accessibility: Keyboard navigation', () => {
           await page.keyboard.press('Tab');
           await page.waitForTimeout(50);
         }
+
+        report.notes.push(
+          `Traversed ${report.visitedCount} of ${report.focusableCount} focusable elements in tab sequence.`
+        );
+        if (report.skipLink && (report.skipLink.text || report.skipLink.href)) {
+          report.notes.push(
+            `Skip link detected (${report.skipLink.text || report.skipLink.href}) targeting ${report.skipLink.href}.`
+          );
+        }
       });
     }
 
@@ -402,18 +467,20 @@ test.describe('Accessibility: Keyboard navigation', () => {
         scope: 'project',
       },
     });
-    runPayload.details = {
-      pages: reports.map((report) => ({
-        page: report.page,
-        focusableCount: report.focusableCount,
-        visitedCount: report.visitedCount,
-        skipLink: report.skipLink,
-        gating: report.gating,
-        advisories: report.advisories,
-        focusSequence: report.sequence,
-      })),
-      wcagReferences: KEYBOARD_WCAG_REFERENCES,
-    };
+  runPayload.details = {
+    pages: reports.map((report) => ({
+      page: report.page,
+      focusableCount: report.focusableCount,
+      visitedCount: report.visitedCount,
+      skipLink: report.skipLink,
+      gating: report.gating,
+      warnings: report.warnings,
+      advisories: report.advisories,
+      focusSequence: report.sequence,
+      notes: report.notes,
+    })),
+    wcagReferences: KEYBOARD_WCAG_REFERENCES,
+  };
     await attachSchemaSummary(testInfo, runPayload);
 
     for (const report of reports) {
@@ -424,11 +491,14 @@ test.describe('Accessibility: Keyboard navigation', () => {
         viewport: 'keyboard',
         summary: {
           gatingIssues: report.gating,
+          gating: report.gating,
+          warnings: report.warnings,
           advisories: report.advisories,
           focusableCount: report.focusableCount,
           visitedCount: report.visitedCount,
           skipLink: report.skipLink,
           focusSequence: report.sequence,
+          notes: report.notes,
         },
         metadata: {
           spec: 'a11y.keyboard.navigation',

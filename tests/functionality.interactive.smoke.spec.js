@@ -13,7 +13,9 @@ const slugify = (value) =>
   String(value || '')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '') || 'root';const buildInteractiveSchemaPayloads = ({
+    .replace(/^-+|-+$/g, '') || 'root';
+
+const buildInteractiveSchemaPayloads = ({
   pages,
   consoleErrors,
   resourceErrors,
@@ -22,15 +24,51 @@ const slugify = (value) =>
 }) => {
   if (!Array.isArray(pages) || pages.length === 0) return null;
 
-  const totalConsoleErrors = Array.isArray(consoleErrors)
-    ? consoleErrors.length
-    : pages.reduce((total, entry) => total + entry.consoleErrors.length, 0);
-  const totalResourceErrors = Array.isArray(resourceErrors)
-    ? resourceErrors.length
-    : pages.reduce((total, entry) => total + entry.resourceErrors.length, 0);
-  const pagesWithConsoleErrors = pages.filter((entry) => entry.consoleErrors.length > 0).length;
-  const pagesWithResourceErrors = pages.filter((entry) => entry.resourceErrors.length > 0).length;
-  const pagesWithWarnings = pages.filter((entry) => entry.notes.some((note) => note.type === 'warning')).length;
+  const enrichedPages = pages.map((entry) => {
+    const warningNotes = entry.notes
+      .filter((note) => note.type === 'warning')
+      .map((note) => note.message);
+    const infoNotes = entry.notes
+      .filter((note) => note.type !== 'warning')
+      .map((note) => note.message);
+    const gatingIssues = [
+      ...entry.consoleErrors.map((error) => `Console error: ${error.message}`),
+      ...entry.resourceErrors.map((error) => {
+        if (error.status) {
+          return `Resource ${error.type || 'response'} ${error.status} on ${error.url}`;
+        }
+        if (error.failure) {
+          return `Resource ${error.type || 'request'} failed (${error.failure}) on ${error.url}`;
+        }
+        return `Resource ${error.type || 'request'} issue on ${error.url}`;
+      }),
+    ];
+    return {
+      page: entry.page,
+      status: entry.status,
+      consoleErrors: entry.consoleErrors,
+      resourceErrors: entry.resourceErrors,
+      gating: gatingIssues,
+      warnings: warningNotes,
+      advisories: [],
+      notes: infoNotes,
+    };
+  });
+
+  const totalConsoleErrors = enrichedPages.reduce(
+    (total, entry) => total + entry.consoleErrors.length,
+    0
+  );
+  const totalResourceErrors = enrichedPages.reduce(
+    (total, entry) => total + entry.resourceErrors.length,
+    0
+  );
+  const pagesWithConsoleErrors = enrichedPages.filter((entry) => entry.consoleErrors.length > 0).length;
+  const pagesWithResourceErrors = enrichedPages.filter(
+    (entry) => entry.resourceErrors.length > 0
+  ).length;
+  const pagesWithWarnings = enrichedPages.filter((entry) => entry.warnings.length > 0).length;
+  const pagesWithGatingIssues = enrichedPages.filter((entry) => entry.gating.length > 0).length;
 
   const runPayload = createRunSummaryPayload({
     baseName: `interactive-${slugify(projectName)}`,
@@ -41,6 +79,7 @@ const slugify = (value) =>
       totalResourceErrors,
       pagesWithConsoleErrors,
       pagesWithResourceErrors,
+      pagesWithGatingIssues,
       pagesWithWarnings,
       resourceErrorBudget: resourceBudget,
       budgetExceeded: totalResourceErrors > resourceBudget,
@@ -53,8 +92,21 @@ const slugify = (value) =>
     },
   });
 
+  runPayload.details = {
+    pages: enrichedPages.map((entry) => ({
+      page: entry.page,
+      status: entry.status,
+      gating: entry.gating,
+      warnings: entry.warnings,
+      advisories: entry.advisories,
+      notes: entry.notes,
+      consoleErrors: entry.consoleErrors.length,
+      resourceErrors: entry.resourceErrors.length,
+    })),
+  };
+
   const MAX_SAMPLE = 10;
-  const pagePayloads = pages.map((entry) => {
+  const pagePayloads = enrichedPages.map((entry) => {
     const consoleSample = entry.consoleErrors.slice(0, MAX_SAMPLE).map((error) => ({
       message: error.message,
       url: error.url || null,
@@ -66,8 +118,6 @@ const slugify = (value) =>
       url: error.url,
       failure: error.failure || null,
     }));
-    const warnings = entry.notes.filter((note) => note.type === 'warning').map((note) => note.message);
-    const infoNotes = entry.notes.filter((note) => note.type !== 'warning').map((note) => note.message);
 
     return createPageSummaryPayload({
       baseName: `interactive-${slugify(projectName)}-${slugify(entry.page)}`,
@@ -76,12 +126,14 @@ const slugify = (value) =>
       viewport: projectName,
       summary: {
         status: entry.status,
+        gating: entry.gating,
+        warnings: entry.warnings,
+        advisories: entry.advisories,
+        notes: entry.notes,
         consoleErrors: entry.consoleErrors.length,
         resourceErrors: entry.resourceErrors.length,
         consoleSample,
         resourceSample,
-        warnings,
-        info: infoNotes,
       },
       metadata: {
         spec: 'functionality.interactive.smoke',

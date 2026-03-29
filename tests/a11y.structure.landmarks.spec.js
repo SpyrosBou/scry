@@ -14,10 +14,10 @@ const {
 } = require('../utils/a11y-shared');
 
 const STRUCTURE_WCAG_REFERENCES = [
-  { id: '1.3.1', name: 'Info and Relationships' },
-  { id: '2.4.1', name: 'Bypass Blocks' },
-  { id: '2.4.6', name: 'Headings and Labels' },
-  { id: '2.4.10', name: 'Section Headings' },
+  { id: '1.3.1', name: 'Info and Relationships', level: 'A' },
+  { id: '2.4.1', name: 'Bypass Blocks', level: 'A' },
+  { id: '2.4.6', name: 'Headings and Labels', level: 'AA' },
+  { id: '2.4.10', name: 'Section Headings', level: 'AAA' },
 ];
 
 const slugify = (value) =>
@@ -26,9 +26,58 @@ const slugify = (value) =>
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '') || 'page';
 
+const findStructureReference = (id) =>
+  STRUCTURE_WCAG_REFERENCES.find((reference) => reference.id === id) || null;
+
+const formatStructureBadgeLabel = (reference) => {
+  if (!reference || !reference.id) return null;
+  const { id, level } = reference;
+  const levelSuffix = level ? ` ${level.toUpperCase()}` : '';
+  return `WCAG ${id}${levelSuffix}`;
+};
+
+const createStructureFinding = (message, wcagId, extras = {}) => {
+  const { summary, sample, samples, nodes, details, impact = 'minor', tags: extraTags } = extras;
+  const reference = wcagId ? findStructureReference(wcagId) : null;
+  const badge = reference ? formatStructureBadgeLabel(reference) : null;
+  const tags = Array.isArray(extraTags) ? extraTags.filter(Boolean) : [];
+  if (badge) tags.unshift(badge);
+  if (reference) {
+    tags.push(`${reference.id} ${reference.name}`);
+  }
+  const uniqueTags = Array.from(new Set(tags));
+
+  const collectedSamples = [];
+  if (Array.isArray(samples)) {
+    for (const value of samples) {
+      if (value != null && String(value).trim()) {
+        collectedSamples.push(String(value).trim());
+      }
+    }
+  }
+  if (sample != null && String(sample).trim()) {
+    collectedSamples.push(String(sample).trim());
+  }
+
+  return {
+    message,
+    summary: summary || message,
+    impact,
+    wcag: badge || null,
+    tags: uniqueTags,
+    sample: collectedSamples.length === 1 ? collectedSamples[0] : null,
+    samples: collectedSamples.length > 1 ? collectedSamples : null,
+    // allow callers to attach structured nodes (with screenshotDataUri/target/html)
+    nodes: Array.isArray(nodes) ? nodes.filter(Boolean) : undefined,
+    details: details ? String(details) : undefined,
+  };
+};
+
 const evaluateStructure = async (page) => {
   return page.evaluate(() => {
-    const headings = Array.from(document.querySelectorAll('h1, h2, h3, h4, h5, h6')).map((heading) => ({
+    const headingNodes = Array.from(document.querySelectorAll('h1, h2, h3, h4, h5, h6'));
+    const headings = headingNodes.map((heading, index) => ({
+      index,
       level: Number(heading.tagName.substring(1)),
       text: (heading.textContent || '').trim(),
     }));
@@ -45,9 +94,15 @@ const evaluateStructure = async (page) => {
       if (previousLevel !== null) {
         const delta = heading.level - previousLevel;
         if (delta > 1) {
-          headingSkips.push(
-            `Level jumps from H${previousLevel} to H${heading.level} — "${heading.text || 'Untitled heading'}"`
-          );
+          const text = heading.text || 'Untitled heading';
+          const message = `Level jumps from H${previousLevel} to H${heading.level} — "${text}"`;
+          headingSkips.push({
+            index: heading.index,
+            level: heading.level,
+            prevLevel: previousLevel,
+            text,
+            message,
+          });
         }
       }
       previousLevel = heading.level;
@@ -92,6 +147,7 @@ test.describe('Accessibility: Structural landmarks', () => {
       const report = {
         page: pagePath,
         gating: [],
+        warnings: [],
         advisories: [],
         headingLevels: [],
         headingSkips: [],
@@ -100,6 +156,7 @@ test.describe('Accessibility: Structural landmarks', () => {
         navigationCount: 0,
         headerCount: 0,
         footerCount: 0,
+        notes: [],
       };
       reports.push(report);
 
@@ -120,7 +177,6 @@ test.describe('Accessibility: Structural landmarks', () => {
 
         const structure = await evaluateStructure(page);
         report.headingLevels = structure.headings;
-        report.headingSkips = structure.headingSkips;
         report.h1Count = structure.h1Count;
         report.hasMain = structure.hasMain;
         report.navigationCount = structure.navigationCount;
@@ -128,32 +184,102 @@ test.describe('Accessibility: Structural landmarks', () => {
         report.footerCount = structure.footerCount;
 
         if (structure.h1Count === 0) {
-          report.gating.push('No H1 heading found on the page.');
+          report.gating.push(
+            createStructureFinding('No H1 heading found on the page.', '2.4.6', {
+              impact: 'critical',
+              summary: 'Missing H1 heading',
+            })
+          );
         } else if (structure.h1Count > 1) {
-          report.gating.push(`Expected a single H1 heading; found ${structure.h1Count}.`);
+          report.gating.push(
+            createStructureFinding(
+              `Expected a single H1 heading; found ${structure.h1Count}.`,
+              '2.4.6',
+              {
+                impact: 'critical',
+                summary: 'Multiple H1 headings detected',
+              }
+            )
+          );
         }
 
         if (!structure.hasMain) {
-          report.gating.push('Missing <main> landmark (or equivalent role="main").');
+          report.gating.push(
+            createStructureFinding(
+              'Missing <main> landmark (or equivalent role="main").',
+              '1.3.1',
+              {
+                impact: 'critical',
+                summary: 'Missing main landmark',
+              }
+            )
+          );
         }
 
         if (!structure.navigationCount) {
-          report.advisories.push('No navigation landmark detected. Ensure primary navigation is wrapped in <nav>.');
+          report.advisories.push(
+            createStructureFinding(
+              'No navigation landmark detected. Ensure primary navigation is wrapped in <nav>.',
+              '2.4.1',
+              {
+                summary: 'No navigation landmark detected',
+              }
+            )
+          );
         }
 
         if (!structure.headerCount) {
-          report.advisories.push('No header/banner landmark detected.');
+          report.advisories.push(
+            createStructureFinding('No header/banner landmark detected.', '1.3.1', {
+              summary: 'No header landmark detected',
+            })
+          );
         }
 
         if (!structure.footerCount) {
-          report.advisories.push('No footer/contentinfo landmark detected.');
-        }
-
-        if (structure.headingSkips.length) {
           report.advisories.push(
-            `Heading levels skip levels on this page (${structure.headingSkips.length} occurrence(s)).`
+            createStructureFinding('No footer/contentinfo landmark detected.', '1.3.1', {
+              summary: 'No footer landmark detected',
+            })
           );
         }
+
+        const headingSkipCount = structure.headingSkips.length;
+        // Enrich heading skip findings with precise targets and screenshots
+        report.headingSkips = [];
+        for (const skip of structure.headingSkips) {
+          // best-effort target label for readability in the report
+          const targetLabel = `h${skip.level}: "${skip.text}"`;
+          let screenshotDataUri = null;
+          try {
+            const locator = page.locator('h1, h2, h3, h4, h5, h6').nth(skip.index);
+            const buffer = await locator.screenshot();
+            screenshotDataUri = `data:image/png;base64,${buffer.toString('base64')}`;
+          } catch (_) {
+            // non-fatal: continue without screenshot
+          }
+
+          report.headingSkips.push(
+            createStructureFinding(skip.message, '2.4.6', {
+              impact: 'moderate',
+              summary: 'Heading level sequence issue',
+              details: `Jumps H${skip.prevLevel} → H${skip.level}`,
+              nodes: [
+                {
+                  target: [targetLabel],
+                  screenshotDataUri: screenshotDataUri || undefined,
+                },
+              ],
+            })
+          );
+        }
+
+        // Do not also add a duplicative advisory for heading skips; the per-occurrence
+        // warnings above already capture the issue with precise targets and screenshots.
+
+        report.notes.push(
+          `Heading outline captured ${structure.headings.length} nodes with ${headingSkipCount} level skip(s).`
+        );
       });
     }
 
@@ -181,19 +307,21 @@ test.describe('Accessibility: Structural landmarks', () => {
     });
     runPayload.details = {
       pages: reports.map((report) => ({
-        page: report.page,
-        h1Count: report.h1Count,
-        hasMainLandmark: report.hasMain,
-        navigationLandmarks: report.navigationCount,
-        headerLandmarks: report.headerCount,
-        footerLandmarks: report.footerCount,
-        headingSkips: report.headingSkips,
-        gating: report.gating,
-        advisories: report.advisories,
-        headingOutline: report.headingLevels,
-      })),
-      wcagReferences: STRUCTURE_WCAG_REFERENCES,
-    };
+      page: report.page,
+      h1Count: report.h1Count,
+      hasMainLandmark: report.hasMain,
+      navigationLandmarks: report.navigationCount,
+      headerLandmarks: report.headerCount,
+      footerLandmarks: report.footerCount,
+      headingSkips: report.headingSkips,
+      gating: report.gating,
+      warnings: report.warnings,
+      advisories: report.advisories,
+      headingOutline: report.headingLevels,
+      notes: report.notes,
+    })),
+    wcagReferences: STRUCTURE_WCAG_REFERENCES,
+  };
     await attachSchemaSummary(testInfo, runPayload);
 
     for (const report of reports) {
@@ -210,8 +338,11 @@ test.describe('Accessibility: Structural landmarks', () => {
           footerLandmarks: report.footerCount,
           headingSkips: report.headingSkips,
           gatingIssues: report.gating,
+          gating: report.gating,
+          warnings: report.warnings,
           advisories: report.advisories,
           headingOutline: report.headingLevels,
+          notes: report.notes,
         },
         metadata: {
           spec: 'a11y.structure.landmarks',

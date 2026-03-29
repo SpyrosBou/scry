@@ -74,17 +74,49 @@ const slugify = (value) =>
 const buildLinksSchemaPayloads = (pages, brokenLinks, projectName, config = {}) => {
   if (!Array.isArray(pages) || pages.length === 0) return null;
 
-  const totalLinksFound = pages.reduce((total, entry) => total + (entry.totalLinks || 0), 0);
-  const totalLinksChecked = pages.reduce((total, entry) => total + (entry.uniqueChecked || 0), 0);
-  const pagesWithBroken = pages.filter((entry) => Array.isArray(entry.broken) && entry.broken.length > 0)
-    .length;
-
   const normalisedConfig = {
     maxPerPage: Number.isFinite(config.maxPerPage) ? config.maxPerPage : null,
     timeoutMs: Number.isFinite(config.timeoutMs) ? config.timeoutMs : null,
     followRedirects: config.followRedirects !== false,
     methodFallback: config.methodFallback !== false,
   };
+
+  const totalLinksFound = pages.reduce((total, entry) => total + (entry.totalLinks || 0), 0);
+  const totalLinksChecked = pages.reduce((total, entry) => total + (entry.uniqueChecked || 0), 0);
+  const pageDetails = pages.map((entry) => {
+    const brokenEntries = Array.isArray(entry.broken) ? entry.broken : [];
+    const gating = brokenEntries.map((issue) => {
+      if (issue.error) {
+        return `Request ${issue.method || 'HEAD'} failed for ${issue.url} (${issue.error})`;
+      }
+      if (issue.status) {
+        return `Received ${issue.status} for ${issue.url} (via ${issue.method || 'HEAD'})`;
+      }
+      return `Broken link detected: ${issue.url}`;
+    });
+    const notes = [];
+    if ((entry.totalLinks || 0) === 0) {
+      notes.push('No <a> elements detected on this page.');
+    } else if (entry.uniqueChecked < entry.totalLinks) {
+      const maxPerPageLabel =
+        normalisedConfig.maxPerPage ?? LINK_CHECK_DEFAULTS.maxPerPage ?? entry.uniqueChecked;
+      notes.push(
+        `Checked ${entry.uniqueChecked} of ${entry.totalLinks} links (cap maxPerPage=${maxPerPageLabel}).`
+      );
+    }
+    return {
+      page: entry.page,
+      totalLinks: entry.totalLinks,
+      uniqueChecked: entry.uniqueChecked,
+      brokenCount: brokenEntries.length,
+      gating,
+      warnings: [],
+      advisories: [],
+      notes,
+      broken: brokenEntries,
+    };
+  });
+  const pagesWithBroken = pageDetails.filter((entry) => entry.brokenCount > 0).length;
 
   const runPayload = createRunSummaryPayload({
     baseName: `links-audit-${slugify(projectName)}`,
@@ -96,6 +128,7 @@ const buildLinksSchemaPayloads = (pages, brokenLinks, projectName, config = {}) 
       brokenLinksDetected: brokenLinks.length,
       pagesWithBrokenLinks: pagesWithBroken,
       maxChecksPerPage: normalisedConfig.maxPerPage,
+      pagesWithGatingIssues: pageDetails.filter((entry) => entry.gating.length > 0).length,
     },
     metadata: {
       spec: 'functionality.links.internal',
@@ -108,9 +141,22 @@ const buildLinksSchemaPayloads = (pages, brokenLinks, projectName, config = {}) 
     },
   });
 
+  runPayload.details = {
+    pages: pageDetails.map((entry) => ({
+      page: entry.page,
+      totalLinks: entry.totalLinks,
+      uniqueChecked: entry.uniqueChecked,
+      brokenCount: entry.brokenCount,
+      gating: entry.gating,
+      warnings: entry.warnings,
+      advisories: entry.advisories,
+      notes: entry.notes,
+    })),
+  };
+
   const MAX_BROKEN_DETAILS = 20;
-  const pagePayloads = pages.map((entry) => {
-    const brokenSample = (entry.broken || []).slice(0, MAX_BROKEN_DETAILS).map((issue) => ({
+  const pagePayloads = pageDetails.map((entry) => {
+    const brokenSample = entry.broken.slice(0, MAX_BROKEN_DETAILS).map((issue) => ({
       url: issue.url,
       status: issue.status ?? null,
       methodTried: issue.method || null,
@@ -125,7 +171,11 @@ const buildLinksSchemaPayloads = (pages, brokenLinks, projectName, config = {}) 
       summary: {
         totalLinks: entry.totalLinks,
         uniqueChecked: entry.uniqueChecked,
-        brokenCount: entry.broken.length,
+        brokenCount: entry.brokenCount,
+        gating: entry.gating,
+        warnings: entry.warnings,
+        advisories: entry.advisories,
+        notes: entry.notes,
         brokenSample,
       },
       metadata: {
@@ -183,7 +233,16 @@ test.describe('Functionality: Internal Links', () => {
     for (const testPage of pagesToTest) {
       await test.step(`Checking internal links on: ${testPage}`, async () => {
         const response = await safeNavigate(page, `${siteConfig.baseUrl}${testPage}`);
-        if (response.status() !== 200) return;
+        if (response.status() !== 200) {
+          // Still record a page entry so discovery/reporting renders this suite
+          pageSummaries.push({
+            page: testPage,
+            totalLinks: 0,
+            uniqueChecked: 0,
+            broken: [],
+          });
+          return;
+        }
         await waitForPageStability(page);
 
         const links = await page

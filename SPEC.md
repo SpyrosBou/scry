@@ -30,6 +30,7 @@
 - `--output=<path>` lets callers capture manifest + run summaries as JSON for dashboards or other tooling without scraping stdout.
 - `utils/run-manifest.js` provides shared helpers for loading/parsing manifests so specs and future tooling avoid duplicating env parsing.
 - Profile-specific env mutations are passed through structured overrides (`envOverrides`) rather than mutating `process.env`, keeping adapter state isolated.
+- Reporter payloads follow a standard contract: suites that emit `codex.report.summary` attachments must populate `summary.gating`, `summary.warnings`, `summary.advisories`, and `summary.notes` arrays (plus any spec-specific metrics). The validator in `utils/report-schema-validator.js` enforces this to keep the refreshed UI consistent, and the current inventory lives in `docs/report-schema-inventory.md`.
 
 ## Implementation Roadmap
 

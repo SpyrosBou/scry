@@ -1,17 +1,65 @@
 #!/usr/bin/env node
 const fs = require('fs');
 const path = require('path');
-const minimist = require('minimist');
 const openModule = require('open');
 const openBrowser = openModule.default || openModule;
 
-const args = minimist(process.argv.slice(2));
+const minimist = require('minimist');
+
+const normalisedArgv = process.argv.slice(2).map((arg) => (arg === '-past' ? '--past' : arg));
+
+const args = minimist(normalisedArgv, {
+  alias: {
+    past: ['p'],
+    count: ['c'],
+  },
+});
 const envBrowser = process.env.REPORT_BROWSER && String(process.env.REPORT_BROWSER).trim();
 const envBrowserArgs = process.env.REPORT_BROWSER_ARGS
   ? String(process.env.REPORT_BROWSER_ARGS).split(/\s+/).filter(Boolean)
   : [];
 const reportsDir = path.join(process.cwd(), 'reports');
 const REPORT_FILE_NAME = 'report.html';
+
+function coerceNumeric(value) {
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      const parsed = coerceNumeric(entry);
+      if (parsed !== null) return parsed;
+    }
+    return null;
+  }
+  if (value === undefined || value === null || value === '') return null;
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+}
+
+function readNpmEnvNumber(key) {
+  const envValue = process.env[`npm_config_${key}`];
+  return coerceNumeric(envValue);
+}
+
+function readNpmOriginalArg(key) {
+  const raw = process.env.npm_config_argv;
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    const original = Array.isArray(parsed?.original) ? parsed.original : [];
+    for (let index = 0; index < original.length; index += 1) {
+      const token = original[index];
+      if (token === `--${key}`) {
+        const next = original[index + 1];
+        return next === undefined ? true : next;
+      }
+      if (token && token.startsWith(`--${key}=`)) {
+        return token.split('=').slice(1).join('=');
+      }
+    }
+  } catch (_error) {
+    // ignore malformed JSON
+  }
+  return null;
+}
 
 function loadRunEntries() {
   if (!fs.existsSync(reportsDir)) return [];
@@ -36,10 +84,29 @@ function loadRunEntries() {
 }
 
 function resolveCount() {
+  const candidates = [
+    coerceNumeric(args.count),
+    readNpmEnvNumber('count'),
+    coerceNumeric(readNpmOriginalArg('count')),
+  ];
+  const resolvedFlag = candidates.find((value) => value && value > 0);
+  if (resolvedFlag) return resolvedFlag;
+
   const positional = args._.map(String).filter(Boolean);
   const numericArg = positional.find((value) => /^\d+$/.test(value));
   const count = Math.max(1, Number.parseInt(numericArg, 10) || 1);
   return count;
+}
+
+function resolvePastOffset() {
+  const candidates = [
+    coerceNumeric(args.past),
+    readNpmEnvNumber('past'),
+    coerceNumeric(readNpmOriginalArg('past')),
+  ];
+  const resolved = candidates.find((value) => value && value > 0);
+  if (resolved) return resolved;
+  return 0;
 }
 
 function resolveBrowserConfig() {
@@ -108,7 +175,15 @@ async function main() {
   }
 
   const count = resolveCount();
-  const toOpen = runEntries.slice(0, count);
+  const offset = resolvePastOffset();
+  if (offset >= runEntries.length) {
+    console.log(
+      `Only ${runEntries.length} report(s) available; past offset ${offset} skips them all.`
+    );
+    process.exit(1);
+  }
+
+  const toOpen = runEntries.slice(offset, offset + count);
 
   await openEntries(toOpen);
 }

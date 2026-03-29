@@ -42,17 +42,40 @@ const buildResponsiveStructureSchemaPayloads = (summaries, viewportName, project
   );
 
   const baseName = `responsive-structure-${slugify(projectName)}-${slugify(viewportName)}`;
+  const enrichedSummaries = summaries.map((entry) => {
+    const gating = [...(entry.gatingIssues || [])];
+    if (entry.error) gating.push(entry.error);
+    const warnings = entry.warnings || [];
+    const notes = entry.info || [];
+    return {
+      page: entry.page,
+      loadTimeMs: entry.loadTime != null ? Math.round(entry.loadTime) : null,
+      thresholdMs: entry.threshold != null ? entry.threshold : null,
+      headerPresent: Boolean(entry.elements?.header),
+      navigationPresent: Boolean(entry.elements?.navigation),
+      contentPresent: Boolean(entry.elements?.content),
+      footerPresent: Boolean(entry.elements?.footer),
+      h1Count: entry.h1Count ?? null,
+      gating,
+      warnings,
+      advisories: [],
+      notes,
+    };
+  });
+
   const runPayload = createRunSummaryPayload({
     baseName,
     title: `Responsive structure summary – ${viewportName}`,
     overview: {
-      totalPages: summaries.length,
+      totalPages: enrichedSummaries.length,
       loadBudgetBreaches: loadBreaches,
       pagesWithErrors: errorCount,
       headerMissing: missingTotals.headerMissing,
       navigationMissing: missingTotals.navigationMissing,
       contentMissing: missingTotals.contentMissing,
       footerMissing: missingTotals.footerMissing,
+      pagesWithGatingIssues: enrichedSummaries.filter((entry) => entry.gating.length > 0).length,
+      pagesWithWarnings: enrichedSummaries.filter((entry) => entry.warnings.length > 0).length,
     },
     metadata: {
       spec: 'responsive.layout.structure',
@@ -66,40 +89,40 @@ const buildResponsiveStructureSchemaPayloads = (summaries, viewportName, project
   });
 
   runPayload.details = {
-    pages: summaries.map((entry) => ({
+    pages: enrichedSummaries.map((entry) => ({
       page: entry.page,
-      loadTimeMs: entry.loadTime != null ? Math.round(entry.loadTime) : null,
-      thresholdMs: entry.threshold != null ? entry.threshold : null,
-      headerPresent: Boolean(entry.elements?.header),
-      navigationPresent: Boolean(entry.elements?.navigation),
-      contentPresent: Boolean(entry.elements?.content),
-      footerPresent: Boolean(entry.elements?.footer),
-      h1Count: entry.h1Count ?? null,
-      warnings: entry.warnings || [],
-      info: entry.info || [],
-      gatingIssues: entry.gatingIssues || [],
-      errors: entry.error ? [entry.error] : [],
+      loadTimeMs: entry.loadTimeMs,
+      thresholdMs: entry.thresholdMs,
+      headerPresent: entry.headerPresent,
+      navigationPresent: entry.navigationPresent,
+      contentPresent: entry.contentPresent,
+      footerPresent: entry.footerPresent,
+      h1Count: entry.h1Count,
+      gating: entry.gating,
+      warnings: entry.warnings,
+      advisories: entry.advisories,
+      notes: entry.notes,
     })),
   };
 
-  const pagePayloads = summaries.map((entry) =>
+  const pagePayloads = enrichedSummaries.map((entry) =>
     createPageSummaryPayload({
       baseName,
       title: `Responsive structure – ${entry.page} (${viewportName})`,
       page: entry.page,
       viewport: viewportName,
       summary: {
-        loadTimeMs: entry.loadTime != null ? Math.round(entry.loadTime) : null,
-        thresholdMs: entry.threshold != null ? entry.threshold : null,
-        headerPresent: Boolean(entry.elements?.header),
-        navigationPresent: Boolean(entry.elements?.navigation),
-        contentPresent: Boolean(entry.elements?.content),
-        footerPresent: Boolean(entry.elements?.footer),
-        h1Count: entry.h1Count ?? null,
-        warnings: entry.warnings || [],
-        info: entry.info || [],
-        gatingIssues: entry.gatingIssues || [],
-        error: entry.error || null,
+        loadTimeMs: entry.loadTimeMs,
+        thresholdMs: entry.thresholdMs,
+        headerPresent: entry.headerPresent,
+        navigationPresent: entry.navigationPresent,
+        contentPresent: entry.contentPresent,
+        footerPresent: entry.footerPresent,
+        h1Count: entry.h1Count,
+        gating: entry.gating,
+        warnings: entry.warnings,
+        advisories: entry.advisories,
+        notes: entry.notes,
       },
       metadata: {
         spec: 'responsive.layout.structure',
@@ -123,17 +146,37 @@ const buildResponsiveWpSchemaPayloads = (entries, projectName) => {
     entries.length;
 
   const baseName = `responsive-wp-${slugify(projectName)}`;
+  const enrichedEntries = entries.map((entry) => {
+    const gating = entry.error ? [entry.error] : [];
+    const warnings = entry.warnings || [];
+    const notes = entry.info || [];
+    return {
+      page: '/',
+      viewport: entry.viewport,
+      responsiveDetected: Boolean(entry.hasWpResponsive),
+      blockElements: entry.blockElements || 0,
+      widgets: entry.widgets || 0,
+      status: entry.status ?? null,
+      gating,
+      warnings,
+      advisories: [],
+      notes,
+    };
+  });
+
   const runPayload = createRunSummaryPayload({
     baseName,
     title: 'WordPress responsive features summary',
     overview: {
-      totalViewports: entries.length,
+      totalViewports: enrichedEntries.length,
       viewportsWithResponsiveElements: responsiveDetected,
       viewportsWithWidgets,
       viewportsWithErrors: errorCount,
       averageBlockElements: Number.isFinite(averageBlocks)
         ? Math.round(averageBlocks * 10) / 10
         : 0,
+      viewportsWithGatingIssues: enrichedEntries.filter((entry) => entry.gating.length > 0).length,
+      viewportsWithWarnings: enrichedEntries.filter((entry) => entry.warnings.length > 0).length,
     },
     metadata: {
       spec: 'responsive.layout.structure',
@@ -146,33 +189,35 @@ const buildResponsiveWpSchemaPayloads = (entries, projectName) => {
   });
 
   runPayload.details = {
-    pages: entries.map((entry) => ({
-      page: '/',
+    pages: enrichedEntries.map((entry) => ({
+      page: entry.page,
       viewport: entry.viewport,
-      responsiveDetected: Boolean(entry.hasWpResponsive),
-      blockElements: entry.blockElements || 0,
-      widgets: entry.widgets || 0,
-      status: entry.status ?? null,
-      warnings: entry.warnings || [],
-      info: entry.info || [],
-      errors: entry.error ? [entry.error] : [],
+      responsiveDetected: entry.responsiveDetected,
+      blockElements: entry.blockElements,
+      widgets: entry.widgets,
+      status: entry.status,
+      gating: entry.gating,
+      warnings: entry.warnings,
+      advisories: entry.advisories,
+      notes: entry.notes,
     })),
   };
 
-  const pagePayloads = entries.map((entry) =>
+  const pagePayloads = enrichedEntries.map((entry) =>
     createPageSummaryPayload({
       baseName,
       title: `WordPress responsive – ${entry.viewport}`,
       page: '/',
       viewport: entry.viewport,
       summary: {
-        responsiveDetected: Boolean(entry.hasWpResponsive),
-        blockElements: entry.blockElements || 0,
-        widgets: entry.widgets || 0,
-        status: entry.status ?? null,
-        warnings: entry.warnings || [],
-        info: entry.info || [],
-        error: entry.error || null,
+        responsiveDetected: entry.responsiveDetected,
+        blockElements: entry.blockElements,
+        widgets: entry.widgets,
+        status: entry.status,
+        gating: entry.gating,
+        warnings: entry.warnings,
+        advisories: entry.advisories,
+        notes: entry.notes,
       },
       metadata: {
         spec: 'responsive.layout.structure',

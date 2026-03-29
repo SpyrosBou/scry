@@ -35,6 +35,16 @@ const chromiumUseOverrides = disableChromiumSandbox
   ? { launchOptions: { args: ['--no-sandbox', '--disable-setuid-sandbox'] } }
   : {};
 
+const localReporters = [
+  ['./utils/custom-html-reporter', { outputFolder: 'reports', reportFileName: 'report.html' }],
+  ['list'],
+];
+
+const ciReporters = [
+  ['blob'],
+  ['list'],
+];
+
 module.exports = defineConfig({
   globalSetup: require.resolve('./scripts/playwright-global-setup'),
   testDir: './tests',
@@ -42,10 +52,7 @@ module.exports = defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: resolveWorkerCount(),
-  reporter: [
-    ['./utils/custom-html-reporter', { outputFolder: 'reports', reportFileName: 'report.html' }],
-    ['list'],
-  ],
+  reporter: process.env.CI ? ciReporters : localReporters,
   // Disable per-test timeout so large accessibility runs can complete
   timeout: 0,
   expect: {
@@ -56,7 +63,7 @@ module.exports = defineConfig({
   // Organize by test file, then test name, with browser-specific suffixes
   snapshotPathTemplate: '{testDir}/baseline-snapshots/{testFileDir}/{testFileName}/{arg}{ext}',
   use: {
-    trace: 'retain-on-failure', // Changed: Create traces for failed tests (better debugging)
+    trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
     ignoreHTTPSErrors: true,

@@ -173,7 +173,9 @@ test.describe('Accessibility: Resilience checks', () => {
           animations: [],
           significant: [],
           gating: [],
+          warnings: [],
           advisories: [],
+          notes: [],
         };
         reports.push(report);
 
@@ -232,6 +234,10 @@ test.describe('Accessibility: Resilience checks', () => {
         if (!motionData.animations.length) {
           report.advisories.push('No running animations detected; ensure interactive components still function as expected.');
         }
+
+        report.notes.push(
+          `Detected ${report.animations.length} animations (${report.significant.length} significant) with reduced motion preference ${report.matchesReduce ? 'respected' : 'ignored'}.`
+        );
       });
     }
 
@@ -266,7 +272,9 @@ test.describe('Accessibility: Resilience checks', () => {
         animations: report.animations,
         significantAnimations: report.significant,
         gating: report.gating,
+        warnings: report.warnings,
         advisories: report.advisories,
+        notes: report.notes,
       })),
       wcagReferences: REDUCED_MOTION_WCAG_REFERENCES,
     };
@@ -283,7 +291,10 @@ test.describe('Accessibility: Resilience checks', () => {
           animations: report.animations,
           significantAnimations: report.significant,
           gatingIssues: report.gating,
+          gating: report.gating,
+          warnings: report.warnings,
           advisories: report.advisories,
+          notes: report.notes,
         },
         metadata: {
           spec: 'a11y.resilience.adaptive',
@@ -317,7 +328,9 @@ test.describe('Accessibility: Resilience checks', () => {
           horizontalOverflow: 0,
           offenders: [],
           gating: [],
+          warnings: [],
           advisories: [],
+          notes: [],
         };
         reports.push(report);
 
@@ -368,6 +381,10 @@ test.describe('Accessibility: Resilience checks', () => {
         if (!reflowData.offenders.length && reflowData.horizontalOverflow > 0) {
           report.advisories.push('Unable to identify specific overflow sources; investigate layout containers.');
         }
+
+        report.notes.push(
+          `Viewport ${report.viewportWidth}px recorded ${report.horizontalOverflow}px horizontal overflow.`
+        );
       });
 
       await page.setViewportSize(originalViewport).catch(() => {});
@@ -401,8 +418,10 @@ test.describe('Accessibility: Resilience checks', () => {
         documentWidth: report.scrollWidth,
         horizontalOverflowPx: report.horizontalOverflow,
         gating: report.gating,
+        warnings: report.warnings,
         advisories: report.advisories,
         overflowSources: report.offenders,
+        notes: report.notes,
       })),
       wcagReferences: REFLOW_WCAG_REFERENCES,
       maxOverflowTolerancePx: MAX_OVERFLOW_TOLERANCE_PX,
@@ -420,8 +439,11 @@ test.describe('Accessibility: Resilience checks', () => {
           documentWidth: report.scrollWidth,
           horizontalOverflowPx: report.horizontalOverflow,
           gatingIssues: report.gating,
+          gating: report.gating,
+          warnings: report.warnings,
           advisories: report.advisories,
           overflowSources: report.offenders,
+          notes: report.notes,
         },
         metadata: {
           spec: 'a11y.resilience.adaptive',
@@ -451,7 +473,9 @@ test.describe('Accessibility: Resilience checks', () => {
           page: testPage,
           frames: [],
           gating: [],
+          warnings: [],
           advisories: [],
+          notes: [],
         };
         reports.push(report);
 
@@ -525,6 +549,10 @@ test.describe('Accessibility: Resilience checks', () => {
             );
           }
         }
+
+        report.notes.push(
+          `${report.frames.length} iframe(s) evaluated; ${report.frames.filter((frame) => frame.crossOrigin).length} cross-origin.`
+        );
       });
     }
 
@@ -554,8 +582,10 @@ test.describe('Accessibility: Resilience checks', () => {
         page: report.page,
         iframeCount: report.frames.length,
         gating: report.gating,
+        warnings: report.warnings,
         advisories: report.advisories,
         frames: report.frames,
+        notes: report.notes,
       })),
       wcagReferences: IFRAME_WCAG_REFERENCES,
     };
@@ -570,8 +600,11 @@ test.describe('Accessibility: Resilience checks', () => {
         summary: {
           iframeCount: report.frames.length,
           gatingIssues: report.gating,
+          gating: report.gating,
+          warnings: report.warnings,
           advisories: report.advisories,
           frames: report.frames,
+          notes: report.notes,
         },
         metadata: {
           spec: 'a11y.resilience.adaptive',

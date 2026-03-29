@@ -10,6 +10,25 @@ const isPlainObject = (value) =>
 
 const normaliseKey = (key) => String(key || '');
 
+const SUMMARY_TYPES_WITH_STANDARD_FINDINGS = new Set([
+  'forms',
+  'keyboard',
+  'reduced-motion',
+  'reflow',
+  'iframe-metadata',
+  'structure',
+  'interactive',
+  'internal-links',
+  'availability',
+  'http',
+  'performance',
+  'responsive-structure',
+  'wp-features',
+  'visual',
+]);
+
+const REQUIRED_FINDING_KEYS = ['gating', 'warnings', 'advisories', 'notes'];
+
 const validateOverview = (overview, errors) => {
   if (overview == null) return;
   if (!isPlainObject(overview)) {
@@ -68,6 +87,16 @@ const validatePageSummary = (payload, errors) => {
   }
   if (payload.summary != null && !isPlainObject(payload.summary)) {
     errors.push('`summary` must be an object when provided for page summaries.');
+  }
+  if (isPlainObject(payload.summary)) {
+    const summaryType = payload.metadata && payload.metadata.summaryType;
+    if (SUMMARY_TYPES_WITH_STANDARD_FINDINGS.has(summaryType)) {
+      REQUIRED_FINDING_KEYS.forEach((key) => {
+        if (!Array.isArray(payload.summary[key])) {
+          errors.push(`summary.${key} must be an array for "${summaryType}" page summaries.`);
+        }
+      });
+    }
   }
   validateMetadata(payload.metadata, errors);
 };

@@ -137,8 +137,7 @@ async function debugBrowserState(page, context, testName) {
       arch: process.arch,
       userAgent: context
         ? await context
-            .newPage()
-            .then((p) => p.evaluate(() => navigator.userAgent))
+            .userAgent()
             .catch(() => 'unknown')
         : 'unknown',
     },
