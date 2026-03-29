@@ -1,0 +1,100 @@
+/* ---------------------------------------------------------------------------
+ * Features section: 2x2 card grid with colored top-border accents.
+ * ------------------------------------------------------------------------ */
+
+.features {
+  background: var(--bg-primary);
+}
+
+.features__grid {
+  display: grid;
+  gap: 1.5rem;
+  grid-template-columns: 1fr;
+}
+
+/* -- Feature card -- */
+.feature-card {
+  position: relative;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 2rem 2rem 1.75rem;
+  transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+  overflow: hidden;
+
+  /* Colored top-border accent */
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  }
+
+  &:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-md);
+  }
+}
+
+.feature-card--blue {
+  &::before { background: var(--status-blue); }
+  &:hover { border-color: rgba(38, 139, 210, 0.3); }
+  .feature-card__icon { color: var(--status-blue); }
+}
+
+.feature-card--yellow {
+  &::before { background: var(--status-yellow); }
+  &:hover { border-color: rgba(181, 137, 0, 0.3); }
+  .feature-card__icon { color: var(--status-yellow); }
+}
+
+.feature-card--green {
+  &::before { background: var(--status-green); }
+  &:hover { border-color: rgba(133, 153, 0, 0.3); }
+  .feature-card__icon { color: var(--status-green); }
+}
+
+.feature-card--red {
+  &::before { background: var(--status-red); }
+  &:hover { border-color: rgba(220, 50, 47, 0.3); }
+  .feature-card__icon { color: var(--status-red); }
+}
+
+.feature-card__icon {
+  margin-bottom: 1.25rem;
+  opacity: 0.85;
+}
+
+.feature-card__title {
+  font-family: var(--font-body);
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 0.75rem;
+}
+
+.feature-card__desc {
+  font-size: 0.925rem;
+  line-height: 1.65;
+  margin-bottom: 1.25rem;
+}
+
+/* Mini sample finding (styled like product UI) */
+.feature-card__sample {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 0.8rem;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+}
+
+.feature-card__finding {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+}

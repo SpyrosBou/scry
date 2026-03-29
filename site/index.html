@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Scry &mdash; Automated WordPress Quality Auditing</title>
+  <meta name="description" content="Scry runs automated Playwright audits across functionality, responsiveness, accessibility, and visual regression for WordPress sites." />
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="Scry &mdash; Automated WordPress Quality Auditing" />
+  <meta property="og:description" content="See what your WordPress site is hiding. Automated audits across four dimensions of quality." />
+  <meta property="og:type" content="website" />
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="styles/landing.css" />
+</head>
+<body>
+
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <!-- ================================================================== -->
+  <!-- NAV                                                                 -->
+  <!-- ================================================================== -->
+  <nav class="nav" aria-label="Primary">
+    <a href="#" class="nav__wordmark">Scry</a>
+    <a href="#cta" class="btn btn--primary nav__cta">Get Started</a>
+  </nav>
+
+  <main id="main">
+
+    <!-- ================================================================ -->
+    <!-- HERO                                                              -->
+    <!-- ================================================================ -->
+    <section class="hero" aria-labelledby="hero-heading">
+      <div class="hero__mesh" aria-hidden="true"></div>
+      <div class="hero__noise" aria-hidden="true"></div>
+      <div class="hero__orb hero__orb--gold" aria-hidden="true"></div>
+      <div class="hero__orb hero__orb--cyan" aria-hidden="true"></div>
+
+      <div class="hero__inner">
+        <div class="hero__content">
+          <h1 id="hero-heading" class="hero__title">
+            See what your WordPress site is&nbsp;hiding
+          </h1>
+          <p class="hero__subtitle">
+            Automated audits across functionality, responsiveness, accessibility, and visual regression&thinsp;&mdash;&thinsp;surfacing the issues that manual testing&nbsp;misses.
+          </p>
+          <div class="hero__actions">
+            <a href="#cta" class="btn btn--primary">Start Auditing</a>
+            <a href="#features" class="btn btn--ghost">Explore Features</a>
+          </div>
+          <div class="hero__cli">
+            <code class="code-block">
+              <span class="prompt">$ </span><span class="command">scry</span> <span class="flag">--site</span> <span class="value">my-store</span> <span class="flag">--all-suites</span>
+            </code>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================================================================ -->
+    <!-- CREDIBILITY BAR                                                   -->
+    <!-- ================================================================ -->
+    <section class="credibility" aria-label="Platform highlights">
+      <div class="credibility__inner">
+        <div class="credibility__item">
+          <svg class="credibility__icon" width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+            <rect x="2" y="2" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.5"/>
+            <rect x="11" y="2" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.5"/>
+            <rect x="2" y="11" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.5"/>
+            <rect x="11" y="11" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.5"/>
+          </svg>
+          <span>4 audit dimensions</span>
+        </div>
+        <div class="credibility__divider" aria-hidden="true"></div>
+        <div class="credibility__item">
+          <svg class="credibility__icon" width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+            <circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M7 10l2 2 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span>WCAG 2.1 AA reports</span>
+        </div>
+        <div class="credibility__divider" aria-hidden="true"></div>
+        <div class="credibility__item">
+          <svg class="credibility__icon" width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+            <path d="M3 10h3l2-5 3 10 2-5h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span>Parallel execution</span>
+        </div>
+        <div class="credibility__divider" aria-hidden="true"></div>
+        <div class="credibility__item">
+          <svg class="credibility__icon" width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+            <circle cx="10" cy="8" r="3" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M5 18c0-2.8 2.2-5 5-5s5 2.2 5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+          <span>Zero-config discovery</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================================================================ -->
+    <!-- FEATURES                                                          -->
+    <!-- ================================================================ -->
+    <section id="features" class="section features" aria-labelledby="features-heading">
+      <div class="section__inner">
+        <h2 id="features-heading" class="section__heading">Four dimensions of quality</h2>
+        <p class="section__subheading">Each audit captures a different axis of site health, so nothing slips through.</p>
+
+        <div class="features__grid">
+
+          <!-- Functionality -->
+          <article class="feature-card feature-card--blue reveal" style="--reveal-delay: 0s">
+            <div class="feature-card__icon" aria-hidden="true">
+              <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+                <path d="M8 12h12M8 16h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                <rect x="3" y="5" width="22" height="18" rx="3" stroke="currentColor" stroke-width="1.5"/>
+                <circle cx="7" cy="8.5" r="1" fill="currentColor"/>
+                <circle cx="10" cy="8.5" r="1" fill="currentColor"/>
+                <circle cx="13" cy="8.5" r="1" fill="currentColor"/>
+              </svg>
+            </div>
+            <h3 class="feature-card__title">Functionality</h3>
+            <p class="feature-card__desc">
+              Validates links, interactive elements, and infrastructure health. Catches broken navigation, dead-end forms, and server errors before they reach production.
+            </p>
+            <div class="feature-card__sample">
+              <span class="badge badge--error">error</span>
+              <span class="feature-card__finding">3 broken links found on /products</span>
+            </div>
+          </article>
+
+          <!-- Responsiveness -->
+          <article class="feature-card feature-card--yellow reveal" style="--reveal-delay: 0.1s">
+            <div class="feature-card__icon" aria-hidden="true">
+              <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+                <rect x="2" y="4" width="16" height="12" rx="2" stroke="currentColor" stroke-width="1.5"/>
+                <path d="M6 20h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                <rect x="20" y="8" width="6" height="10" rx="1.5" stroke="currentColor" stroke-width="1.5"/>
+                <line x1="20" y1="15" x2="26" y2="15" stroke="currentColor" stroke-width="1"/>
+              </svg>
+            </div>
+            <h3 class="feature-card__title">Responsiveness</h3>
+            <p class="feature-card__desc">
+              Tests layout integrity across mobile, tablet, and desktop viewports. Flags overflow, clipping, and layout shifts that break the experience on real devices.
+            </p>
+            <div class="feature-card__sample">
+              <span class="badge badge--warning">warning</span>
+              <span class="feature-card__finding">Horizontal overflow at 375px viewport</span>
+            </div>
+          </article>
+
+          <!-- Accessibility -->
+          <article class="feature-card feature-card--green reveal" style="--reveal-delay: 0.2s">
+            <div class="feature-card__icon" aria-hidden="true">
+              <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+                <circle cx="14" cy="6" r="3" stroke="currentColor" stroke-width="1.5"/>
+                <path d="M7 12h14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                <path d="M14 12v6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                <path d="M10 24l4-6 4 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+            <h3 class="feature-card__title">Accessibility</h3>
+            <p class="feature-card__desc">
+              Runs axe-core audits against WCAG&nbsp;2.1 criteria. Surfaces violations by impact, maps them to specific DOM nodes, and tracks compliance over time.
+            </p>
+            <div class="feature-card__sample">
+              <span class="badge badge--ok">pass</span>
+              <span class="feature-card__finding">All 47 WCAG rules passing</span>
+            </div>
+          </article>
+
+          <!-- Visual Regression -->
+          <article class="feature-card feature-card--red reveal" style="--reveal-delay: 0.3s">
+            <div class="feature-card__icon" aria-hidden="true">
+              <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+                <rect x="3" y="3" width="10" height="10" rx="2" stroke="currentColor" stroke-width="1.5"/>
+                <rect x="15" y="3" width="10" height="10" rx="2" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 2"/>
+                <path d="M8 19v6M14 17v8M20 20v5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <h3 class="feature-card__title">Visual Regression</h3>
+            <p class="feature-card__desc">
+              Compares screenshots against baselines pixel by pixel. Detects unintended visual changes from theme updates, plugin conflicts, or CSS&nbsp;drift.
+            </p>
+            <div class="feature-card__sample">
+              <span class="badge badge--error">2.4% diff</span>
+              <span class="feature-card__finding">Header layout shifted on /about</span>
+            </div>
+          </article>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- ================================================================ -->
+    <!-- HOW IT WORKS                                                      -->
+    <!-- ================================================================ -->
+    <section class="section how-it-works" aria-labelledby="how-heading">
+      <div class="section__inner">
+        <h2 id="how-heading" class="section__heading">Three steps to clarity</h2>
+        <p class="section__subheading">From URL to interactive report in&nbsp;minutes.</p>
+
+        <div class="steps">
+
+          <article class="step reveal" style="--reveal-delay: 0s">
+            <span class="step__number">1</span>
+            <h3 class="step__title">Configure</h3>
+            <p class="step__desc">
+              Point Scry at any WordPress site. Automatic sitemap discovery finds every page&thinsp;&mdash;&thinsp;or specify exactly which pages to&nbsp;test.
+            </p>
+            <code class="code-block step__code">
+              <span class="prompt">$ </span><span class="command">npm run discover</span> <span class="flag">--</span> <span class="value">https://your-site.com</span>
+            </code>
+          </article>
+
+          <div class="steps__connector" aria-hidden="true"></div>
+
+          <article class="step reveal" style="--reveal-delay: 0.15s">
+            <span class="step__number">2</span>
+            <h3 class="step__title">Run</h3>
+            <p class="step__desc">
+              Choose your suites and let Playwright do the&nbsp;work. Parallel workers distribute tests across browsers and&nbsp;viewports.
+            </p>
+            <code class="code-block step__code">
+              <span class="prompt">$ </span><span class="command">node run-tests.js</span> <span class="flag">--site</span> <span class="value">your-site</span> <span class="flag">--all-suites</span>
+            </code>
+          </article>
+
+          <div class="steps__connector" aria-hidden="true"></div>
+
+          <article class="step reveal" style="--reveal-delay: 0.3s">
+            <span class="step__number">3</span>
+            <h3 class="step__title">Review</h3>
+            <p class="step__desc">
+              Open rich, interactive HTML reports. Drill into findings by suite, page, and severity. Track progress across&nbsp;runs.
+            </p>
+            <div class="step__report-mock" aria-hidden="true">
+              <div class="mock-sidebar">
+                <div class="mock-item mock-item--ok"></div>
+                <div class="mock-item mock-item--ok"></div>
+                <div class="mock-item mock-item--error"></div>
+                <div class="mock-item mock-item--warning"></div>
+                <div class="mock-item mock-item--ok"></div>
+              </div>
+              <div class="mock-content">
+                <div class="mock-bar mock-bar--wide"></div>
+                <div class="mock-bar mock-bar--medium"></div>
+                <div class="mock-bar mock-bar--narrow"></div>
+              </div>
+            </div>
+          </article>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- ================================================================ -->
+    <!-- BENEFITS                                                          -->
+    <!-- ================================================================ -->
+    <section class="section benefits" aria-labelledby="benefits-heading">
+      <div class="section__inner benefits__layout">
+
+        <div class="benefits__statement reveal">
+          <h2 id="benefits-heading" class="benefits__quote">
+            Stop finding bugs in&nbsp;production.
+          </h2>
+        </div>
+
+        <div class="benefits__grid">
+
+          <div class="benefit reveal" style="--reveal-delay: 0s">
+            <div class="benefit__icon" aria-hidden="true">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </div>
+            <h3 class="benefit__title">Catch regressions early</h3>
+            <p class="benefit__desc">Detect visual and functional breakdowns before they&nbsp;ship.</p>
+          </div>
+
+          <div class="benefit reveal" style="--reveal-delay: 0.08s">
+            <div class="benefit__icon" aria-hidden="true">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </div>
+            <h3 class="benefit__title">Ensure WCAG compliance</h3>
+            <p class="benefit__desc">Maintain accessibility standards with every&nbsp;deployment.</p>
+          </div>
+
+          <div class="benefit reveal" style="--reveal-delay: 0.16s">
+            <div class="benefit__icon" aria-hidden="true">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </div>
+            <h3 class="benefit__title">Test at scale</h3>
+            <p class="benefit__desc">Audit entire sitemaps, not just a handful of&nbsp;pages.</p>
+          </div>
+
+          <div class="benefit reveal" style="--reveal-delay: 0.24s">
+            <div class="benefit__icon" aria-hidden="true">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M9 17H5a2 2 0 01-2-2V5a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2h-4m-4 4l-4-4h3a1 1 0 001-1v-2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </div>
+            <h3 class="benefit__title">Rich, shareable reports</h3>
+            <p class="benefit__desc">HTML reports your whole team can review&thinsp;&mdash;&thinsp;no special tooling&nbsp;required.</p>
+          </div>
+
+          <div class="benefit reveal" style="--reveal-delay: 0.32s">
+            <div class="benefit__icon" aria-hidden="true">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M8 9l3 3-3 3m5 0h3M5 3h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </div>
+            <h3 class="benefit__title">CI/CD ready</h3>
+            <p class="benefit__desc">Integrate into your deployment pipeline with a single CLI&nbsp;command.</p>
+          </div>
+
+          <div class="benefit reveal" style="--reveal-delay: 0.4s">
+            <div class="benefit__icon" aria-hidden="true">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.5"/><path d="M12 2v3m0 14v3m-7.07-2.93l2.12-2.12M16.95 7.05l2.12-2.12M2 12h3m14 0h3M4.93 4.93l2.12 2.12M16.95 16.95l2.12 2.12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            </div>
+            <h3 class="benefit__title">WordPress-native</h3>
+            <p class="benefit__desc">Purpose-built for WordPress themes, plugins, and page&nbsp;builders.</p>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- ================================================================ -->
+    <!-- CTA                                                               -->
+    <!-- ================================================================ -->
+    <section id="cta" class="section cta" aria-labelledby="cta-heading">
+      <div class="section__inner cta__inner">
+        <h2 id="cta-heading" class="cta__title">Start seeing clearly.</h2>
+        <p class="cta__desc">
+          Scry is open source and free to run on your own infrastructure.<br />
+          Install in minutes, audit in&nbsp;seconds.
+        </p>
+        <div class="cta__actions">
+          <a href="#" class="btn btn--primary">Get Started</a>
+          <a href="#" class="btn btn--secondary">Read the Docs</a>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ==================================================================== -->
+  <!-- FOOTER                                                                -->
+  <!-- ==================================================================== -->
+  <footer class="footer" role="contentinfo">
+    <div class="footer__border" aria-hidden="true"></div>
+    <div class="footer__inner">
+      <div class="footer__brand">
+        <span class="footer__wordmark">Scry</span>
+        <p class="footer__tagline">Automated WordPress quality&nbsp;auditing.</p>
+      </div>
+      <nav class="footer__links" aria-label="Footer">
+        <a href="#">Documentation</a>
+        <a href="#">GitHub</a>
+        <a href="#">Report an Issue</a>
+      </nav>
+      <div class="footer__legal">
+        <span>MIT License</span>
+        <span>&copy; <span id="year"></span> Scry</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/landing.js"></script>
+</body>
+</html>

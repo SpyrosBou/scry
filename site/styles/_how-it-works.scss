@@ -1,0 +1,102 @@
+/* ---------------------------------------------------------------------------
+ * How it works: 3-step process with connecting line.
+ * ------------------------------------------------------------------------ */
+
+.how-it-works {
+  background: var(--bg-deep);
+}
+
+.steps {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+}
+
+.step {
+  text-align: center;
+  padding: 2rem 1.5rem;
+}
+
+.step__number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.5rem;
+  height: 3.5rem;
+  font-family: var(--font-display);
+  font-size: 1.75rem;
+  color: var(--gold);
+  border: 1.5px solid var(--border-gold);
+  border-radius: 50%;
+  margin-bottom: 1.25rem;
+}
+
+.step__title {
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 1.15rem;
+  color: var(--text-primary);
+  margin-bottom: 0.75rem;
+}
+
+.step__desc {
+  font-size: 0.925rem;
+  margin: 0 auto 1.25rem;
+  max-width: 32ch;
+}
+
+.step__code {
+  font-size: 0.8rem;
+}
+
+/* Connector line between steps */
+.steps__connector {
+  width: 1px;
+  height: 2.5rem;
+  margin: 0 auto;
+  border-left: 1px dashed var(--border-strong);
+}
+
+/* Mini report mock for step 3 */
+.step__report-mock {
+  display: inline-flex;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+
+.mock-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.mock-item {
+  width: 4px;
+  height: 8px;
+  border-radius: 2px;
+}
+
+.mock-item--ok      { background: var(--status-green); }
+.mock-item--error   { background: var(--status-red); }
+.mock-item--warning { background: var(--status-yellow); }
+
+.mock-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  justify-content: center;
+}
+
+.mock-bar {
+  height: 3px;
+  border-radius: 2px;
+  background: var(--border-strong);
+}
+
+.mock-bar--wide   { width: 60px; }
+.mock-bar--medium { width: 45px; }
+.mock-bar--narrow { width: 30px; }

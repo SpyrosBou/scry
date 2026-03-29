@@ -1,0 +1,159 @@
+/* ---------------------------------------------------------------------------
+ * Shared components: buttons, code blocks, nav, badges.
+ * ------------------------------------------------------------------------ */
+
+/* -- Buttons -- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.875rem 2rem;
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  font-weight: 600;
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+  text-decoration: none;
+  line-height: 1;
+  min-height: 48px;
+
+  &:hover {
+    transform: translateY(-2px);
+  }
+
+  &:active {
+    transform: translateY(0);
+  }
+}
+
+.btn--primary {
+  background: var(--gold);
+  color: var(--text-inverse);
+  box-shadow: var(--shadow-sm), 0 0 24px var(--gold-glow);
+
+  &:hover {
+    background: var(--gold-light);
+    color: var(--text-inverse);
+    box-shadow: var(--shadow-md), 0 0 40px var(--gold-glow);
+  }
+}
+
+.btn--secondary {
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-default);
+
+  &:hover {
+    color: var(--text-primary);
+    border-color: var(--border-strong);
+    background: rgba(255, 255, 255, 0.03);
+  }
+}
+
+.btn--ghost {
+  background: transparent;
+  color: var(--cyan);
+  padding: 0.875rem 0;
+
+  &:hover {
+    color: var(--cyan-light);
+  }
+
+  &::after {
+    content: '\2192';
+    transition: transform 0.2s ease;
+  }
+
+  &:hover::after {
+    transform: translateX(4px);
+  }
+}
+
+/* -- Code blocks -- */
+.code-block {
+  display: inline-block;
+  padding: 1rem 1.5rem;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+.code-block .prompt {
+  color: var(--gold-muted);
+  user-select: none;
+}
+
+.code-block .command {
+  color: var(--text-primary);
+}
+
+.code-block .flag {
+  color: var(--cyan);
+}
+
+.code-block .value {
+  color: var(--gold-light);
+}
+
+/* -- Navigation -- */
+.nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  padding: 1.25rem clamp(1.25rem, 4vw, 3rem);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transition: background 0.3s ease, box-shadow 0.3s ease;
+}
+
+.nav--scrolled {
+  background: rgba(10, 14, 26, 0.92);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 1px 0 var(--border-subtle);
+}
+
+.nav__wordmark {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 1.5rem;
+  color: var(--text-primary);
+  text-decoration: none;
+  letter-spacing: -0.01em;
+}
+
+.nav__cta {
+  padding: 0.625rem 1.5rem;
+  font-size: 0.85rem;
+  min-height: 44px;
+}
+
+/* -- Badge / pill -- */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.6rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-radius: 4px;
+  line-height: 1;
+}
+
+.badge--error   { background: rgba(220, 50, 47, 0.15); color: var(--status-red); }
+.badge--warning { background: rgba(181, 137, 0, 0.15); color: var(--status-yellow); }
+.badge--ok      { background: rgba(133, 153, 0, 0.15); color: var(--status-green); }
+.badge--info    { background: rgba(38, 139, 210, 0.15); color: var(--status-blue); }

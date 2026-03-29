@@ -1,0 +1,33 @@
+/* ---------------------------------------------------------------------------
+ * Final CTA section.
+ * ------------------------------------------------------------------------ */
+
+.cta {
+  background:
+    radial-gradient(ellipse 60% 50% at 50% 80%, rgba(212, 165, 116, 0.06) 0%, transparent 70%),
+    var(--bg-deep);
+}
+
+.cta__inner {
+  text-align: center;
+  padding: 2rem 0;
+}
+
+.cta__title {
+  font-size: clamp(2rem, 4vw, 3.2rem);
+  margin-bottom: 1.25rem;
+}
+
+.cta__desc {
+  font-size: 1.1rem;
+  margin: 0 auto 2.5rem;
+  max-width: 50ch;
+  line-height: 1.7;
+}
+
+.cta__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 1rem;
+}

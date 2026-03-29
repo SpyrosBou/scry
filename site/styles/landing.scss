@@ -1,0 +1,15 @@
+/* ---------------------------------------------------------------------------
+ * Scry landing page styles entry point.
+ * Modules follow Sass @use guidance for clarity and reuse.
+ * ------------------------------------------------------------------------ */
+@use './variables';
+@use './base';
+@use './components';
+@use './hero';
+@use './features';
+@use './how-it-works';
+@use './benefits';
+@use './cta';
+@use './footer';
+@use './animations';
+@use './responsive';

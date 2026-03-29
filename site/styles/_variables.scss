@@ -1,0 +1,67 @@
+/* ---------------------------------------------------------------------------
+ * Design tokens for the Scry landing page.
+ * All values exposed as CSS custom properties on :root.
+ * ------------------------------------------------------------------------ */
+
+:root {
+  /* -- Backgrounds -- */
+  --bg-deep:        #0a0e1a;
+  --bg-primary:     #0f1629;
+  --bg-elevated:    #151d35;
+  --bg-surface:     #1a2340;
+  --bg-subtle:      #1e2a4a;
+
+  /* -- Text -- */
+  --text-primary:   #e8e6e1;
+  --text-secondary: #9ca3b4;
+  --text-tertiary:  #8891a0;
+  --text-inverse:   #0a0e1a;
+
+  /* -- Gold accent (primary CTA, highlights) -- */
+  --gold:           #d4a574;
+  --gold-light:     #f0c987;
+  --gold-muted:     #a67c52;
+  --gold-glow:      rgba(212, 165, 116, 0.15);
+  --gold-bg:        rgba(212, 165, 116, 0.08);
+
+  /* -- Cyan accent (secondary, links) -- */
+  --cyan:           #4ecdc4;
+  --cyan-light:     #7eddd6;
+  --cyan-muted:     #2a8f89;
+  --cyan-glow:      rgba(78, 205, 196, 0.12);
+  --cyan-bg:        rgba(78, 205, 196, 0.06);
+
+  /* -- Solarized status (feature cards) -- */
+  --status-blue:    #268bd2;
+  --status-yellow:  #b58900;
+  --status-green:   #859900;
+  --status-red:     #dc322f;
+
+  /* -- Borders -- */
+  --border-subtle:  rgba(255, 255, 255, 0.06);
+  --border-default: rgba(255, 255, 255, 0.10);
+  --border-strong:  rgba(255, 255, 255, 0.16);
+  --border-gold:    rgba(212, 165, 116, 0.25);
+
+  /* -- Shadows -- */
+  --shadow-sm:      0 2px 8px rgba(0, 0, 0, 0.3);
+  --shadow-md:      0 8px 24px rgba(0, 0, 0, 0.4);
+  --shadow-lg:      0 16px 48px rgba(0, 0, 0, 0.5);
+  --shadow-glow:    0 0 40px rgba(212, 165, 116, 0.08);
+
+  /* -- Typography -- */
+  --font-display:   'Instrument Serif', Georgia, 'Times New Roman', serif;
+  --font-body:      'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
+  --font-mono:      'JetBrains Mono', 'SF Mono', Consolas, monospace;
+
+  /* -- Spacing -- */
+  --section-gap:    clamp(4rem, 8vw, 8rem);
+  --content-max:    1200px;
+  --content-narrow: 800px;
+
+  /* -- Radius -- */
+  --radius-sm:      8px;
+  --radius-md:      12px;
+  --radius-lg:      20px;
+  --radius-xl:      28px;
+}

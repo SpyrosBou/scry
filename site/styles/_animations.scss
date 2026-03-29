@@ -1,0 +1,75 @@
+/* ---------------------------------------------------------------------------
+ * Scroll-reveal system, ambient effects, and reduced-motion handling.
+ * ------------------------------------------------------------------------ */
+
+/* -- Scroll reveal -- */
+.reveal {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+  transition-delay: var(--reveal-delay, 0s);
+}
+
+.reveal--visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* -- Credibility bar -- */
+
+.credibility {
+  position: relative;
+  background: var(--bg-primary);
+  border-top: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-subtle);
+  padding: 1.5rem clamp(1.25rem, 4vw, 3rem);
+}
+
+.credibility__inner {
+  max-width: var(--content-max);
+  margin: 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 1.25rem 2rem;
+}
+
+.credibility__item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.credibility__icon {
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+
+.credibility__divider {
+  width: 1px;
+  height: 16px;
+  background: var(--border-default);
+}
+
+/* -- Reduced motion -- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .reveal {
+    opacity: 1;
+    transform: none;
+  }
+}
