@@ -28,7 +28,7 @@
  * const elements = await wpPageObjects.verifyCriticalElements();
  * // Returns: { header: true, navigation: true, content: true, footer: true }
  *
- * @author Website Testing Suite
+ * @author Scry
  */
 
 const { expect } = require('@playwright/test');

@@ -1,4 +1,4 @@
-# Website Testing Runner – Product & Architecture Specification
+# Scry – Product & Architecture Specification
 
 ## Vision
 
@@ -8,14 +8,15 @@
 
 ## User Experience Goals
 
-- **Stepwise selection:** Users pick specs, sites, page caps, and browser projects in discrete steps; advanced options can layer in later (discovery hooks, tagging, etc.).
+- **Stepwise selection:** Users pick specs, sites, page caps, and browser projects in discrete steps; advanced execution options can layer in later without changing the base flow.
 - **Manifest visibility:** Before launching, the tool can display a summary of the resolved manifest (pages, specs, browsers) so the user knows exactly what will run.
 - **Progress feedback:** Execution emits structured events (start, per-site updates, summaries) consumable by CLI logs today and GUI progress views later.
 - **Artifact discoverability:** Every run produces a run manifest and clear pointers to reports/test-results folders for post-run inspection.
 
 ## Architecture Direction
 
-- **Core Engine:** A reusable module accepts a structured `RunConfig` and orchestrates Playwright execution. It handles site loading, discovery, homepage guarantees, sampling, and manifest authoring.
+- **Core Engine:** A reusable module accepts a structured `RunConfig` and orchestrates Playwright execution. It handles site loading, homepage guarantees, sampling, and manifest authoring.
+- **Discovery Service:** Site manifest discovery is a separate mutating workflow. It owns sitemap refresh, canonical-host correction, and intentional `sites/*.json` writes.
 - **Adapters:**
   - _CLI Adapter_ (`run-tests.js`) parses arguments, builds a `RunConfig`, invokes the core, and renders console output.
   - _GUI Adapter_ (future) presents step-wise selectors, serialises choices into a `RunConfig`, and streams progress via the same core API.
@@ -27,16 +28,17 @@
 - Manifest generation is centralised in `TestRunner.prepareRunManifest`. Small payloads are exported inline via `SITE_RUN_MANIFEST_INLINE`; larger ones persist under `reports/run-manifests/` and are referenced through `SITE_RUN_MANIFEST`.
 - `SITE_TEST_PAGES` (and optional `SITE_TEST_PAGES_LIMIT`) remain for backward compatibility, but specs now primarily read from the manifest via `utils/run-manifest.js` or through `SiteLoader` overrides.
 - The CLI adapter listens to `onEvent` hooks (`manifest:ready`, `manifest:persisted`, `run:complete`) to print previews ahead of execution—mirroring the planned GUI stepper preview.
+- `run-tests.js` is execution-only. Discovery and baseline refresh run through dedicated commands (`npm run discover`, `npm run baselines:update`) rather than through runner flags.
 - `--output=<path>` lets callers capture manifest + run summaries as JSON for dashboards or other tooling without scraping stdout.
 - `utils/run-manifest.js` provides shared helpers for loading/parsing manifests so specs and future tooling avoid duplicating env parsing.
 - Profile-specific env mutations are passed through structured overrides (`envOverrides`) rather than mutating `process.env`, keeping adapter state isolated.
-- Reporter payloads follow a standard contract: suites that emit `codex.report.summary` attachments must populate `summary.gating`, `summary.warnings`, `summary.advisories`, and `summary.notes` arrays (plus any spec-specific metrics). The validator in `utils/report-schema-validator.js` enforces this to keep the refreshed UI consistent, and the current inventory lives in `docs/report-schema-inventory.md`.
+- Reporter payloads follow a standard contract: suites that emit `codex.report.summary` attachments must populate `summary.gating`, `summary.warnings`, `summary.advisories`, and `summary.notes` arrays (plus any spec-specific metrics). The validator in `utils/report-schema-validator.js` enforces this to keep the refreshed UI consistent.
 
 ## Implementation Roadmap
 
 1. **Config Helpers**
    - Introduce helpers that convert adapter input into a normalised `RunConfig` object.
-   - Encapsulate page selection (discovery, homepage insertion, cap application) in one place.
+   - Encapsulate page selection, homepage insertion, and cap application in one place.
 2. **Manifest Generation**
    - Produce a structured manifest (`site`, `pages`, `specs`, `projects`, `limits`, timestamps).
    - Use env overrides for small manifests; fall back to persisted temp files for larger payloads.

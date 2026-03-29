@@ -1,10 +1,10 @@
 /**
- * Responsive Testing Helpers for WordPress Testing Suite
+ * Responsive Testing Helpers for Scry
  *
  * Provides viewport-specific utilities, mobile interaction patterns,
  * and WordPress-responsive testing patterns following industry standards.
  *
- * @author Website Testing Suite
+ * @author Scry
  */
 
 const { expect } = require('@playwright/test');

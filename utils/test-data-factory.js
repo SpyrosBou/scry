@@ -1,10 +1,10 @@
 /**
- * Test Data Factory for WordPress Testing Suite
+ * Test Data Factory for Scry
  *
  * Provides consistent, realistic test data generation following industry best practices.
  * Supports various data types including form data, user data, and WordPress-specific content.
  *
- * @author Website Testing Suite
+ * @author Scry
  */
 
 /**

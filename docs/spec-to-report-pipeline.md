@@ -1,44 +1,43 @@
-# Spec → Reporter → Dashboard Pipeline
+# Spec -> Reporter -> Dashboard Pipeline
 
-This note captures how Playwright specs feed data into the custom HTML reporter and how that output becomes the dashboard surfaced through `npm run reports:read`. File paths and line numbers are included so you can jump directly into the implementation if anything changes.
+This note captures the current execution and reporting flow after the Phase 1-2 runner split. It intentionally avoids stale line-number references.
 
 ## 1. Entry Points and CLI Orchestration
-- `run-tests.js:215-383` parses CLI flags such as `--site`, `--visual`, `--test`, and `--pages`, ensuring suite flags and explicit spec globs stay mutually exclusive.
-- `run-tests.js:176-213` wraps options with an `onEvent` emitter so higher-level commands (e.g., `--output`) can record `manifest:*` and `run:complete` events.
-- `utils/test-runner.js:297-775` (`TestRunner.runTestsForSite`) loads the requested site via `SiteLoader`, performs optional sitemap discovery, selects the spec files based on suite flags, and infers the Playwright projects/browsers to run.
-- `utils/test-runner.js:194-228` builds the run manifest (pages, specs, projects, limits) and `utils/test-runner.js:165-191` persists it to `reports/run-manifests/` when the payload is large, otherwise inlines it via `SITE_RUN_MANIFEST_INLINE`. Environment variables `SITE_NAME`, `SITE_BASE_URL`, `SITE_TEST_PAGES`, etc., are injected into the Playwright process so specs know what to exercise.
+
+- `run-tests.js` is execution-only. It parses run flags, rejects legacy mutating flags such as `--discover` and `--update-baselines`, builds a run context, and forwards it into `TestRunner.runTestsForSite()`.
+- `utils/run-cli.js` owns CLI parsing, validation, manifest-preview rendering, and output-writer creation for `--output`.
+- `scripts/discovery/discover-pages.js` is the only workflow that scaffolds or updates `sites/*.json`. It now routes through `utils/discovery-service.js` instead of tunneling through the test runner.
+- `scripts/discovery/update-baselines.js` is the only CLI entry point that updates visual baselines.
+- `utils/test-runner.js` loads the requested site, applies homepage and page-cap rules, builds the run manifest, and spawns Playwright with an explicit env payload.
+- Large manifests persist under `reports/run-manifests/`; small manifests are inlined via `SITE_RUN_MANIFEST_INLINE`.
 
 ## 2. Spec Responsibilities
-- Tests import the shared fixtures from `utils/test-fixtures.js:4-24`, which expose `siteContext` / `siteConfig` / `siteName` so suites never read env vars directly, and wrap Playwright’s `test` with `errorContext` for consistent setup/teardown + `testInfo` access.
-- Active site metadata is resolved once via `utils/test-context.js:1-21`, so every spec can call `getActiveSiteContext()` without touching `process.env`.
-- Each suite (example: `tests/functionality.interactive.smoke.spec.js`) iterates the manifest’s `testPages`, runs its checks (console/resource errors, forms, WCAG, responsive, etc.), and aggregates per-page/per-run metrics before yielding control back to the reporter.
-- When a suite needs to expose structured insights it uses the helpers from `utils/reporting-utils.js`:
-  - `attachSummary()` (`utils/reporting-utils.js:143-196`) emits HTML/Markdown blocks (named `*.summary.*`).
-  - `attachSchemaSummary()` (`utils/reporting-utils.js:198-214`) validates payloads produced by `createRunSummaryPayload()` / `createPageSummaryPayload()` (`utils/report-schema.js:6-40`) before attaching them as `*.summary.schema.json`.
-- **Keyboard + WCAG specs**: `tests/a11y.audit.wcag.spec.js` streams each page’s Axe run into an aggregation store (`utils/report-aggregation-store.js`). Every worker writes its page report to `test-results/.a11y-aggregation/<run-token>/` so the serial “Aggregate results” test can rehydrate all 5 reports (it now waits up to two minutes to ensure every parallel page finishes via `utils/a11y-aggregation-waiter.js`), emit the run/page schema payloads, and clean up. During the scan we enrich each violation/advisory with culprits (target selector + screenshot) so `renderPerPageIssuesTable()` can show “View offending element”. The WCAG spec now iterates every Axe-provided selector, waits for the locator to become visible, captures an element screenshot with animations/caret disabled, and—if that fails—pads the element’s bounding box for a contextual clip or falls back to a cached full-page shot. Each node records whether we used an element, context, or page fallback so future reporter tweaks can surface that provenance. To keep attachments loadable we only embed those screenshot-heavy nodes in the per-page schema payloads—the run-level summary carries per-page counts and metadata so the HTML reporter stays responsive even when dozens of findings include inline PNGs.
-- **Structural semantics spec**: `tests/a11y.structure.landmarks.spec.js` captures the site structure (H1 count, landmark presence, heading skips). When a landmark is missing we snapshot the page once, add it to the finding as a node, and attach both project- and per-page schema summaries so the reporter can render structural gating/advisory tables with clickable culprits.
-- **Responsive + infrastructure specs** follow the same contract: gather per-page summaries, call `applyViewportMetadata()` so each entry records browser/viewport/site labels, then call `attachSchemaSummary()` for run + page payloads.
-- All of these artifacts are standard Playwright attachments—no spec needs to understand the HTML reporter, it just supplies JSON + optional HTML/Markdown.
+
+- Specs still run against site context derived from the runner manifest and env payload. The fixture layer in `utils/test-fixtures.js` and `utils/test-context.js` exists, but the suite is not yet uniformly migrated to fixture-only site context.
+- Suites iterate the selected `testPages`, run checks, and attach structured artifacts through `utils/reporting-utils.js`.
+- `attachSummary()` emits HTML or Markdown summaries for narrative sections.
+- `attachSchemaSummary()` validates and attaches normalized JSON payloads produced by the report-schema helpers.
+- Accessibility, responsive, and functionality suites all follow the same broad contract: emit page-level findings plus run-level summaries, then leave rendering decisions to the reporter.
 
 ## 3. Reporter Internals
-- `playwright.config.js:38-54` globally registers `./utils/custom-html-reporter` plus the default `list` reporter (and `blob` on CI), so every run triggers the custom reporter.
-- `CustomHtmlReporter` (`utils/custom-html-reporter.js`) lifecycle:
-  - `onBegin()` captures the config/suite metadata and total planned tests.
-  - `onTestEnd()` (`utils/custom-html-reporter.js:141-206`) aggregates attempts, stdout/stderr, and calls `processAttachments()` (`utils/custom-html-reporter.js:243-402`) to separate inline text/binary assets from schema summaries/summary blocks.
-  - `buildRunData()` (`utils/custom-html-reporter.js:404-518`) serialises tests, deduplicates summary blocks, tallies status counts, and enriches the run with site/profile/environment metadata sourced from env vars or `sites/<name>.json`.
-- `writeOutputs()` (`utils/custom-html-reporter.js:576-684`) renders the HTML via `renderReportHtml()` (`utils/report-templates.js`), writes `data/run.json`, per-test JSON files under `reports/run-*/data/tests/`, Markdown summaries, and updates `reports/latest-run.json` plus `reports/manifest.json`.
-- `utils/report-templates/helpers/render-primitives.js` now centralises the shared HTML primitives that every section uses (status badges, gating/advisory tables, per-page accordions, viewport normalisers, etc.) so section modules import a single API instead of duplicating `MISSING_DATA_LABEL` logic across the 7k-line file.
-- `utils/report-templates/helpers/section-data.js` holds the data shapers (`collectIssueMessages`, `collectSchemaProjects`, `firstRunPayload`, and `summaryTypeFromGroup`) so both the orchestrator and upcoming section modules can reason about schema buckets without re-implementing those reducers.
+
+- `playwright.config.js` registers the custom HTML reporter alongside Playwright's standard console reporter.
+- `utils/custom-html-reporter.js` aggregates test attempts, attachments, stdout/stderr, and schema summaries into one normalized run payload.
+- The reporter writes `report.html`, `data/run.json`, per-test JSON payloads, Markdown summaries, and `reports/latest-run.json`.
+- `utils/report-templates.js` and its helper modules render the HTML dashboard from normalized run data rather than from spec-specific logic.
 
 ## 4. Dashboard and Post-Run Surfacing
-- `reports/latest-run.json` is re-read by `TestRunner.readLatestReportSummary()` (`utils/test-runner.js:777-804`) right after Playwright exits so the CLI can print a “Quick Summary” (pass/fail counts, flaky numbers, report location).
-- The CLI prints `npm run reports:read` as the way to open the dashboard. That script (`scripts/reporting/read-reports.js`) loads `reports/manifest.json`, selects the newest run (or a specific historical run if requested), and opens the HTML in the user’s browser.
-- Reporter styles originate from `styles/report/report-styles.scss`; whenever those change you run `npm run styles:build` to regenerate the CSS shipped with the HTML.
+
+- `TestRunner.readLatestReportSummary()` reads `reports/latest-run.json` after Playwright exits so the CLI can print a short run summary.
+- `npm run reports:read` opens the latest generated report.
+- `npm run reports:dev` serves the generated report UI with live reload for report-template work.
 
 ## 5. Data Flow Recap
-1. **Runner** chooses sites/specs/projects, writes/exports the manifest, and spawns Playwright with the necessary env vars.
-2. **Specs** consume those env vars to know which pages to hit, attach schema summaries and narrative summaries as artifacts, and rely on shared helpers for consistency.
-3. **Reporter** ingests every test result, recognises the schema/summary attachments, and produces `report.html`, structured JSON, and Markdown sidecars without massaging the payloads (missing values simply surface as `DATA MISSING`).
-4. **Dashboard consumers** (CLI quick summary, `npm run reports:read`, CI artifacts) read from `reports/latest-run.json`, `manifest.json`, and the generated HTML to present the final results.
 
-Use this file when you need to trace a metric from a spec all the way to the dashboard or when onboarding teammates who need to understand why the reporter requires certain attachments or env variables.
+1. The execution CLI resolves sites, specs, limits, and projects.
+2. The runner builds a manifest and spawns Playwright with explicit run context.
+3. Specs attach normalized artifacts and summaries.
+4. The custom reporter materializes HTML, JSON, and summary metadata.
+5. CLI summary and report-viewer commands read the generated artifacts.
+
+Use this note when you need to trace how execution data reaches the HTML report without relying on stale implementation offsets.

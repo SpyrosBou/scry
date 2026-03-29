@@ -1,7 +1,7 @@
 /* eslint-env node, browser */
 /* global window */
 /**
- * Enhanced Test Helpers for Playwright WordPress Testing Suite
+ * Enhanced Test Helpers for Scry
  *
  * This module provides comprehensive utilities for better error reporting,
  * debugging, browser lifecycle management, and industry-standard retry strategies

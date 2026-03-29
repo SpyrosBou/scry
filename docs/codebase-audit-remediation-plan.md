@@ -2,7 +2,7 @@
 
 ## Audit Context
 
-- Repository: `website-testing`
+- Repository: `scry`
 - Branch audited: `refactor/report-templates-structure`
 - HEAD audited: `d162e91`
 - Audit date: 2026-03-29
