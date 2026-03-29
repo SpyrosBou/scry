@@ -1,14 +1,8 @@
 const { test, expect } = require('../utils/test-fixtures');
 const fs = require('fs');
 const SiteLoader = require('../utils/site-loader');
-const {
-  setupTestPage,
-  teardownTestPage,
-  safeNavigate,
-  waitForPageStability,
-  ErrorContext,
-} = require('../utils/test-helpers');
-const { attachSchemaSummary, escapeHtml } = require('../utils/reporting-utils');
+const { safeNavigate, waitForPageStability } = require('../utils/test-helpers');
+const { attachSchemaSummary } = require('../utils/reporting-utils');
 const { createRunSummaryPayload, createPageSummaryPayload } = require('../utils/report-schema');
 
 const slugify = (value) =>
@@ -221,7 +215,7 @@ test.describe('Visual Regression', () => {
   let siteConfig;
   let errorContext;
 
-  test.beforeEach(async ({ page, context, errorContext: sharedErrorContext }, testInfo) => {
+  test.beforeEach(({ errorContext: sharedErrorContext }) => {
     const siteName = process.env.SITE_NAME;
     if (!siteName) throw new Error('SITE_NAME environment variable is required');
     siteConfig = SiteLoader.loadSite(siteName);
@@ -314,15 +308,6 @@ test.describe('Visual Regression', () => {
             const masks = maskSelectors.map((sel) => page.locator(sel));
 
             const artifactsLabel = `${screenshotName.replace(/\.png$/i, '')}`;
-
-            const toDataUri = (filePath) => {
-              try {
-                const content = fs.readFileSync(filePath);
-                return `data:image/png;base64,${content.toString('base64')}`;
-              } catch (_error) {
-                return null;
-              }
-            };
 
             const collectVisualArtifacts = async (includeDiffArtifacts = false) => {
               const artifactInfo = { baseline: null, actual: null, diff: null };

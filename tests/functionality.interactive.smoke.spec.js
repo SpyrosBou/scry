@@ -1,27 +1,19 @@
 const { test, expect } = require('../utils/test-fixtures');
-const SiteLoader = require('../utils/site-loader');
 const {
   safeNavigate,
   waitForPageStability,
 } = require('../utils/test-helpers');
-const { TestDataFactory, createTestData } = require('../utils/test-data-factory');
+const { createTestData } = require('../utils/test-data-factory');
 const { WordPressPageObjects } = require('../utils/wordpress-page-objects');
 const { attachSchemaSummary } = require('../utils/reporting-utils');
-const { createRunSummaryPayload, createPageSummaryPayload } = require('../utils/report-schema');
+const {
+  buildRunSummaryPayload,
+  buildPageSummaryPayload,
+} = require('../utils/report-summary-builder');
 
-const slugify = (value) =>
-  String(value || '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '') || 'root';
+let siteConfig;
 
-const buildInteractiveSchemaPayloads = ({
-  pages,
-  consoleErrors,
-  resourceErrors,
-  resourceBudget,
-  projectName,
-}) => {
+const buildInteractiveSchemaPayloads = ({ pages, resourceBudget, projectName }) => {
   if (!Array.isArray(pages) || pages.length === 0) return null;
 
   const enrichedPages = pages.map((entry) => {
@@ -70,8 +62,9 @@ const buildInteractiveSchemaPayloads = ({
   const pagesWithWarnings = enrichedPages.filter((entry) => entry.warnings.length > 0).length;
   const pagesWithGatingIssues = enrichedPages.filter((entry) => entry.gating.length > 0).length;
 
-  const runPayload = createRunSummaryPayload({
-    baseName: `interactive-${slugify(projectName)}`,
+  const runPayload = buildRunSummaryPayload({
+    prefix: 'interactive',
+    key: projectName,
     title: 'Interactive smoke summary',
     overview: {
       totalPages: pages.length,
@@ -119,11 +112,12 @@ const buildInteractiveSchemaPayloads = ({
       failure: error.failure || null,
     }));
 
-    return createPageSummaryPayload({
-      baseName: `interactive-${slugify(projectName)}-${slugify(entry.page)}`,
-      title: `Interactive checks – ${entry.page}`,
-      page: entry.page,
+    return buildPageSummaryPayload({
+      prefix: 'interactive',
+      projectName,
       viewport: projectName,
+      page: entry.page,
+      title: `Interactive checks – ${entry.page}`,
       summary: {
         status: entry.status,
         gating: entry.gating,
@@ -148,16 +142,13 @@ const buildInteractiveSchemaPayloads = ({
 };
 
 test.describe('Functionality: Interactive Elements', () => {
-  let siteConfig;
-  let errorContext;
+  test.beforeAll(async ({ siteConfig: resolvedConfig }) => {
+    siteConfig = resolvedConfig;
+  });
+
   let wpPageObjects;
 
-  test.beforeEach(async ({ page, context, errorContext: sharedErrorContext }, testInfo) => {
-    const siteName = process.env.SITE_NAME;
-    if (!siteName) throw new Error('SITE_NAME environment variable is required');
-    siteConfig = SiteLoader.loadSite(siteName);
-    SiteLoader.validateSiteConfig(siteConfig);
-    errorContext = sharedErrorContext;
+  test.beforeEach(async ({ page }) => {
     wpPageObjects = new WordPressPageObjects(page, siteConfig);
   });
 
@@ -173,7 +164,7 @@ test.describe('Functionality: Interactive Elements', () => {
     const ignoreMatchers = [...defaultIgnored, ...siteIgnored].map((pattern) => {
       try {
         return new RegExp(pattern, 'i');
-      } catch (error) {
+      } catch (_error) {
         const escaped = pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         return new RegExp(escaped, 'i');
       }
@@ -329,7 +320,7 @@ test.describe('Functionality: Interactive Elements', () => {
     }
   });
 
-  test('Form interactions and validation (if configured)', async ({ page }) => {
+  test('Form interactions and validation (if configured)', async () => {
     test.setTimeout(7200000);
     if (!siteConfig.forms || siteConfig.forms.length === 0) {
       console.log('ℹ️  No forms configured for testing');

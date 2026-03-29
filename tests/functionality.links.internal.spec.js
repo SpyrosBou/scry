@@ -191,14 +191,12 @@ const buildLinksSchemaPayloads = (pages, brokenLinks, projectName, config = {}) 
 
 test.describe('Functionality: Internal Links', () => {
   let siteConfig;
-  let errorContext;
 
-  test.beforeEach(async ({ page, context, errorContext: sharedErrorContext }, testInfo) => {
+  test.beforeEach(() => {
     const siteName = process.env.SITE_NAME;
     if (!siteName) throw new Error('SITE_NAME environment variable is required');
     siteConfig = SiteLoader.loadSite(siteName);
     SiteLoader.validateSiteConfig(siteConfig);
-    errorContext = sharedErrorContext;
   });
 
   test('Validate internal links across pages (rate-limited)', async ({ page }) => {

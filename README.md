@@ -2,12 +2,19 @@
 
 Automated Playwright-powered testing harness for auditing WordPress websites across functionality, responsiveness, accessibility, and visual regression criteria. The suite standardises how sites are exercised, captures rich HTML (HyperText Markup Language) reports, and keeps a historical record of findings for ongoing quality assurance.
 
+> Last updated for version 2025.11.12-agents-refresh (ref 0eb768b).
+
 ## Key Capabilities
 - Generates Solarized-themed HTML reports with parity to the approved reporting mocks.
 - Supports functionality, responsive, accessibility, and visual regression suites with per-page manifest control.
 - Ships helper utilities for schema validation, reporting payloads, and Playwright fixtures.
 - Discovers site pages from sitemaps and manages baseline snapshots for intentional UI (User Interface) changes.
 - Provides cleanup and regeneration scripts to keep artifacts tidy during development.
+
+## Package-Lite Distribution
+- `../a11y-testing` contains an accessibility-focused copy of this repo for lightweight handoffs. The folder mirrors the main codebase (minus `.git`) so teams that emphasise WCAG (Web Content Accessibility Guidelines) sweeps can stay focused.
+- All helper utilities, manifests, and scripts remain intact in that folder, so you can still run `node run-tests.js --site <name> --pages <n|all> --accessibility`.
+- When you update shared helpers or docs, mirror any relevant accessibility guidance inside `../a11y-testing` so both distributions stay aligned.
 
 ## Getting Started
 
@@ -48,6 +55,7 @@ node run-tests.js --site example-site --pages 5 --responsive
   - Reuse by name (refresh sitemap-backed pages only): `npm run discover -- woodworking-ddev`
   - Flags supported: `--base-url|--baseUrl`, `--site-name|--config-name`, `--name|--display`, `--yes|-y`, `--no|-n`, `--allow-duplicate`, `--local`, `--help`.
   - Behavior: if a config for the base URL already exists, it will be reused unless `--allow-duplicate` is passed. In interactive mode you’ll be prompted; in non-interactive mode pair `--yes` with the necessary flags. When a sitemap strategy is missing, `--discover` seeds one that points to `<baseUrl>/sitemap.xml` and persists new pages back to `sites/<name>.json`.
+  - Host guard rails: when sitemap URLs resolve to a different host (for example `example.com` vs `www.example.com`), discovery now warns, temporarily follows the alternate host so `testPages` stay populated, and automatically rewrites `baseUrl` and `discover.sitemapUrl` in the site config to that canonical host.
 - **Debugging:** use `--debug` for Playwright trace mode or `--output <path>` to persist manifest JSON.
 - **Baseline refresh:** append `--update-baselines` alongside `--site` to regenerate visual baselines (skips functional runs and exits after Playwright completes).
 - **Page cap:** omit `--pages` to use the default of 5, pass a positive integer to override, or use `--pages all` to test every available page.
@@ -69,15 +77,21 @@ node run-tests.js --site example-site --pages 5 --responsive
 Helpful environment variables:
 - `REPORT_BROWSER` and `REPORT_BROWSER_ARGS` force a specific viewer when opening reports.
 - `A11Y_SAMPLE=<n>` caps accessibility sampling when the suite is large.
+- `A11Y_PARALLEL_PAGES`, `A11Y_STRUCTURE_CONCURRENCY`, `A11Y_KEYBOARD_CONCURRENCY`, `A11Y_MOTION_CONCURRENCY`, `A11Y_REFLOW_CONCURRENCY`, and `A11Y_IFRAME_CONCURRENCY` tune how many accessibility pages audit simultaneously (defaults auto-scale based on CPU count).
+- `A11Y_PARALLEL_PAGES`, `A11Y_STRUCTURE_CONCURRENCY`, and `A11Y_KEYBOARD_CONCURRENCY` control how many accessibility audits run concurrently (defaults to a small CPU-aware limit so we stay performant without hammering target sites).
 
 ## Reports and Artifacts
 - Run outputs live under `reports/run-*/` with HTML in `report.html` and structured data in `data/run.json`.
+- The custom HTML reporter is always enabled (even on CI) so every run includes `report.html` plus `data/run.json`; CI simply layers Playwright's `blob` reporter on top for merges.
+- Binary attachments (screenshots, diffs, and other large blobs) are saved beside the run as files under `reports/run-*/data/attachments/` and the HTML references them relatively so even extremely large accessibility runs do not try to inline hundreds of megabytes of base64 data (which previously caused the reporter to crash before writing `report.html`). The reporter retains the first 20 Playwright screenshots per test (`REPORT_IMAGE_LIMIT=<n>` raises the cap or `0`/`infinity` disables it).
 - Large manifests are written to `reports/run-manifests/`; trim that folder with `npm run clean:manifests [days]` (default 15 days) when it grows.
 - Capture run manifests and summaries programmatically with `--output ./reports/run-summary.json` — the file contains one entry per site with manifest metadata and report status.
 - Use `npm run reports:dev` to start a preview server with live reload at http://127.0.0.1:4173/ (default). It watches `reports/run-*`, `reports/latest-run.json`, plus the template and SCSS sources in `utils/` and `docs/mocks/`, auto-refreshing immediately when report data, styling, or helper code changes.
 - Override the preview port with `--port` or `REPORT_PORT`, and lock the viewer to a specific run via `--run run-YYYYMMDD-HHMMSS`.
 - Use `npm run reports:read [count]` to open the most recent report(s) without hunting filenames.
 - Regenerate an interactive report from stored data via `npm run reports:regenerate`.
+- Status summary pills in the HTML report now display zero counts (e.g., “0 blockers”) so stakeholders can distinguish a clean run from missing data.
+- When tweaking `styles/report/report-styles.scss`, run `npm run styles:build` to refresh the precompiled CSS that the runtime embeds—Sass no longer compiles on import.
 - Clean up old artifacts with `npm run clean:reports`, `npm run clean:manifests`, or `npm run clean:test-results`.
 - If a suite ran but didn’t emit schema summaries (for example, all pages returned non‑200), the report now force‑renders a placeholder panel for that suite so it’s still visible in the sidebar and “Suites at a glance”. The “Test details” panel will contain logs to diagnose why the suite produced no data.
 - WCAG column scoping: the “WCAG level” column appears only in accessibility tables (WCAG audit, keyboard, reflow, reduced‑motion, iframe, and structural a11y). Other suites (links, interactive, availability, performance, responsive) don’t render this column.
@@ -88,26 +102,26 @@ Helpful environment variables:
   - Keyboard audit continues to attach focused‑element screenshots when focus indicators are missing.
 
 ## Reporter Layout Migration Guide
-- **Layout blueprint:** Every spec panel now targets the four-block structure used by the WCAG (Web Content Accessibility Guidelines) audit — run summary, gating violations, best-practice advisories, and per-page findings. Reuse `renderUnifiedIssuesTable` for the first two tables and `renderPerPageAccordion` plus a spec-specific page card renderer for the accordion.
-- **Specs completed (four-section layout + deduped tables):**
+- **Layout blueprint:** Every spec panel now renders three shared sections — unique gating violations, unique advisories/best-practice findings, and the per-page accordion. Reuse `renderUnifiedIssuesTable` for the first two tables and `renderPerPageAccordion` plus a spec-specific page card renderer for the accordion.
+- **Specs completed (shared layout + deduped tables):**
   - `tests/a11y.audit.wcag.spec.js` (reference implementation).
-  - `tests/a11y.keyboard.navigation.spec.js` — keyboard run summary funnels `gating`, `warnings` (execution failures), and `advisories` through `renderUnifiedIssuesTable`, and the per-page card maps focus metrics + issues via `renderKeyboardPageIssuesTable`.
+  - `tests/a11y.keyboard.navigation.spec.js` — keyboard results funnel `gating`, `warnings` (execution failures), and `advisories` through `renderUnifiedIssuesTable`, and the per-page card maps focus metrics + issues via `renderKeyboardPageIssuesTable`.
   - `tests/a11y.structure.landmarks.spec.js` — structural semantics summary collapses `gatingIssues`, `headingSkips`, `warnings`, and `advisories` into the shared tables and per-page card generated by `renderStructurePageCard`.
   - `tests/functionality.links.internal.spec.js` — internal link integrity uses `renderInternalLinksPageCard`, with `collectIssueMessages` deduping link failures before they hit the run-level tables.
   - `tests/functionality.interactive.smoke.spec.js` — console and API (Application Programming Interface) stability normalises console/resource messages through `normalizeInteractiveMessage`, feeding `renderUnifiedIssuesTable` and the per-page card so repeated Playwright retries collapse into one row.
 - **Remaining specs to migrate:** Functionality infrastructure panels (`renderAvailabilityGroupHtml`, `renderHttpGroupHtml`, `renderPerformanceGroupHtml`), responsive layout suites, and visual regression reports still use bespoke markup; track progress in `docs/reporting-redesign-roadmap.md`.
 - **Porting checklist for new specs:**
-  1. Update the group renderer in `utils/report-templates.js` to compose the four sections in order. Always call `collectIssueMessages` (with a spec-specific normaliser) so gating/advisory tables show unique rows.
+  1. Update the group renderer in `utils/report-templates.js` to compose the three sections in order (gating table, advisory table, per-page accordion). Always call `collectIssueMessages` (with a spec-specific normaliser) so gating/advisory tables show unique rows.
   2. Ensure the per-page data passed to `renderPerPageAccordion` includes `_summaryClass` so status pills match gating severity. Extend or create a `render<SpecName>PageCard` helper instead of inlining markup.
   3. If raw findings contain noisy output (for example Playwright call logs), add a normaliser beside `normalizeInteractiveMessage` to trim ANSI (American National Standards Institute) codes, collapse whitespace, and simplify URLs via `simplifyUrlForDisplay`.
-  4. Regenerate the target report with `npm run reports:regenerate -- run-<id>` and validate in the browser that the new layout matches the WCAG panel (run summary copy, table headings, badge classes, accordion controls).
+  4. Regenerate the target report with `npm run reports:regenerate -- run-<id>` and validate in the browser that the new layout matches the WCAG panel (table headings, badge classes, accordion controls).
   5. Document the migration in `docs/reporting-redesign-roadmap.md` and append the spec status entry in `plan.md` so future contributors follow the exact same steps.
 
 ## Project Structure
 - `sites/` – JSON configs describing environments and page manifests.
 - `tests/` – Playwright specs grouped by suite family (responsive, functionality, accessibility, visual) plus `unit/` tests.
 - `utils/` – shared helpers including `test-runner.js`, fixtures, reporting utilities, and schema logic.
-- `scripts/` – Node scripts backing CLI commands (`discover`, `install-browsers`, `cleanup`, report tools).
+- `scripts/` – Node scripts grouped by concern (`discovery/`, `reporting/`, `maintenance/`, `runtime/`). See `scripts/README.md` for the current tree.
 - `docs/` – reference material, reporting mocks, and the redesign roadmap.
 - `reports/` & `test-results/` – generated artifacts (safe to delete; regenerated on demand).
 
@@ -121,7 +135,8 @@ Helpful environment variables:
   ```
 
 ## Linting and Tests
-- Lint JavaScript with `npm run lint` (or `npm run lint:fix` to auto-format where possible).
+- Lint all JavaScript sources with `npm run lint` (or `npm run lint:fix` to auto-format where possible). The flat config now warns on unused `eslint-disable` directives so lingering suppressions can be cleaned up quickly and includes Playwright spec overrides with browser globals.
+- Enforce shared helper/config formatting with `npm run prettier:check` (or `npm run prettier:write`) so the scriptable JS modules tracked by `.prettierrc` stay aligned.
 - Execute Node unit tests with `npm run test:unit`.
 - Use suite shortcuts such as `npm run test:visual -- --site=<name> [--pages=<n|all>]` to mirror reporter commands.
 
@@ -138,9 +153,11 @@ Helpful environment variables:
 - Update documentation (`README.md`, `docs/`) alongside any user-facing changes or new workflows.
 - Adhere to Conventional Commits, one logical change per commit, and keep commit messages under 72 characters.
 
+> README last updated for commit `8c3c2d5aa2f85ba5084881575846702212686305`.
+
 ## Roadmap and References
 - Reporting parity progress: `docs/reporting-redesign-roadmap.md`
-- Design tokens and styling: `docs/mocks/report-styles.scss`
+- Design tokens and styling: `styles/report/report-styles.scss`
 - Full mock report reference: `docs/mocks/full-run-report.html`
 - Schema inventory (planned): tracked in `docs/reporting-redesign-roadmap.md` until `docs/report-schema-inventory.md` lands.
 

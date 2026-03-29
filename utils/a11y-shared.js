@@ -1,3 +1,8 @@
+const {
+  resolveReportMetadata,
+  applyViewportMetadata: applyMetadata,
+} = require('./report-metadata');
+
 const DEFAULT_ACCESSIBILITY_SAMPLE = 'all';
 
 const ensureHomepageFirst = (pages = []) => {
@@ -15,6 +20,11 @@ const ensureHomepageFirst = (pages = []) => {
   }
 
   return unique;
+};
+
+const uniquePagesPreserveOrder = (pages = []) => {
+  const filtered = Array.isArray(pages) ? pages.filter((page) => typeof page === 'string') : [];
+  return Array.from(new Set(filtered));
 };
 
 const parseSampleSetting = (value) => {
@@ -61,7 +71,10 @@ const resolveSampleSetting = (
 };
 
 const selectAccessibilityTestPages = (siteConfig, options = {}) => {
-  const pages = ensureHomepageFirst(siteConfig?.testPages || []);
+  const pages =
+    siteConfig?.includeHomepage === false
+      ? uniquePagesPreserveOrder(siteConfig?.testPages || [])
+      : ensureHomepageFirst(siteConfig?.testPages || []);
   const sampleSetting = resolveSampleSetting(siteConfig, options);
 
   if (sampleSetting === 'all') {
@@ -99,4 +112,7 @@ module.exports = {
   parseSampleSetting,
   resolveSampleSetting,
   selectAccessibilityTestPages,
+  resolveAccessibilityMetadata: resolveReportMetadata,
+  applyViewportMetadata: (items, viewportLabel, siteLabel) =>
+    applyMetadata(items, { viewportLabel, siteLabel }),
 };

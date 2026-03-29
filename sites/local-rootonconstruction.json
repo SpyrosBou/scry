@@ -1,0 +1,21 @@
+{
+  "name": "Local - Rooton Construction (built from rootOn)",
+  "baseUrl": "http://127.0.0.1:4174",
+  "includeHomepage": false,
+  "testPages": ["/projects/rootonconstruction/"],
+  "forms": [
+    {
+      "name": "Contact form",
+      "page": "/projects/rootonconstruction/",
+      "selector": "#contact form",
+      "submitButton": "button[type='submit']",
+      "fields": {
+        "firstName": "#firstName",
+        "lastName": "#lastName",
+        "email": "#email",
+        "subject": "#subject",
+        "message": "#message"
+      }
+    }
+  ]
+}

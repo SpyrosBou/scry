@@ -9,6 +9,7 @@ const {
     renderVisualPageCard,
   },
 } = require('../../utils/report-templates');
+const { renderStatusSummaryList } = require('../../utils/report-template-helpers');
 
 test('renderIssueSectionPair renders gating and advisory sections', () => {
   const html = renderIssueSectionPair({
@@ -122,4 +123,22 @@ test('renderVisualPageCard summarizes diff results and artifacts', () => {
   assert.match(html, /baseline\.png/);
   assert.match(html, /Minor padding change/);
   assert.match(html, /Verify hero image spacing/);
+});
+
+test('renderStatusSummaryList keeps zero counts but omits empty values', () => {
+  const html = renderStatusSummaryList(
+    [
+      { label: 'Blockers', count: 0, tone: 'status-error' },
+      { label: 'Warnings', count: 3, tone: 'status-warn' },
+      { label: 'Missing', count: null },
+    ],
+    { className: 'custom-summary' }
+  );
+
+  assert.match(html, /custom-summary/);
+  assert.match(html, /Blockers/);
+  assert.match(html, />0<\/span>/);
+  assert.match(html, /Warnings/);
+  assert.match(html, />3<\/span>/);
+  assert.doesNotMatch(html, /Missing/);
 });

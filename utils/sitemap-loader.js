@@ -11,6 +11,18 @@ const fetchFn = globalThis.fetch
 const DEFAULT_MAX_PAGES = Number.POSITIVE_INFINITY;
 const DEFAULT_MAX_DEPTH = Number.POSITIVE_INFINITY;
 
+const normaliseHost = (value) =>
+  String(value || '')
+    .trim()
+    .toLowerCase();
+const stripWww = (host) => normaliseHost(host).replace(/^www\./, '');
+const hostsShareBaseLabel = (a, b) => {
+  if (!a || !b) return false;
+  return stripWww(a) === stripWww(b);
+};
+const trimTrailingSlash = (value) =>
+  typeof value === 'string' ? value.replace(/\/+$/, '') : value;
+
 const parseLimit = (value) => {
   if (value === undefined || value === null) return null;
   if (typeof value === 'string') {
@@ -69,17 +81,31 @@ function isSitemapIndex(xml) {
   return /<sitemapindex[\s>]/i.test(xml);
 }
 
-function normalizeToPath(urlString, baseUrl) {
+function getHost(urlString) {
   try {
-    const url = new URL(urlString);
-    const base = new URL(baseUrl);
-    if (url.origin !== base.origin) {
-      return null;
-    }
-    return url.pathname.endsWith('/') ? url.pathname : `${url.pathname}/`.replace(/\/+$/, '/');
+    return new URL(urlString).host;
   } catch (_error) {
     return null;
   }
+}
+
+function normalizeToPath(urlString, baseUrl, { allowHostAlias = false } = {}) {
+  let url;
+  let base;
+  try {
+    url = new URL(urlString);
+    base = new URL(baseUrl);
+  } catch (_error) {
+    return null;
+  }
+
+  const sameOrigin = url.origin === base.origin;
+  const aliasOrigin = allowHostAlias && hostsShareBaseLabel(url.host, base.host);
+  if (!sameOrigin && !aliasOrigin) {
+    return null;
+  }
+
+  return url.pathname.endsWith('/') ? url.pathname : `${url.pathname}/`.replace(/\/+$/, '/');
 }
 
 async function fetchXml(url, redirectCount = 0) {
@@ -177,11 +203,33 @@ async function collectUrls(url, options, visited, depth) {
   }
 }
 
-function filterAndNormalize(urls, baseUrl, includePatterns, excludePatterns, maxPages) {
+function filterAndNormalize(
+  urls,
+  baseUrl,
+  includePatterns,
+  excludePatterns,
+  maxPages,
+  options = {}
+) {
   const normalized = [];
+  const mismatchedHosts = new Map();
+  const baseHost = (() => {
+    try {
+      return new URL(baseUrl).host;
+    } catch (_error) {
+      return '';
+    }
+  })();
+
   for (const url of urls) {
-    const path = normalizeToPath(url, baseUrl);
-    if (!path) continue;
+    const path = normalizeToPath(url, baseUrl, options);
+    if (!path) {
+      const host = getHost(url);
+      if (host && host !== baseHost) {
+        mismatchedHosts.set(host, (mismatchedHosts.get(host) || 0) + 1);
+      }
+      continue;
+    }
     if (excludePatterns.some((pattern) => pattern.test(path))) continue;
     if (includePatterns.length > 0 && !includePatterns.some((pattern) => pattern.test(path))) {
       continue;
@@ -189,7 +237,7 @@ function filterAndNormalize(urls, baseUrl, includePatterns, excludePatterns, max
     normalized.push(path);
     if (normalized.length >= maxPages) break;
   }
-  return normalized;
+  return { normalized, mismatchedHosts };
 }
 
 async function discoverFromSitemap(siteConfig, discoverConfig = {}) {
@@ -200,6 +248,8 @@ async function discoverFromSitemap(siteConfig, discoverConfig = {}) {
   }
 
   const sitemapUrl = discoverConfig.sitemapUrl || `${baseUrl.replace(/\/$/, '')}/sitemap.xml`;
+  const baseHost = getHost(baseUrl) || '';
+  const sitemapHost = getHost(sitemapUrl) || '';
   const resolvedMaxPages = parseLimit(discoverConfig.maxPages);
   const resolvedMaxDepth = parseLimit(discoverConfig.maxDepth);
   const options = {
@@ -221,15 +271,72 @@ async function discoverFromSitemap(siteConfig, discoverConfig = {}) {
 
   const visited = new Set();
   const collected = await collectUrls(sitemapUrl, options, visited, 0);
-  if (collected.length === 0) return [];
 
-  const normalized = filterAndNormalize(
-    collected,
-    baseUrl,
-    includePatterns,
-    excludePatterns,
-    options.maxPages
-  );
+  let normalized = [];
+  let mismatchedHosts = new Map();
+  let resolvedBaseUrl = trimTrailingSlash(baseUrl);
+  let hostAdjusted = false;
+
+  if (collected.length > 0) {
+    const filtered = filterAndNormalize(
+      collected,
+      baseUrl,
+      includePatterns,
+      excludePatterns,
+      options.maxPages
+    );
+    normalized = filtered.normalized;
+    mismatchedHosts = filtered.mismatchedHosts;
+
+    if (normalized.length === 0 && mismatchedHosts.size > 0) {
+      const aliasHost = [...mismatchedHosts.keys()].find((host) =>
+        hostsShareBaseLabel(host, baseHost)
+      );
+
+      if (aliasHost) {
+        const aliasUrl = new URL(baseUrl);
+        aliasUrl.host = aliasHost;
+        const retry = filterAndNormalize(
+          collected,
+          aliasUrl.toString(),
+          includePatterns,
+          excludePatterns,
+          options.maxPages,
+          { allowHostAlias: true }
+        );
+
+        if (retry.normalized.length > 0) {
+          normalized = retry.normalized;
+          mismatchedHosts = retry.mismatchedHosts;
+          resolvedBaseUrl = trimTrailingSlash(aliasUrl.toString());
+          hostAdjusted = true;
+          console.warn(
+            `⚠️  Sitemap host mismatch detected (${baseHost} vs ${aliasHost}); falling back to ${aliasHost} for discovery. Update baseUrl or discover.sitemapUrl to skip this warning.`
+          );
+        }
+      }
+
+      if (normalized.length === 0) {
+        const offendingHost = [...mismatchedHosts.keys()][0];
+        console.warn(
+          `⚠️  Sitemap entries resolved to ${offendingHost}, but baseUrl host ${baseHost} does not match. Update your site config baseUrl/discover.sitemapUrl.`
+        );
+      }
+    }
+  }
+
+  if (collected.length === 0) {
+    const empty = [];
+    empty.meta = {
+      baseHost,
+      sitemapHost,
+      resolvedHost: getHost(resolvedBaseUrl) || baseHost,
+      resolvedBaseUrl,
+      hostAdjusted: false,
+      mismatchedHosts: [],
+    };
+    return empty;
+  }
 
   const unique = Array.from(new Set(normalized));
 
@@ -242,6 +349,18 @@ async function discoverFromSitemap(siteConfig, discoverConfig = {}) {
   } else {
     unique.unshift('/');
   }
+
+  unique.meta = {
+    baseHost,
+    sitemapHost,
+    resolvedHost: getHost(resolvedBaseUrl) || baseHost,
+    resolvedBaseUrl,
+    hostAdjusted,
+    mismatchedHosts: Array.from(mismatchedHosts.entries()).map(([host, count]) => ({
+      host,
+      count,
+    })),
+  };
 
   return unique;
 }

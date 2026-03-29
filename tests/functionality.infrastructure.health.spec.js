@@ -328,18 +328,6 @@ const buildPerformanceSchemaPayloads = (data, breaches, projectName) => {
     })
   );
 
-  runPayload.details = {
-    pages: data.map((entry) => ({
-      page: entry.page,
-      loadTimeMs: roundMetric(entry.loadTime),
-      domContentLoadedMs: roundMetric(entry.domContentLoaded),
-      loadCompleteMs: roundMetric(entry.loadComplete),
-      firstPaintMs: roundMetric(entry.firstPaint),
-      firstContentfulPaintMs: roundMetric(entry.firstContentfulPaint),
-      budgetBreaches: breachMap.get(entry.page) || [],
-    })),
-  };
-
   return { runPayload, pagePayloads };
 };
 
@@ -348,7 +336,7 @@ test.describe('Functionality: Core Infrastructure', () => {
   let errorContext;
   let wpPageObjects;
 
-  test.beforeEach(async ({ page, context, errorContext: sharedErrorContext }, testInfo) => {
+  test.beforeEach(async ({ page, errorContext: sharedErrorContext }) => {
     const siteName = process.env.SITE_NAME;
     if (!siteName) throw new Error('SITE_NAME environment variable is required');
 

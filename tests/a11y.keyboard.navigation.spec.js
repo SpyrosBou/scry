@@ -5,17 +5,19 @@ test.use({ trace: 'off', video: 'off' });
 
 const { PNG } = require('pngjs');
 const SiteLoader = require('../utils/site-loader');
+const { runPageTasks, resolveConcurrencyLimit } = require('../utils/concurrency-helpers');
+const {
+  selectAccessibilityTestPages,
+  DEFAULT_ACCESSIBILITY_SAMPLE,
+  resolveAccessibilityMetadata,
+  applyViewportMetadata,
+} = require('../utils/a11y-shared');
 const {
   safeNavigate,
   waitForPageStability,
 } = require('../utils/test-helpers');
 const { attachSchemaSummary } = require('../utils/reporting-utils');
 const { createRunSummaryPayload, createPageSummaryPayload } = require('../utils/report-schema');
-const {
-  DEFAULT_ACCESSIBILITY_SAMPLE,
-  selectAccessibilityTestPages,
-} = require('../utils/a11y-shared');
-
 const KEYBOARD_WCAG_REFERENCES = [
   { id: '2.1.1', name: 'Keyboard', level: 'A' },
   { id: '2.1.2', name: 'No Keyboard Trap', level: 'A' },
@@ -281,18 +283,16 @@ const describeFocusTarget = (snapshot) => {
 
 test.describe('Accessibility: Keyboard navigation', () => {
   let siteConfig;
-  let errorContext;
 
-  test.beforeEach(async ({ page, context, errorContext: sharedErrorContext }, testInfo) => {
+  test.beforeEach(() => {
     const siteName = process.env.SITE_NAME;
     if (!siteName) throw new Error('SITE_NAME environment variable is required');
 
     siteConfig = SiteLoader.loadSite(siteName);
     SiteLoader.validateSiteConfig(siteConfig);
-    errorContext = sharedErrorContext;
   });
 
-  test('Keyboard focus flows are accessible', async ({ page }, testInfo) => {
+  test('Keyboard focus flows are accessible', async ({ browser }, testInfo) => {
     test.setTimeout(7200000);
 
     const pages = selectAccessibilityTestPages(siteConfig, {
@@ -300,158 +300,28 @@ test.describe('Accessibility: Keyboard navigation', () => {
       configKeys: ['a11yKeyboardSampleSize', 'a11yResponsiveSampleSize'],
     });
 
-    const reports = [];
     const maxTabIterations = Number(process.env.A11Y_KEYBOARD_STEPS || DEFAULT_MAX_TAB_ITERATIONS);
+    const concurrency = resolveConcurrencyLimit(
+      process.env.A11Y_KEYBOARD_CONCURRENCY,
+      process.env.A11Y_PARALLEL_PAGES
+    );
 
-    for (const testPage of pages) {
-      await test.step(`Keyboard audit: ${testPage}`, async () => {
-        const report = {
-          page: testPage,
-          focusableCount: 0,
-          visitedCount: 0,
-          skipLink: null,
-          gating: [],
-          warnings: [],
-          advisories: [],
-          sequence: [],
-          notes: [],
-        };
-        reports.push(report);
-
-        let response;
-        try {
-          response = await safeNavigate(page, `${siteConfig.baseUrl}${testPage}`);
-        } catch (error) {
-          report.gating.push(`Navigation failed: ${error.message}`);
-          return;
-        }
-
-        if (!response || response.status() >= 400) {
-          report.gating.push(
-            `Received HTTP status ${response ? response.status() : 'unknown'} when loading page.`
-          );
-          return;
-        }
-
-        const stability = await waitForPageStability(page);
-        if (!stability.ok) {
-          report.gating.push(`Page did not reach a stable state: ${stability.message}`);
-          return;
-        }
-
-        const focusable = await page.evaluate(focusableElementScript);
-        report.focusableCount = focusable.length;
-        if (focusable.length === 0) {
-          report.gating.push('No focusable elements detected on page.');
-          return;
-        }
-
-        report.skipLink = await page.evaluate(skipLinkMetadataScript);
-        if (!report.skipLink) {
-          report.advisories.push(
-            createKeyboardAdvisory('Skip navigation link not detected near top of document.', '2.4.1', {
-              summary: 'Skip navigation link not detected near top of document.',
-            })
-          );
-        }
-
-        await page.evaluate(() => {
-          if (document.body) document.body.focus({ preventScroll: true });
-        });
-
-        const visited = [];
-
-        for (let step = 0; step < Math.min(maxTabIterations, focusable.length); step += 1) {
-          await page.keyboard.press('Tab');
-          await page.waitForTimeout(75);
-
-          const snapshot = await page.evaluate(activeElementSnapshotScript);
-          if (!snapshot || snapshot.type === 'none') {
-            report.gating.push('No active element after tabbing — possible focus trap.');
-            break;
-          }
-
-          if (snapshot.isBody) {
-            report.gating.push('Tab order returned focus to <body>, indicating a keyboard trap.');
-            break;
-          }
-
-          const identity = `${snapshot.tag}|${snapshot.id || ''}|${snapshot.role || ''}|${snapshot.label || ''}`;
-          visited.push(identity);
-
-          const activeElementHandle = await page.evaluateHandle(() => document.activeElement);
-          let hasIndicator = false;
-          let nodeScreenshot = null;
-          if (activeElementHandle && activeElementHandle.asElement()) {
-            const result = await detectFocusIndicator(page, activeElementHandle.asElement());
-            hasIndicator = result.hasIndicator;
-            nodeScreenshot = result.screenshotDataUri || null;
-          }
-          if (activeElementHandle) await activeElementHandle.dispose();
-
-          if (!snapshot.isVisible) {
-            report.gating.push(
-              `Keyboard focus moved to an element that is visually hidden (${snapshot.tag} ${snapshot.id ? `#${snapshot.id}` : ''}).`
-            );
-          }
-          if (!hasIndicator) {
-            const focusTarget = describeFocusTarget(snapshot);
-            report.advisories.push(
-              createKeyboardAdvisory(
-                `Unable to detect focus indicator change for ${focusTarget.descriptor} (${focusTarget.label}).`,
-                '2.4.7',
-                {
-                  summary: 'Unable to detect focus indicator change',
-                  samples: [
-                    { label: focusTarget.sample, screenshotDataUri: nodeScreenshot },
-                  ],
-                }
-              )
-            );
-          }
-
-          report.sequence.push({
-            index: step + 1,
-            hasIndicator,
-            summary: `${snapshot.tag}${snapshot.id ? `#${snapshot.id}` : ''}${
-              snapshot.role ? ` [role=${snapshot.role}]` : ''
-            } — ${snapshot.label || 'no accessible label'}`,
-          });
-        }
-
-        report.visitedCount = visited.length;
-
-        if (visited.length <= 1 && focusable.length > 1) {
-          report.gating.push('Tab order did not progress beyond the first interactive element.');
-        }
-
-        if (visited.length > 1) {
-          await page.keyboard.press('Shift+Tab');
-          await page.waitForTimeout(75);
-          const reverseSnapshot = await page.evaluate(activeElementSnapshotScript);
-          if (!reverseSnapshot || reverseSnapshot.isBody) {
-            report.gating.push('Reverse tabbing returned focus to <body>; keyboard users may get trapped.');
-          }
-          await page.keyboard.press('Tab');
-          await page.waitForTimeout(50);
-        }
-
-        report.notes.push(
-          `Traversed ${report.visitedCount} of ${report.focusableCount} focusable elements in tab sequence.`
-        );
-        if (report.skipLink && (report.skipLink.text || report.skipLink.href)) {
-          report.notes.push(
-            `Skip link detected (${report.skipLink.text || report.skipLink.href}) targeting ${report.skipLink.href}.`
-          );
-        }
-      });
-    }
+    const reports = await runPageTasks(
+      browser,
+      pages,
+      async ({ page, pagePath }) =>
+        runKeyboardAudit(page, siteConfig, pagePath, {
+          maxTabIterations,
+        }),
+      { concurrency, testInfo, logLabel: 'Keyboard audit' }
+    );
 
     const gatingTotal = reports.reduce((total, report) => total + report.gating.length, 0);
-    const projectName = siteConfig.name || process.env.SITE_NAME || 'default';
+    const { siteLabel, viewportLabel } = resolveAccessibilityMetadata(siteConfig, testInfo);
+    applyViewportMetadata(reports, viewportLabel, siteLabel);
 
     const runPayload = createRunSummaryPayload({
-      baseName: `a11y-keyboard-summary-${slugify(projectName)}`,
+      baseName: `a11y-keyboard-summary-${slugify(siteLabel)}`,
       title: 'Keyboard navigation summary',
       overview: {
         totalPagesAudited: reports.length,
@@ -462,12 +332,15 @@ test.describe('Accessibility: Keyboard navigation', () => {
       metadata: {
         spec: 'a11y.keyboard.navigation',
         summaryType: 'keyboard',
-        projectName,
+        projectName: siteLabel,
+        siteName: siteLabel,
+        viewports: [viewportLabel],
         suppressPageEntries: true,
         scope: 'project',
       },
     });
   runPayload.details = {
+    viewports: [viewportLabel],
     pages: reports.map((report) => ({
       page: report.page,
       focusableCount: report.focusableCount,
@@ -478,6 +351,10 @@ test.describe('Accessibility: Keyboard navigation', () => {
       advisories: report.advisories,
       focusSequence: report.sequence,
       notes: report.notes,
+      projectName: viewportLabel,
+      browser: viewportLabel,
+      viewport: viewportLabel,
+      viewports: [viewportLabel],
     })),
     wcagReferences: KEYBOARD_WCAG_REFERENCES,
   };
@@ -485,10 +362,10 @@ test.describe('Accessibility: Keyboard navigation', () => {
 
     for (const report of reports) {
       const pagePayload = createPageSummaryPayload({
-        baseName: `a11y-keyboard-${slugify(projectName)}-${slugify(report.page)}`,
+        baseName: `a11y-keyboard-${slugify(siteLabel)}-${slugify(report.page)}`,
         title: `Keyboard audit — ${report.page}`,
         page: report.page,
-        viewport: 'keyboard',
+        viewport: viewportLabel,
         summary: {
           gatingIssues: report.gating,
           gating: report.gating,
@@ -499,11 +376,17 @@ test.describe('Accessibility: Keyboard navigation', () => {
           skipLink: report.skipLink,
           focusSequence: report.sequence,
           notes: report.notes,
+          projectName: viewportLabel,
+          browser: viewportLabel,
+          viewport: viewportLabel,
+          viewports: [viewportLabel],
         },
         metadata: {
           spec: 'a11y.keyboard.navigation',
           summaryType: 'keyboard',
-          projectName,
+          projectName: siteLabel,
+          siteName: siteLabel,
+          viewports: [viewportLabel],
         },
       });
       await attachSchemaSummary(testInfo, pagePayload);
@@ -512,3 +395,143 @@ test.describe('Accessibility: Keyboard navigation', () => {
     expect(gatingTotal, 'Keyboard navigation gating issues detected').toBe(0);
   });
 });
+
+async function runKeyboardAudit(page, siteConfig, testPage, { maxTabIterations }) {
+  const report = {
+    page: testPage,
+    focusableCount: 0,
+    visitedCount: 0,
+    skipLink: null,
+    gating: [],
+    warnings: [],
+    advisories: [],
+    sequence: [],
+    notes: [],
+  };
+
+  try {
+    const response = await safeNavigate(page, `${siteConfig.baseUrl}${testPage}`);
+    if (!response || response.status() >= 400) {
+      report.gating.push(
+        `Received HTTP status ${response ? response.status() : 'unknown'} when loading page.`
+      );
+      return report;
+    }
+
+    const stability = await waitForPageStability(page);
+    if (!stability.ok) {
+      report.gating.push(`Page did not reach a stable state: ${stability.message}`);
+      return report;
+    }
+
+    const focusable = await page.evaluate(focusableElementScript);
+    report.focusableCount = focusable.length;
+    if (focusable.length === 0) {
+      report.gating.push('No focusable elements detected on page.');
+      return report;
+    }
+
+    report.skipLink = await page.evaluate(skipLinkMetadataScript);
+    if (!report.skipLink) {
+      report.advisories.push(
+        createKeyboardAdvisory('Skip navigation link not detected near top of document.', '2.4.1', {
+          summary: 'Skip navigation link not detected near top of document.',
+        })
+      );
+    }
+
+    await page.evaluate(() => {
+      if (document.body) document.body.focus({ preventScroll: true });
+    });
+
+    const visited = [];
+
+    for (let step = 0; step < Math.min(maxTabIterations, focusable.length); step += 1) {
+      await page.keyboard.press('Tab');
+      await page.waitForTimeout(75);
+
+      const snapshot = await page.evaluate(activeElementSnapshotScript);
+      if (!snapshot || snapshot.type === 'none') {
+        report.gating.push('No active element after tabbing — possible focus trap.');
+        break;
+      }
+
+      if (snapshot.isBody) {
+        report.gating.push('Tab order returned focus to <body>, indicating a keyboard trap.');
+        break;
+      }
+
+      const identity = `${snapshot.tag}|${snapshot.id || ''}|${snapshot.role || ''}|${snapshot.label || ''}`;
+      visited.push(identity);
+
+      const activeElementHandle = await page.evaluateHandle(() => document.activeElement);
+      let hasIndicator = false;
+      let nodeScreenshot = null;
+      if (activeElementHandle && activeElementHandle.asElement()) {
+        const result = await detectFocusIndicator(page, activeElementHandle.asElement());
+        hasIndicator = result.hasIndicator;
+        nodeScreenshot = result.screenshotDataUri || null;
+      }
+      if (activeElementHandle) await activeElementHandle.dispose();
+
+      if (!snapshot.isVisible) {
+        report.gating.push(
+          `Keyboard focus moved to an element that is visually hidden (${snapshot.tag} ${snapshot.id ? `#${snapshot.id}` : ''}).`
+        );
+      }
+      if (!hasIndicator) {
+        const focusTarget = describeFocusTarget(snapshot);
+        report.advisories.push(
+          createKeyboardAdvisory(
+            `Unable to detect focus indicator change for ${focusTarget.descriptor} (${focusTarget.label}).`,
+            '2.4.7',
+            {
+              summary: 'Unable to detect focus indicator change',
+              samples: [{ label: focusTarget.sample, screenshotDataUri: nodeScreenshot }],
+            }
+          )
+        );
+      }
+
+      report.sequence.push({
+        index: step + 1,
+        hasIndicator,
+        summary: `${snapshot.tag}${snapshot.id ? `#${snapshot.id}` : ''}${
+          snapshot.role ? ` [role=${snapshot.role}]` : ''
+        } — ${snapshot.label || 'no accessible label'}`,
+      });
+    }
+
+    report.visitedCount = visited.length;
+
+    if (visited.length <= 1 && focusable.length > 1) {
+      report.gating.push('Tab order did not progress beyond the first interactive element.');
+    }
+
+    if (visited.length > 1) {
+      await page.keyboard.press('Shift+Tab');
+      await page.waitForTimeout(75);
+      const reverseSnapshot = await page.evaluate(activeElementSnapshotScript);
+      if (!reverseSnapshot || reverseSnapshot.isBody) {
+        report.gating.push('Reverse tabbing returned focus to <body>; keyboard users may get trapped.');
+      }
+      await page.keyboard.press('Tab');
+      await page.waitForTimeout(50);
+    }
+
+    report.notes.push(
+      `Traversed ${report.visitedCount} of ${report.focusableCount} focusable elements in tab sequence.`
+    );
+    if (report.skipLink && (report.skipLink.text || report.skipLink.href)) {
+      report.notes.push(
+        `Skip link detected (${report.skipLink.text || report.skipLink.href}) targeting ${report.skipLink.href}.`
+      );
+    }
+  } catch (error) {
+    report.gating.push(`Navigation failed: ${error.message}`);
+  } finally {
+    // cleaned up by runPageTasks
+  }
+
+  return report;
+}

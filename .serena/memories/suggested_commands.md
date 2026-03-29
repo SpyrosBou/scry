@@ -1,0 +1,11 @@
+- Install deps + browsers + report CSS: `npm run setup`
+- Refresh Playwright browsers only: `npm run install-browsers`
+- Build reporter styles after editing SCSS: `npm run styles:build`
+- Run the harness: `node run-tests.js --site <name> [--pages <n|all>] [--responsive|--functionality|--accessibility|--visual|--all-suites --exclude ...]`
+- Shortcut suites: `npm run test:responsive -- --site <name>`, `npm run test:functionality -- --site <name>`, etc.
+- Update visual baselines: `npm run baselines:update -- <site>` or append `--update-baselines` to a test run.
+- Discover/refresh site manifests: `npm run discover -- <site|https://base.url>`
+- Read latest HTML reports: `npm run reports:read [count]`
+- Clean artifacts: `npm run clean:reports`, `npm run clean:manifests`, `npm run clean:test-results`
+- Lint/format: `npm run lint`, `npm run lint:fix`, `npm run prettier:check`, `npm run prettier:write`
+- Node unit tests: `npm run test:unit`

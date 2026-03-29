@@ -10,6 +10,54 @@ const {
 } = require('./report-templates');
 const { SCHEMA_ID: SUMMARY_SCHEMA_ID } = require('./report-schema');
 
+const ATTACHMENT_DIR = path.posix.join('data', 'attachments');
+const CONTENT_TYPE_EXTENSIONS = {
+  'image/png': '.png',
+  'image/jpeg': '.jpg',
+  'image/webp': '.webp',
+  'image/gif': '.gif',
+  'image/bmp': '.bmp',
+  'image/svg+xml': '.svg',
+};
+const DEFAULT_IMAGE_ATTACHMENT_LIMIT = 20;
+
+const inferAttachmentExtension = (contentType, fallbackName = '') => {
+  if (CONTENT_TYPE_EXTENSIONS[contentType]) {
+    return CONTENT_TYPE_EXTENSIONS[contentType];
+  }
+  if (fallbackName) {
+    const fromName = path.extname(fallbackName);
+    if (fromName) return fromName;
+  }
+  if (contentType && contentType.includes('/')) {
+    const subtype = contentType.split('/')[1]?.split('+')[0];
+    if (subtype) return `.${subtype}`;
+  }
+  return '';
+};
+
+const normaliseImageAttachmentLimit = (value) => {
+  if (value === undefined || value === null || value === '') {
+    return DEFAULT_IMAGE_ATTACHMENT_LIMIT;
+  }
+  if (value === false) return Infinity;
+  const raw = typeof value === 'number' ? value : Number(String(value).trim());
+  if (Number.isFinite(raw)) {
+    if (raw <= 0) return Infinity;
+    return Math.max(1, Math.floor(raw));
+  }
+  const normalised = String(value).trim().toLowerCase();
+  if (['infinite', 'infinity', 'all', 'unlimited'].includes(normalised)) {
+    return Infinity;
+  }
+  const parsed = Number(normalised);
+  if (Number.isFinite(parsed)) {
+    if (parsed <= 0) return Infinity;
+    return Math.max(1, Math.floor(parsed));
+  }
+  return DEFAULT_IMAGE_ATTACHMENT_LIMIT;
+};
+
 const DEFAULT_INLINE_LIMIT = 8 * 1024 * 1024; // 8 MB
 const DEFAULT_MAX_TEXT_LENGTH = 200_000; // characters
 
@@ -56,6 +104,24 @@ class CustomHtmlReporter {
     this.testEntries = new Map();
     this.projectSet = new Set();
     this.orderCounter = 0;
+    this.pendingAssets = [];
+    this.assetCounter = 0;
+    this.imageAttachmentLimit = normaliseImageAttachmentLimit(
+      options.imageAttachmentLimit ?? process.env.REPORT_IMAGE_LIMIT
+    );
+  }
+
+  scheduleAttachmentAsset({ name, contentType, sourcePath, buffer }) {
+    const extension = inferAttachmentExtension(contentType, name);
+    const safeBase = slugify(name).slice(0, 40) || 'attachment';
+    const fileName = `${safeBase}-${this.assetCounter++}${extension}`.replace(/\.+$/, '');
+    const relativePath = path.posix.join(ATTACHMENT_DIR, fileName);
+    this.pendingAssets.push({
+      relativePath,
+      sourcePath: sourcePath || null,
+      buffer: buffer || null,
+    });
+    return relativePath;
   }
 
   generateRunId() {
@@ -183,12 +249,17 @@ class CustomHtmlReporter {
     const processed = [];
     const summaries = [];
     const schemaSummaries = [];
+    const limit = this.imageAttachmentLimit;
+    const enforceLimit = Number.isFinite(limit);
+    let imageCount = 0;
 
     for (const attachment of attachments) {
       const name = attachment?.name || 'attachment';
       const contentType = attachment?.contentType || 'application/octet-stream';
       const attachmentPath = attachment?.path;
+      let sourcePath = attachmentPath && fs.existsSync(attachmentPath) ? attachmentPath : null;
       let buffer = null;
+      let size = 0;
       let errorMessage = null;
 
       const isSummaryArtifact =
@@ -199,38 +270,56 @@ class CustomHtmlReporter {
 
       if (attachment?.body) {
         buffer = Buffer.isBuffer(attachment.body) ? attachment.body : Buffer.from(attachment.body);
-      } else if (attachmentPath) {
+        size = buffer.length;
+      } else if (sourcePath) {
         try {
-          buffer = fs.readFileSync(attachmentPath);
-        } catch (_error) {
-          errorMessage = `Unable to read attachment ${name}: ${_error.message}`;
+          const stats = fs.statSync(sourcePath);
+          size = stats.size;
+        } catch (error) {
+          errorMessage = `Unable to stat attachment ${name}: ${error.message}`;
+          sourcePath = null;
         }
       }
 
-      if (contentType === 'application/json' && buffer) {
+      const ensureBuffer = () => {
+        if (buffer) return buffer;
+        if (!sourcePath) return null;
         try {
-          const parsed = JSON.parse(buffer.toString('utf8'));
-          if (parsed?.schema === SUMMARY_SCHEMA_ID) {
-            schemaSummaries.push(parsed);
-            continue;
+          buffer = fs.readFileSync(sourcePath);
+          size = buffer.length;
+        } catch (error) {
+          errorMessage = `Unable to read attachment ${name}: ${error.message}`;
+          buffer = null;
+        }
+        return buffer;
+      };
+
+      if (contentType === 'application/json') {
+        const jsonBuffer = ensureBuffer();
+        if (jsonBuffer) {
+          try {
+            const parsed = JSON.parse(jsonBuffer.toString('utf8'));
+            if (parsed?.schema === SUMMARY_SCHEMA_ID) {
+              schemaSummaries.push(parsed);
+              continue;
+            }
+            if (parsed?.type === 'custom-report-summary') {
+              summaries.push({
+                baseName: parsed.baseName || name.replace(/\.summary\.json$/, ''),
+                title: parsed.title || parsed.baseName || name,
+                html: parsed.htmlBody || null,
+                markdown: parsed.markdown || null,
+                setDescription: Boolean(parsed.setDescription),
+                createdAt: parsed.createdAt || null,
+              });
+              continue;
+            }
+          } catch (_error) {
+            // fall through and treat as regular attachment
           }
-          if (parsed?.type === 'custom-report-summary') {
-            summaries.push({
-              baseName: parsed.baseName || name.replace(/\.summary\.json$/, ''),
-              title: parsed.title || parsed.baseName || name,
-              html: parsed.htmlBody || null,
-              markdown: parsed.markdown || null,
-              setDescription: Boolean(parsed.setDescription),
-              createdAt: parsed.createdAt || null,
-            });
-            continue;
-          }
-        } catch (_error) {
-          // fall through and treat as regular attachment
         }
       }
 
-      const size = buffer ? buffer.length : 0;
       const attachmentEntry = {
         name,
         contentType,
@@ -238,26 +327,36 @@ class CustomHtmlReporter {
         error: errorMessage,
       };
 
-      if (!buffer) {
+      if (!buffer && !sourcePath) {
         attachmentEntry.omitted = true;
         attachmentEntry.reason = errorMessage || 'Attachment data unavailable.';
         processed.push(attachmentEntry);
         continue;
       }
 
-      if (size > this.options.inlineLimitBytes) {
-        attachmentEntry.omitted = true;
-        attachmentEntry.reason = `Attachment omitted; ${formatBytes(size)} exceeds inline limit of ${formatBytes(
-          this.options.inlineLimitBytes
-        )}.`;
-        processed.push(attachmentEntry);
-        continue;
-      }
-
       if (contentType.startsWith('image/')) {
-        attachmentEntry.dataUri = `data:${contentType};base64,${buffer.toString('base64')}`;
+        if (enforceLimit && imageCount >= limit) {
+          attachmentEntry.omitted = true;
+          attachmentEntry.reason = `Screenshot omitted; reached per-test cap of ${limit}.`;
+        } else {
+          imageCount += 1;
+          const relativePath = this.scheduleAttachmentAsset({
+            name,
+            contentType,
+            sourcePath,
+            buffer: sourcePath ? null : ensureBuffer(),
+          });
+          attachmentEntry.assetPath = relativePath;
+        }
       } else if (contentType.startsWith('text/')) {
-        let text = buffer.toString('utf8');
+        const textBuffer = ensureBuffer();
+        if (!textBuffer) {
+          attachmentEntry.omitted = true;
+          attachmentEntry.reason = errorMessage || 'Attachment data unavailable.';
+          processed.push(attachmentEntry);
+          continue;
+        }
+        let text = textBuffer.toString('utf8');
         let truncated = false;
         if (text.length > this.options.maxTextLength) {
           text = `${text.slice(0, this.options.maxTextLength)}\n… (truncated)`;
@@ -269,7 +368,14 @@ class CustomHtmlReporter {
           attachmentEntry.html = text;
         }
       } else if (contentType === 'application/json') {
-        let text = buffer.toString('utf8');
+        const jsonBuffer = ensureBuffer();
+        if (!jsonBuffer) {
+          attachmentEntry.omitted = true;
+          attachmentEntry.reason = errorMessage || 'Attachment data unavailable.';
+          processed.push(attachmentEntry);
+          continue;
+        }
+        let text = jsonBuffer.toString('utf8');
         let truncated = false;
         if (text.length > this.options.maxTextLength) {
           text = `${text.slice(0, this.options.maxTextLength)}\n… (truncated)`;
@@ -281,7 +387,13 @@ class CustomHtmlReporter {
         attachmentEntry.omitted = true;
         attachmentEntry.reason = `Attachment (${formatBytes(size)}) not embedded (type ${contentType}).`;
       } else {
-        attachmentEntry.dataUri = `data:${contentType};base64,${buffer.toString('base64')}`;
+        const relativePath = this.scheduleAttachmentAsset({
+          name,
+          contentType,
+          sourcePath,
+          buffer: sourcePath ? null : ensureBuffer(),
+        });
+        attachmentEntry.assetPath = relativePath;
       }
 
       processed.push(attachmentEntry);
@@ -472,6 +584,26 @@ class CustomHtmlReporter {
     const dataDir = path.join(runDir, 'data');
     const testsDir = path.join(dataDir, 'tests');
     fs.mkdirSync(testsDir, { recursive: true });
+    if (this.pendingAssets.length > 0) {
+      for (const asset of this.pendingAssets) {
+        const assetFsPath = path.join(runDir, asset.relativePath.split('/').join(path.sep));
+        fs.mkdirSync(path.dirname(assetFsPath), { recursive: true });
+        try {
+          if (asset.sourcePath) {
+            fs.copyFileSync(asset.sourcePath, assetFsPath);
+          } else if (asset.buffer) {
+            fs.writeFileSync(assetFsPath, asset.buffer);
+          } else {
+            fs.writeFileSync(assetFsPath, '');
+          }
+        } catch (error) {
+          console.warn(`⚠️  Failed to persist attachment "${assetFsPath}": ${error.message}`);
+        } finally {
+          asset.buffer = null;
+        }
+      }
+      this.pendingAssets = [];
+    }
 
     const reportHtml = renderReportHtml(runData);
     const reportPath = path.join(runDir, this.options.reportFileName);

@@ -1,0 +1,10 @@
+node_modules
+.pw-browsers
+playwright-report
+reports
+test-results
+tests/baseline-snapshots
+utils/report-templates.js
+utils/report-templates/
+docs/mocks/
+sites/*.json

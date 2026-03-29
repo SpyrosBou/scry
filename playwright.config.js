@@ -35,24 +35,21 @@ const chromiumUseOverrides = disableChromiumSandbox
   ? { launchOptions: { args: ['--no-sandbox', '--disable-setuid-sandbox'] } }
   : {};
 
-const localReporters = [
+const sharedReporters = [
   ['./utils/custom-html-reporter', { outputFolder: 'reports', reportFileName: 'report.html' }],
   ['list'],
 ];
 
-const ciReporters = [
-  ['blob'],
-  ['list'],
-];
+const reporter = process.env.CI ? [...sharedReporters, ['blob']] : sharedReporters;
 
 module.exports = defineConfig({
-  globalSetup: require.resolve('./scripts/playwright-global-setup'),
+  globalSetup: require.resolve('./scripts/runtime/playwright-global-setup'),
   testDir: './tests',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: resolveWorkerCount(),
-  reporter: process.env.CI ? ciReporters : localReporters,
+  reporter,
   // Disable per-test timeout so large accessibility runs can complete
   timeout: 0,
   expect: {

@@ -8,6 +8,7 @@ const {
 } = require('../utils/test-helpers');
 const { attachSchemaSummary } = require('../utils/reporting-utils');
 const { createRunSummaryPayload, createPageSummaryPayload } = require('../utils/report-schema');
+const { resolveAccessibilityMetadata, applyViewportMetadata } = require('../utils/a11y-shared');
 
 const ERROR_SELECTORS = [
   '[role="alert"]',
@@ -17,6 +18,7 @@ const ERROR_SELECTORS = [
   '.form-error',
   '.field-error',
   '.validation-error',
+  '.error-msg',
   '.wpcf7-not-valid-tip',
   '.nf-error',
   '.gfield_validation_message',
@@ -77,12 +79,19 @@ const getAccessibleNameDetails = async (fieldLocator) => {
       controlType === 'button' || inputType === 'submit' || inputType === 'button'
         ? (el.value || '').trim()
         : '';
+    const elementText =
+      controlType === 'button' || controlType === 'summary' || controlType === 'a'
+        ? (el.textContent || '').trim()
+        : '';
 
-    const accessibleName = [labelText, ariaLabel, labelledbyText, title, valueText]
+    let accessibleName = [labelText, ariaLabel, labelledbyText, title, valueText]
       .map((value) => value.trim())
       .filter(Boolean)
       .join(' ')
       .trim();
+    if (!accessibleName && elementText) {
+      accessibleName = elementText;
+    }
 
     const describedByIds = (el.getAttribute('aria-describedby') || '')
       .split(/\s+/)
@@ -160,12 +169,15 @@ const evaluatePostSubmitState = async (formLocator, fieldSelectors) => {
           .map((value) => value.trim())
           .filter(Boolean);
 
+        const fieldContainer =
+          field.closest('label, .form-field, .field, .gfield, .nf-field, .wpcf7-form-control-wrap') ||
+          field.parentElement ||
+          form;
+
         const inlineErrors = Array.from(
           new Set(
             errorSelectors.flatMap((selector) => {
-              const nodes = Array.from(
-                field.closest('label, .form-field, .field, .gfield, .nf-field, .wpcf7-form-control-wrap')?.querySelectorAll(selector) || []
-              );
+              const nodes = Array.from(fieldContainer.querySelectorAll(selector));
               if (nodes.length) return nodes;
               return [];
             })
@@ -195,15 +207,13 @@ const evaluatePostSubmitState = async (formLocator, fieldSelectors) => {
 
 test.describe('Accessibility: Forms', () => {
   let siteConfig;
-  let errorContext;
 
-  test.beforeEach(async ({ page, context, errorContext: sharedErrorContext }, testInfo) => {
+  test.beforeEach(() => {
     const siteName = process.env.SITE_NAME;
     if (!siteName) throw new Error('SITE_NAME environment variable is required');
 
     siteConfig = SiteLoader.loadSite(siteName);
     SiteLoader.validateSiteConfig(siteConfig);
-    errorContext = sharedErrorContext;
   });
 
   test('Forms provide accessible labelling and validation feedback', async ({ page }, testInfo) => {
@@ -357,11 +367,11 @@ test.describe('Accessibility: Forms', () => {
     }
 
     const gatingTotal = reports.reduce((sum, report) => sum + report.gating.length, 0);
-
-    const projectName = siteConfig.name || process.env.SITE_NAME || 'default';
+    const { siteLabel, viewportLabel } = resolveAccessibilityMetadata(siteConfig, testInfo);
+    applyViewportMetadata(reports, viewportLabel, siteLabel);
 
     const runPayload = createRunSummaryPayload({
-      baseName: `a11y-forms-summary-${slugify(projectName)}`,
+      baseName: `a11y-forms-summary-${slugify(siteLabel)}`,
       title: 'Forms accessibility summary',
       overview: {
         totalFormsAudited: reports.length,
@@ -374,7 +384,9 @@ test.describe('Accessibility: Forms', () => {
       metadata: {
         spec: 'a11y.forms.validation',
         summaryType: 'forms',
-        projectName,
+        projectName: siteLabel,
+        siteName: siteLabel,
+        viewports: [viewportLabel],
         suppressPageEntries: true,
         scope: 'project',
       },
@@ -389,6 +401,10 @@ test.describe('Accessibility: Forms', () => {
       advisories: report.advisories,
       fields: report.fields,
       notes: report.notes,
+      projectName: viewportLabel,
+      browser: viewportLabel,
+      viewport: viewportLabel,
+      viewports: [viewportLabel],
     })),
     wcagReferences: FORMS_WCAG_REFERENCES,
   };
@@ -396,10 +412,10 @@ test.describe('Accessibility: Forms', () => {
 
     for (const report of reports) {
       const pagePayload = createPageSummaryPayload({
-        baseName: `a11y-forms-${slugify(projectName)}-${slugify(report.formName)}-${slugify(report.page)}`,
+        baseName: `a11y-forms-${slugify(siteLabel)}-${slugify(report.formName)}-${slugify(report.page)}`,
         title: `${report.formName} — ${report.page}`,
         page: report.page,
-        viewport: 'forms',
+        viewport: viewportLabel,
         summary: {
           formName: report.formName,
           selectorUsed: report.selectorUsed,
@@ -409,11 +425,17 @@ test.describe('Accessibility: Forms', () => {
           advisories: report.advisories,
           fields: report.fields,
           notes: report.notes,
+          projectName: viewportLabel,
+          browser: viewportLabel,
+          viewport: viewportLabel,
+          viewports: [viewportLabel],
         },
         metadata: {
           spec: 'a11y.forms.validation',
           summaryType: 'forms',
-          projectName,
+          projectName: siteLabel,
+          siteName: siteLabel,
+          viewports: [viewportLabel],
         },
       });
       await attachSchemaSummary(testInfo, pagePayload);

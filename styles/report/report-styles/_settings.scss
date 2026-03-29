@@ -1,0 +1,322 @@
+@use 'sass:map';
+
+/* -----------------------------------------------------------------------------
+ * Theme tokens, shared maps, and generator mixins
+ * Inspired by the Sass module guidance on @use/@forward for scoping settings.
+ * -------------------------------------------------------------------------- */
+
+/* Light theme palette ------------------------------------------------------ */
+$theme-light: (
+  bg-app: linear-gradient(180deg, #fdf6e3 0%, #eee8d5 100%),
+  bg-primary: #fdf6e3,
+  surface-sidebar: rgba(253, 246, 227, 0.92),
+  surface-panel: #fefbf0,
+  surface-card: rgba(238, 232, 213, 0.94),
+  surface-subtle: rgba(238, 232, 213, 0.7),
+  surface-inset: rgba(253, 246, 227, 0.78),
+  surface-outline: rgba(101, 123, 131, 0.18),
+  border-default: rgba(101, 123, 131, 0.3),
+  border-strong: rgba(38, 139, 210, 0.38),
+  text-strong: #586e75,
+  text-muted: #839496,
+  text-subtle: rgba(147, 161, 161, 0.85),
+  text-inverse: #073642,
+  accent: #268bd2,
+  accent-soft: rgba(38, 139, 210, 0.18),
+  status-error-bg: rgba(220, 50, 47, 0.18),
+  status-error-border: rgba(220, 50, 47, 0.45),
+  status-error-text: #dc322f,
+  status-warning-bg: rgba(203, 75, 22, 0.18),
+  status-warning-border: rgba(203, 75, 22, 0.45),
+  status-warning-text: #cb4b16,
+  status-info-bg: rgba(255, 232, 163, 0.4),
+  status-info-border: rgba(234, 179, 8, 0.42),
+  status-info-text: #7a4c00,
+  status-advisory-bg: rgba(181, 137, 0, 0.2),
+  status-advisory-text: #b58900,
+  status-ok-bg: rgba(133, 153, 0, 0.18),
+  status-ok-border: rgba(133, 153, 0, 0.45),
+  status-ok-text: #859900,
+  shadow-elevated: 0 24px 40px rgba(101, 123, 131, 0.18),
+  shadow-floating: 0 14px 28px rgba(101, 123, 131, 0.14),
+  shadow-card: 0 16px 32px rgba(101, 123, 131, 0.16),
+  shadow-card-hover: 0 28px 44px rgba(101, 123, 131, 0.2),
+  shadow-inset: inset 0 0 0 1px rgba(147, 161, 161, 0.18),
+  code-bg: rgba(238, 232, 213, 0.9),
+  code-border: rgba(147, 161, 161, 0.45),
+  nav-status-pass-bg: rgba(133, 153, 0, 0.2),
+  nav-status-pass-text: #556b00,
+  nav-status-fail-bg: rgba(220, 50, 47, 0.2),
+  nav-status-fail-text: #b22222,
+  nav-status-info-bg: rgba(255, 232, 163, 0.55),
+  nav-status-info-text: #614000,
+  nav-status-summary-bg: rgba(42, 161, 152, 0.18),
+  nav-status-summary-text: #2aa198,
+  nav-card-pass-bg: rgba(133, 153, 0, 0.12),
+  nav-card-pass-border: rgba(133, 153, 0, 0.4),
+  nav-card-pass-hover-bg: rgba(133, 153, 0, 0.2),
+  nav-card-fail-bg: rgba(220, 50, 47, 0.12),
+  nav-card-fail-border: rgba(220, 50, 47, 0.4),
+  nav-card-fail-hover-bg: rgba(220, 50, 47, 0.2),
+  nav-card-info-bg: rgba(255, 232, 163, 0.32),
+  nav-card-info-border: rgba(234, 179, 8, 0.45),
+  nav-card-info-hover-bg: rgba(255, 232, 163, 0.45),
+  summary-highlight-bg: rgba(227, 238, 255, 0.9),
+  summary-highlight-border: rgba(59, 130, 246, 0.28),
+  summary-highlight-hover-bg: rgba(217, 233, 255, 0.96),
+  summary-highlight-text: #0f172a,
+  summary-highlight-badge-bg: rgba(148, 197, 255, 0.6),
+  summary-highlight-shadow: 0 14px 28px rgba(37, 99, 235, 0.18),
+  summary-highlight-hover-shadow: 0 18px 32px rgba(37, 99, 235, 0.22),
+  summary-ok-bg: rgba(16, 185, 129, 0.12),
+  summary-ok-border: rgba(16, 185, 129, 0.22),
+  summary-ok-shadow: rgba(16, 185, 129, 0.18),
+  summary-ok-text: #065f46,
+  summary-ok-body: rgba(240, 253, 244, 0.92),
+  summary-fail-bg: rgba(220, 38, 38, 0.12),
+  summary-fail-border: rgba(220, 38, 38, 0.22),
+  summary-fail-shadow: rgba(220, 38, 38, 0.18),
+  summary-fail-text: #7f1d1d,
+  summary-fail-body: rgba(254, 242, 242, 0.92),
+  summary-advisory-bg: rgba(255, 232, 163, 0.4),
+  summary-advisory-border: rgba(234, 179, 8, 0.35),
+  summary-advisory-shadow: rgba(234, 179, 8, 0.2),
+  summary-advisory-text: #7a4c00,
+  summary-advisory-body: rgba(255, 249, 219, 0.92),
+  summary-warn-bg: rgba(217, 119, 6, 0.12),
+  summary-warn-border: rgba(217, 119, 6, 0.22),
+  summary-warn-shadow: rgba(217, 119, 6, 0.18),
+  summary-warn-text: #78350f,
+  summary-warn-body: rgba(255, 247, 237, 0.92),
+  table-advisory-bg: #fff6d6,
+  table-advisory-hover-bg: #ffe8a3,
+  summary-heading-advisory-bg: rgba(255, 232, 163, 0.9),
+  summary-heading-advisory-text: #7a4c00,
+  summary-impact-critical-bg: rgba(220, 50, 47, 0.16),
+  summary-impact-serious-bg: rgba(203, 75, 22, 0.16),
+  summary-impact-moderate-bg: rgba(181, 137, 0, 0.16),
+  summary-impact-minor-bg: rgba(38, 139, 210, 0.16),
+);
+
+/* Dark theme palette ------------------------------------------------------- */
+
+$theme-dark: (
+  bg-app: linear-gradient(180deg, #001b22 0%, #002b36 100%),
+  bg-primary: #002b36,
+  surface-sidebar: rgba(0, 43, 54, 0.88),
+  surface-panel: #073642,
+  surface-card: rgba(7, 54, 66, 0.92),
+  surface-subtle: rgba(0, 43, 54, 0.85),
+  surface-inset: rgba(0, 59, 74, 0.8),
+  surface-outline: rgba(88, 110, 117, 0.3),
+  border-default: rgba(88, 110, 117, 0.35),
+  border-strong: rgba(38, 139, 210, 0.35),
+  text-strong: #fdf6e3,
+  text-muted: #93a1a1,
+  text-subtle: rgba(147, 161, 161, 0.7),
+  text-inverse: #fdf6e3,
+  accent: #268bd2,
+  accent-soft: rgba(38, 139, 210, 0.24),
+  status-error-bg: rgba(220, 50, 47, 0.3),
+  status-error-border: rgba(220, 50, 47, 0.6),
+  status-error-text: #fce9e9,
+  status-warning-bg: rgba(203, 75, 22, 0.28),
+  status-warning-border: rgba(203, 75, 22, 0.6),
+  status-warning-text: #ffe4d6,
+  status-info-bg: rgba(181, 137, 0, 0.38),
+  status-info-border: rgba(181, 137, 0, 0.65),
+  status-info-text: #fff2c7,
+  status-advisory-bg: rgba(181, 137, 0, 0.32),
+  status-advisory-text: #fff2c7,
+  status-ok-bg: rgba(133, 153, 0, 0.28),
+  status-ok-border: rgba(133, 153, 0, 0.6),
+  status-ok-text: #f4ffcf,
+  shadow-elevated: 0 24px 40px rgba(0, 15, 20, 0.65),
+  shadow-floating: 0 14px 28px rgba(0, 0, 0, 0.55),
+  shadow-card: 0 16px 32px rgba(0, 0, 0, 0.55),
+  shadow-card-hover: 0 32px 52px rgba(0, 0, 0, 0.65),
+  shadow-inset: inset 0 0 0 1px rgba(147, 161, 161, 0.18),
+  code-bg: rgba(7, 54, 66, 0.7),
+  code-border: rgba(0, 43, 54, 0.8),
+  nav-status-pass-bg: rgba(133, 153, 0, 0.24),
+  nav-status-pass-text: #f4ffcf,
+  nav-status-fail-bg: rgba(220, 50, 47, 0.32),
+  nav-status-fail-text: #ffe2e0,
+  nav-status-info-bg: rgba(181, 137, 0, 0.42),
+  nav-status-info-text: #fff2c7,
+  nav-status-summary-bg: rgba(42, 161, 152, 0.28),
+  nav-status-summary-text: #e0fffb,
+  nav-card-pass-bg: rgba(133, 153, 0, 0.16),
+  nav-card-pass-border: rgba(133, 153, 0, 0.5),
+  nav-card-pass-hover-bg: rgba(133, 153, 0, 0.26),
+  nav-card-fail-bg: rgba(220, 50, 47, 0.18),
+  nav-card-fail-border: rgba(220, 50, 47, 0.5),
+  nav-card-fail-hover-bg: rgba(220, 50, 47, 0.28),
+  nav-card-info-bg: rgba(181, 137, 0, 0.28),
+  nav-card-info-border: rgba(181, 137, 0, 0.58),
+  nav-card-info-hover-bg: rgba(181, 137, 0, 0.38),
+  summary-highlight-bg: rgba(38, 139, 210, 0.28),
+  summary-highlight-border: rgba(38, 139, 210, 0.45),
+  summary-highlight-hover-bg: rgba(38, 139, 210, 0.38),
+  summary-highlight-text: #fdf6e3,
+  summary-highlight-badge-bg: rgba(38, 139, 210, 0.5),
+  summary-highlight-shadow: 0 14px 28px rgba(38, 139, 210, 0.32),
+  summary-highlight-hover-shadow: 0 18px 36px rgba(38, 139, 210, 0.38),
+  summary-ok-bg: rgba(133, 153, 0, 0.24),
+  summary-ok-border: rgba(133, 153, 0, 0.5),
+  summary-ok-shadow: rgba(133, 153, 0, 0.35),
+  summary-ok-text: #fdf6e3,
+  summary-ok-body: rgba(133, 153, 0, 0.18),
+  summary-fail-bg: rgba(220, 50, 47, 0.26),
+  summary-fail-border: rgba(220, 50, 47, 0.55),
+  summary-fail-shadow: rgba(220, 50, 47, 0.4),
+  summary-fail-text: #fdf6e3,
+  summary-fail-body: rgba(220, 50, 47, 0.18),
+  summary-advisory-bg: rgba(181, 137, 0, 0.28),
+  summary-advisory-border: rgba(181, 137, 0, 0.55),
+  summary-advisory-shadow: rgba(181, 137, 0, 0.38),
+  summary-advisory-text: #fdf6e3,
+  summary-advisory-body: rgba(181, 137, 0, 0.2),
+  summary-warn-bg: rgba(203, 75, 22, 0.28),
+  summary-warn-border: rgba(203, 75, 22, 0.58),
+  summary-warn-shadow: rgba(203, 75, 22, 0.4),
+  summary-warn-text: #fdf6e3,
+  summary-warn-body: rgba(203, 75, 22, 0.2),
+  table-advisory-bg: rgba(181, 137, 0, 0.22),
+  table-advisory-hover-bg: rgba(181, 137, 0, 0.32),
+  summary-heading-advisory-bg: rgba(181, 137, 0, 0.35),
+  summary-heading-advisory-text: #fdf6e3,
+  summary-impact-critical-bg: rgba(220, 50, 47, 0.24),
+  summary-impact-serious-bg: rgba(203, 75, 22, 0.24),
+  summary-impact-moderate-bg: rgba(181, 137, 0, 0.24),
+  summary-impact-minor-bg: rgba(38, 139, 210, 0.24),
+);
+
+@mixin theme-variables($theme) {
+  @each $token, $value in $theme {
+    --#{$token}: #{$value};
+  }
+}
+
+:root {
+  @include theme-variables($theme-light);
+  --font-body: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-heading:
+    'Work Sans', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --radius-lg: 16px;
+  --radius-md: 10px;
+  --grid-gap: 1.5rem;
+}
+
+[data-theme='dark'] {
+  @include theme-variables($theme-dark);
+}
+
+/* Status theme maps -------------------------------------------------------- */
+$badge-statuses: (
+  error: (
+    bg: var(--status-error-bg),
+    color: var(--status-error-text),
+  ),
+  warning: (
+    bg: var(--status-warning-bg),
+    color: var(--status-warning-text),
+  ),
+  info: (
+    bg: var(--status-info-bg),
+    color: var(--status-info-text),
+  ),
+  advisory: (
+    bg: var(--status-advisory-bg),
+    color: var(--status-advisory-text),
+  ),
+  ok: (
+    bg: var(--status-ok-bg),
+    color: var(--status-ok-text),
+  ),
+);
+
+$filter-chip-statuses: (
+  failed: (
+    bg: var(--status-error-bg),
+    color: var(--status-error-text),
+    border: var(--status-error-border),
+  ),
+  timedOut: (
+    bg: var(--status-error-bg),
+    color: var(--status-error-text),
+    border: var(--status-error-border),
+  ),
+  interrupted: (
+    bg: var(--status-error-bg),
+    color: var(--status-error-text),
+    border: var(--status-error-border),
+  ),
+  flaky: (
+    bg: var(--status-warning-bg),
+    color: var(--status-warning-text),
+    border: var(--status-warning-border),
+  ),
+  passed: (
+    bg: var(--status-ok-bg),
+    color: var(--status-ok-text),
+    border: var(--status-ok-border),
+  ),
+  skipped: (
+    bg: var(--status-info-bg),
+    color: var(--status-info-text),
+    border: var(--status-info-border),
+  ),
+  unknown: (
+    bg: var(--status-info-bg),
+    color: var(--status-info-text),
+    border: var(--status-info-border),
+  ),
+);
+
+$test-card-statuses: (
+  failed: var(--status-error-border),
+  timedOut: var(--status-error-border),
+  interrupted: var(--status-error-border),
+  passed: var(--status-ok-border),
+  flaky: var(--status-warning-border),
+  skipped: var(--status-info-border),
+  unknown: var(--status-info-border),
+);
+
+/* Utility mixins ----------------------------------------------------------- */
+@mixin status-pill-theme($name, $theme) {
+  .status-#{$name} {
+    background: map.get($theme, bg);
+    color: map.get($theme, color);
+  }
+}
+
+@mixin filter-chip-theme($status, $styles) {
+  .filter-chip.status-#{$status} {
+    input:checked + span {
+      background: map.get($styles, bg);
+      color: map.get($styles, color);
+      border-color: map.get($styles, border);
+    }
+  }
+}
+
+@mixin test-card-border($status, $color) {
+  .test-card.status-#{$status} {
+    border-left: 4px solid #{$color};
+  }
+}
+
+/* Auto-generate component variants ---------------------------------------- */
+@each $status, $theme in $badge-statuses {
+  @include status-pill-theme($status, $theme);
+}
+
+@each $status, $theme in $filter-chip-statuses {
+  @include filter-chip-theme($status, $theme);
+}
+
+@each $status, $color in $test-card-statuses {
+  @include test-card-border($status, $color);
+}

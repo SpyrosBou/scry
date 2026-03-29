@@ -1,0 +1,13 @@
+/* -----------------------------------------------------------------------------
+ * Playwright report styles entry point
+ * Modules follow Sass @use guidance for clarity and reuse.
+ * -------------------------------------------------------------------------- */
+@use './report-styles/settings';
+@use './report-styles/base';
+@use './report-styles/layout';
+@use './report-styles/tests';
+@use './report-styles/summary';
+@use './report-styles/per-page';
+@use './report-styles/states';
+@use './report-styles/interactions';
+@use './report-styles/responsive';
