@@ -54,25 +54,25 @@ const createAggregationStore = ({ persistRoot = DEFAULT_PERSIST_ROOT, runToken =
     }
   };
 
-const syncFromDisk = (projectName) => {
-  if (!baseDir) return;
-  const projectDir = path.join(baseDir, encodeProjectKey(projectName));
-  if (!fs.existsSync(projectDir)) return;
-  const entries = fs
-    .readdirSync(projectDir)
-    .filter((file) => file.endsWith('.json'))
-    .map((file) => readJsonFile(path.join(projectDir, file)))
-    .filter(Boolean)
-    .sort(sortByIndex);
-  if (entries.length === 0) return;
-  const store = getProjectStore(projectName);
-  entries.forEach((entry) => {
-    const index = entry.index ?? store.size + 1;
-    if (!store.has(index)) {
-      store.set(index, entry);
-    }
-  });
-};
+  const syncFromDisk = (projectName) => {
+    if (!baseDir) return;
+    const projectDir = path.join(baseDir, encodeProjectKey(projectName));
+    if (!fs.existsSync(projectDir)) return;
+    const entries = fs
+      .readdirSync(projectDir)
+      .filter((file) => file.endsWith('.json'))
+      .map((file) => readJsonFile(path.join(projectDir, file)))
+      .filter(Boolean)
+      .sort(sortByIndex);
+    if (entries.length === 0) return;
+    const store = getProjectStore(projectName);
+    entries.forEach((entry) => {
+      const index = entry.index ?? store.size + 1;
+      if (!store.has(index)) {
+        store.set(index, entry);
+      }
+    });
+  };
 
   const record = (projectName, report) => {
     const store = getProjectStore(projectName);

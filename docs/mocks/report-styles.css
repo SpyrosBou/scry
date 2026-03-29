@@ -1299,7 +1299,6 @@ body[data-theme=dark] .theme-toggle__icon--moon {
   border-radius: 6px;
   background: rgba(255, 255, 255, 0.02);
   color: var(--accent);
-  text-decoration: underline;
   cursor: pointer;
   transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 0 6px rgba(0, 0, 0, 0.15);
