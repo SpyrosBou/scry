@@ -8,12 +8,15 @@
 - Audit date: 2026-03-29
 - Audit stance: greenfield. Assume no live deployment constraints, no backward-compatibility obligations, and no need to preserve custom behavior unless it clearly earns its cost.
 - Audit method: direct codebase inspection only. No implementation assumptions were taken from prior plans or subagent output.
+- Product framing: legacy site manifests, baselines, and fixture data are archival regression inputs. They are useful only insofar as they exercise runner, config, reporting, and execution infrastructure that can later ship as SaaS.
 
 ## Executive Summary
 
 This codebase is not failing because it lacks features. It is failing because it has accumulated too much custom infrastructure for the problem it is trying to solve. The project has a reasonable core stack, but it has drifted into a shape where a Playwright test harness now carries a custom runner, custom manifest transport, custom aggregation, custom schema contract, custom HTML reporter, custom report viewer, custom discovery workflow, and large helper layers that often repackage Playwright rather than using it directly.
 
 The highest-value recommendation is not "polish what is here." It is "reduce the number of systems." Keep Playwright Test, Axe, JSON site manifests, and a small amount of reusable test support. Rebuild execution around deterministic run configuration, refactor specs into isolated per-page tests, and either radically slim the custom reporting stack or replace it with a simpler post-run reporting model.
+
+The important product target is not whether old site fixtures stay green forever. The important product target is whether the runner, schemas, orchestration boundaries, and reporting contracts are strong enough to become a proper SaaS testing platform.
 
 If I were taking this project over, I would treat the current code as a functional prototype with some useful pieces, not as an architecture to preserve.
 
@@ -215,71 +218,116 @@ Recommendation: pick one primary identity. My recommendation is: a CLI-first Pla
 
 ## Phase 1: Stop Current Breakage and Trim Dead Weight
 
-- Fix lint and formatting failures.
-- Remove unused direct dependencies: `js-yaml`, `@testing-library/dom`, `playwright-testing-library`.
-- Remove invalid package metadata such as `"main": "index.js"` if no library entry point is intended.
-- Replace `npm run setup` with a deterministic bootstrap that does not call `npm install` internally and does not duplicate Playwright browser installation.
-- Update retained low-risk dependencies and regenerate `package-lock.json`.
+Status: completed on 2026-03-29.
+
+- [x] Fix lint and formatting failures.
+- [x] Remove unused direct dependencies: `js-yaml`, `@testing-library/dom`, `playwright-testing-library`.
+- [x] Remove invalid package metadata such as `"main": "index.js"` if no library entry point is intended.
+- [x] Replace `npm run setup` with a deterministic bootstrap that does not call `npm install` internally and does not duplicate Playwright browser installation.
+- [x] Update retained low-risk dependencies and regenerate `package-lock.json`.
 
 ### Phase 1 Acceptance Criteria
 
-- `npm run lint` passes.
-- `npm run prettier:check` passes.
-- `npm audit` has no high or critical findings.
-- `package.json` declares only dependencies that are actually used.
-- Bootstrap commands are single-purpose and non-redundant.
+- [x] `npm run lint` passes.
+- [x] `npm run prettier:check` passes.
+- [x] `npm audit` has no high or critical findings.
+- [x] `package.json` declares only dependencies that are actually used.
+- [x] Bootstrap commands are single-purpose and non-redundant.
 
 ## Phase 2: Separate Discovery from Execution
 
-- Remove repo-tracked file writes from `TestRunner.runTestsForSite`.
-- Move sitemap refresh and site-file mutation exclusively into `scripts/discovery/discover-pages.js` or a replacement discovery command.
-- Refactor runner logic into smaller modules: CLI parsing, config resolution, manifest creation, Playwright invocation, report summary reading.
-- Stop mutating global `process.env` inside the runner except for explicit child-process env payload construction.
+Status: completed on 2026-03-29.
+
+- [x] Remove repo-tracked file writes from `TestRunner.runTestsForSite`.
+- [x] Move sitemap refresh and site-file mutation exclusively into `scripts/discovery/discover-pages.js` or a replacement discovery command.
+- [x] Refactor runner logic into smaller modules: CLI parsing, config resolution, manifest creation, Playwright invocation, report summary reading.
+- [x] Stop mutating global `process.env` inside the runner except for explicit child-process env payload construction.
 
 ### Phase 2 Acceptance Criteria
 
-- `node run-tests.js --dry-run` never writes repo-tracked files.
-- `node run-tests.js` never writes repo-tracked files.
-- Only discovery commands can change `sites/*.json`.
-- `utils/test-runner.js` is no longer the single home for unrelated execution concerns.
+- [x] `node run-tests.js --dry-run` never writes repo-tracked files.
+- [x] `node run-tests.js` never writes repo-tracked files.
+- [x] Only discovery commands can change `sites/*.json`.
+- [x] `utils/test-runner.js` is no longer the single home for unrelated execution concerns.
 
 ## Phase 3: Rebuild Specs Around Playwright's Native Model
 
-- Remove `timeout: 0` from `playwright.config.js`.
-- Remove all 2-hour spec-level timeouts.
-- Convert page loops into generated tests per page or per page-and-viewport.
-- Make fixtures the only source of site context and remove direct `process.env.SITE_NAME` reads from specs.
-- Replace fixed sleeps with state-based waits wherever possible.
-- Shrink or delete helper abstractions that mostly repackage Playwright.
+Status: completed on 2026-03-29.
+
+Progress on 2026-03-29:
+
+- [x] Converted `functionality.links.internal` to generated per-page tests with an aggregate summary step.
+- [x] Converted `functionality.interactive.smoke` to generated per-page tests with an aggregate summary step.
+- [x] Converted `visual.regression.snapshots` to generated per-page/viewport tests with per-viewport aggregate summaries.
+- [x] Converted `functionality.infrastructure.health` to generated per-page tests with aggregate availability, HTTP, and performance summary steps.
+- [x] Converted `responsive.layout.structure` to generated per-page/viewport structure tests, generated cross-viewport comparisons, and generated WordPress responsive feature tests.
+- [x] Removed `utils/wordpress-page-objects.js` and the unused `utils/responsive-helpers.js` module after their final callers were refactored away.
+
+Known remaining productization follow-up after Phase 3:
+
+- [ ] Define the minimum archival fixture set required to regression-test runner, schema, and reporting infrastructure without treating legacy site-specific failures as remediation blockers.
+- [ ] Replace fixture-specific smoke confidence with infrastructure-oriented validation for generated test enumeration, report aggregation, config resolution, and bounded execution behavior.
+
+- [x] Remove `timeout: 0` from `playwright.config.js`.
+- [x] Remove all 2-hour spec-level timeouts.
+- [x] Convert page loops into generated tests per page or per page-and-viewport.
+- [x] Make fixtures the only source of site context and remove direct `process.env.SITE_NAME` reads from specs.
+- [x] Replace fixed sleeps with state-based waits wherever possible.
+- [x] Shrink or delete helper abstractions that mostly repackage Playwright.
 
 ### Phase 3 Acceptance Criteria
 
-- No spec reads `process.env.SITE_NAME`.
-- No spec calls `SiteLoader.loadSite()` in setup.
-- No spec contains `test.setTimeout(7200000)`.
-- Global test timeout is bounded.
-- Failures are isolated to individual pages or page-and-viewport combinations.
+- [x] No spec reads `process.env.SITE_NAME`.
+- [x] No spec calls `SiteLoader.loadSite()` in setup.
+- [x] No spec contains `test.setTimeout(7200000)`.
+- [x] Global test timeout is bounded.
+- [x] Failures are isolated to individual pages or page-and-viewport combinations.
 
 ## Phase 4: Simplify Reporting and Data Contracts
 
+Status: in progress on 2026-03-29.
+
+Progress on 2026-03-29:
+
+- [x] Removed the last spec-authored presentation path so active specs emit schema payloads only.
+- [x] Removed legacy custom-summary parsing from the reporter and report viewer.
+- [x] Added schema-first report coverage for `responsive-consistency`.
+- [x] Fixed naming discipline for `siteName`, `projectName`, `browser`, and `viewport` in the shared metadata helper and active accessibility payloads.
+- [x] Added `docs/report-schema-inventory.md` as the source of truth for active summary types and field meanings.
+- [x] Extracted the responsive report renderers into `utils/report-templates/groups/responsive.js` to keep reducing `utils/report-templates.js` by feature boundary.
+- [x] Extracted the site-quality markdown renderers into `utils/report-templates/groups/site-quality.js` so HTML and markdown suite reporting now move together by feature boundary.
+- [x] Extracted the WCAG group renderers into `utils/report-templates/groups/accessibility.js` so accessibility reporting is no longer split between the monolith and feature module.
+- [x] Extracted the non-WCAG accessibility panel renderers into `utils/report-templates/groups/accessibility-panels.js` so keyboard, reduced-motion, reflow, iframe, and structure reporting now move together.
+- [x] Removed payload-level `htmlBody` / `markdownBody` support and page-level `cardHtml` / `cardMarkdown` escape hatches so specs can no longer ship presentation markup inside schema payloads.
+- [x] Centralized active `summaryType` definitions so renderer coverage and schema validation fail together when a new type is added without report support.
+- [ ] Continue modularizing or replacing `utils/report-templates.js` until it is no longer a monolith.
+
 - Decide whether the custom HTML report is a product feature or an internal convenience.
 - If it is a convenience, replace the current custom reporter stack with a smaller post-run summary layer.
-- If it is a product feature, narrow the contract so specs emit normalized JSON only and renderers consume that JSON without extra inference.
-- Fix naming discipline for `siteName`, `projectName`, `browser`, and `viewport`.
+- If it is a product feature, keep the contract narrow so specs emit normalized JSON only and renderers consume that JSON without extra inference.
+- Reshape reporting around a SaaS-ready contract: stable machine data first, presentation second.
 - Continue modularizing or replacing `utils/report-templates.js` until it is no longer a monolith.
 
 ### Phase 4 Acceptance Criteria
 
-- Report payload fields have one meaning each and are documented.
-- Specs are not responsible for presentation concerns.
-- `utils/report-templates.js` is no longer a single-file monolith.
-- The report viewer can be changed without rewriting specs.
+- [x] Report payload fields have one meaning each and are documented.
+- [x] Specs are not responsible for presentation concerns.
+- [ ] `utils/report-templates.js` is no longer a single-file monolith.
+- [x] The report viewer can be changed without rewriting specs.
 
 ## Phase 5: Lock Down Schemas and Configuration Discipline
+
+Progress on 2026-03-29:
+
+- [x] Added strict site-config validation for required fields plus supported optional fields such as `forms`, discovery config, visual thresholds/overrides, masks, and accessibility sample settings.
+- [x] Removed execution-time homepage injection; manifests must now declare homepage coverage unless `includeHomepage` is explicitly false.
+- [x] Removed `SITE_TEST_PAGES` / `SITE_TEST_PAGES_LIMIT` execution fallbacks and switched runtime site context to the validated run-manifest snapshot.
+- [x] Updated baseline refresh and reporter metadata loading to use the run manifest rather than `SITE_NAME` / `SITE_BASE_URL` style fallbacks.
 
 - Add JSON schema validation for site manifests.
 - Validate optional fields such as `forms`, `visualThresholds`, `visualOverrides`, `discover`, and accessibility sampling config before execution.
 - Remove runtime "repair" behavior such as silent homepage injection except where explicitly configured.
+- Treat site manifests as customer-style inputs to a SaaS system, not hand-repaired internal fixtures.
 - Define one documented report-schema inventory if the custom report stack remains.
 
 ### Phase 5 Acceptance Criteria
@@ -290,6 +338,8 @@ Recommendation: pick one primary identity. My recommendation is: a CLI-first Pla
 
 ## Phase 6: Rewrite Documentation Around Reality
 
+- [x] Updated README, SPEC, and reporting docs to describe the manifest-only execution context and schema-only reporting contract.
+- [x] Added a deterministic repo-owned smoke manifest (`scry-site-local`) for local runner/report validation against the bundled site preview.
 - Replace drift-prone status claims in `README.md`, `SPEC.md`, and roadmap docs with source-of-truth documentation.
 - Remove references to nonexistent docs such as `docs/report-schema-inventory.md` until they actually exist.
 - Delete the README guidance that relies on a mirrored sibling copy at `../a11y-testing`.
@@ -306,11 +356,12 @@ Recommendation: pick one primary identity. My recommendation is: a CLI-first Pla
 
 - Use targeted unit tests for pure runner/config/report modules.
 - Keep targeted Playwright smoke coverage small while execution architecture is changing.
-- Validate one representative site per suite family after each structural phase.
+- Validate one representative archival fixture per suite family only as an infrastructure smoke check, not as a product success criterion.
+- Prefer runner/report/schema validation over per-site content fidelity when the two are in tension.
 - Do not run broad all-pages suites as a substitute for unit coverage during refactor.
 
 ## Final Recommendation
 
 Do not treat this as a cleanup sprint. Treat it as a simplification program.
 
-The current project has good intent and real effort behind it, but it has crossed the point where incremental local fixes will keep paying off. The right move is to reduce the number of custom systems, restore deterministic boundaries, and make Playwright do more of the work the codebase is currently trying to do itself.
+The current project has good intent and real effort behind it, but it has crossed the point where incremental local fixes will keep paying off. The right move is to reduce the number of custom systems, restore deterministic boundaries, and make Playwright do more of the work the codebase is currently trying to do itself. The end state should be a SaaS-ready execution platform whose confidence comes from infrastructure correctness, not from nursing old fixture sites back to health.

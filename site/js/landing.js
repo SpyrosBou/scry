@@ -1,3 +1,4 @@
+/* global IntersectionObserver, document, window */
 /* ---------------------------------------------------------------------------
  * Landing page interactions:
  *   - Scroll-reveal via IntersectionObserver
@@ -8,6 +9,34 @@
 
 (function () {
   'use strict';
+
+  var prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+  function getScrollBehavior() {
+    return prefersReducedMotion.matches ? 'auto' : 'smooth';
+  }
+
+  function focusFragmentTarget(target) {
+    if (!target) return;
+
+    var hadTabIndex = target.hasAttribute('tabindex');
+    if (!hadTabIndex) {
+      target.setAttribute('tabindex', '-1');
+    }
+
+    target.focus({ preventScroll: true });
+
+    if (!hadTabIndex) {
+      target.addEventListener(
+        'blur',
+        function handleBlur() {
+          target.removeAttribute('tabindex');
+          target.removeEventListener('blur', handleBlur);
+        },
+        { once: true }
+      );
+    }
+  }
 
   /* -- Scroll reveal -- */
   const revealEls = document.querySelectorAll('.reveal');
@@ -40,6 +69,7 @@
   var scrollThreshold = 60;
 
   function onScroll() {
+    if (!nav) return;
     if (window.scrollY > scrollThreshold) {
       nav.classList.add('nav--scrolled');
     } else {
@@ -64,7 +94,11 @@
       var target = document.querySelector(targetId);
       if (target) {
         e.preventDefault();
-        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        target.scrollIntoView({ behavior: getScrollBehavior(), block: 'start' });
+        focusFragmentTarget(target);
+        if (window.location.hash !== targetId) {
+          window.history.pushState(null, '', targetId);
+        }
       }
     });
   });

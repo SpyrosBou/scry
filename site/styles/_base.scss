@@ -11,6 +11,7 @@
 }
 
 html {
+  color-scheme: dark;
   scroll-behavior: smooth;
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
@@ -50,6 +51,13 @@ h3 {
   font-size: clamp(1.2rem, 2vw, 1.5rem);
 }
 
+.hero__title,
+.section__heading,
+.benefits__quote,
+.cta__title {
+  text-wrap: balance;
+}
+
 /* -- Body text -- */
 p {
   max-width: 65ch;
@@ -59,6 +67,8 @@ p {
 a {
   color: var(--cyan);
   text-decoration: none;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: rgba(78, 205, 196, 0.18);
   transition: color 0.2s ease;
 
   &:hover {
@@ -128,4 +138,9 @@ img, svg {
   margin: 0 auto 3rem;
   font-size: 1.1rem;
   color: var(--text-secondary);
+}
+
+#main,
+section[id] {
+  scroll-margin-top: 6rem;
 }

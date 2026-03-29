@@ -15,42 +15,36 @@
 
 ## Architecture Direction
 
-- **Core Engine:** A reusable module accepts a structured `RunConfig` and orchestrates Playwright execution. It handles site loading, homepage guarantees, sampling, and manifest authoring.
+- **Core Engine:** A reusable module accepts a structured `RunConfig` and orchestrates Playwright execution. It handles site loading, validation, page-cap application, and manifest authoring.
 - **Discovery Service:** Site manifest discovery is a separate mutating workflow. It owns sitemap refresh, canonical-host correction, and intentional `sites/*.json` writes.
 - **Adapters:**
   - _CLI Adapter_ (`run-tests.js`) parses arguments, builds a `RunConfig`, invokes the core, and renders console output.
   - _GUI Adapter_ (future) presents step-wise selectors, serialises choices into a `RunConfig`, and streams progress via the same core API.
-- **Manifests:** The engine emits a canonical run manifest containing resolved pages, specs, projects, limits, and metadata. It is shared with workers via env vars or temp files and exposed to adapters for preview/logging.
+- **Manifests:** The engine emits a canonical run manifest containing resolved pages, specs, projects, limits, and a validated site-config snapshot. It is shared with workers via env vars or temp files and exposed to adapters for preview/logging.
 - **Events API (future):** Core runner exposes hooks (e.g., `onProgress`, `onSummary`) so adapters render feedback without scraping stdout.
 
 ## Current Implementation Snapshot
 
 - Manifest generation is centralised in `TestRunner.prepareRunManifest`. Small payloads are exported inline via `SITE_RUN_MANIFEST_INLINE`; larger ones persist under `reports/run-manifests/` and are referenced through `SITE_RUN_MANIFEST`.
-- `SITE_TEST_PAGES` (and optional `SITE_TEST_PAGES_LIMIT`) remain for backward compatibility, but specs now primarily read from the manifest via `utils/run-manifest.js` or through `SiteLoader` overrides.
+- Specs and fixtures load site context from the run manifest, not from ad hoc env fallbacks.
 - The CLI adapter listens to `onEvent` hooks (`manifest:ready`, `manifest:persisted`, `run:complete`) to print previews ahead of execution—mirroring the planned GUI stepper preview.
 - `run-tests.js` is execution-only. Discovery and baseline refresh run through dedicated commands (`npm run discover`, `npm run baselines:update`) rather than through runner flags.
 - `--output=<path>` lets callers capture manifest + run summaries as JSON for dashboards or other tooling without scraping stdout.
-- `utils/run-manifest.js` provides shared helpers for loading/parsing manifests so specs and future tooling avoid duplicating env parsing.
+- `utils/run-manifest.js` provides shared helpers for loading/parsing manifests so specs, reporters, and future tooling avoid duplicating runtime-context parsing.
 - Profile-specific env mutations are passed through structured overrides (`envOverrides`) rather than mutating `process.env`, keeping adapter state isolated.
-- Reporter payloads follow a standard contract: suites that emit `codex.report.summary` attachments must populate `summary.gating`, `summary.warnings`, `summary.advisories`, and `summary.notes` arrays (plus any spec-specific metrics). The validator in `utils/report-schema-validator.js` enforces this to keep the refreshed UI consistent.
+- Reporter payloads follow a standard contract: suites that emit `codex.report.summary` attachments must supply `metadata.summaryType`, must not embed presentation HTML/Markdown, and must populate `summary.gating`, `summary.warnings`, `summary.advisories`, and `summary.notes` arrays for the standard finding suites. The validator in `utils/report-schema-validator.js` enforces this.
 
 ## Implementation Roadmap
 
-1. **Config Helpers**
-   - Introduce helpers that convert adapter input into a normalised `RunConfig` object.
-   - Encapsulate page selection, homepage insertion, and cap application in one place.
-2. **Manifest Generation**
-   - Produce a structured manifest (`site`, `pages`, `specs`, `projects`, `limits`, timestamps).
-   - Use env overrides for small manifests; fall back to persisted temp files for larger payloads.
-   - Keep `SITE_TEST_PAGES` for backward compatibility while signalling the manifest path to workers.
-3. **Runner Integration**
-   - Refactor `TestRunner.runTestsForSite` to rely on the new helpers and manifest data when spawning Playwright.
-   - Avoid mutating global `process.env`; provide env payloads explicitly.
-4. **Adapter Alignment** (future)
-   - Update CLI output to optionally surface manifest summaries.
-   - Design the GUI stepper around the same helper functions and manifest preview.
-5. **Events & Telemetry** (future)
-   - Add optional progress callbacks and richer status objects so GUIs can display live feedback.
+1. **Finish reporting modularization**
+   - Keep `utils/report-templates.js` as orchestration plus shared primitives only.
+   - Continue moving suite-specific rendering into grouped modules and keep renderer coverage aligned with the active `summaryType` registry.
+2. **Lock manifest discipline**
+   - Keep the run manifest as the only supported execution context contract.
+   - Reject invalid site configs before any browser work and keep discovery as the only mutating path.
+3. **Adapter alignment** (future)
+   - Surface manifest summaries in the CLI and GUI from the same helper layer.
+   - Expose richer progress callbacks only through structured core events.
 
 ## Open Questions
 
