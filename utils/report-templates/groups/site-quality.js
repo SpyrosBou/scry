@@ -1,16 +1,4 @@
-const {
-  describeCount,
-  escapeHtml,
-  formatCount,
-  formatMillisecondsDisplay,
-  formatPercentage,
-  humaniseKey,
-  isPlainObject,
-  renderInsightTiles,
-  renderIssueGroup,
-  summariseIssueEntries,
-} = require('../../report-template-helpers');
-const { renderSummaryMetrics } = require('../../reporting-utils');
+const { humaniseKey } = require('../../report-template-helpers');
 const { KIND_PAGE_SUMMARY } = require('../../report-schema');
 const createBucketedSuiteRenderer = require('./helpers/bucketed-suite');
 
@@ -22,15 +10,13 @@ module.exports = function createSiteQualityRenderers({
   renderProjectBlockSection,
   renderSchemaGroupContainer,
   formatPageLabel,
-  renderPerPageIssuesTable,
-  formatUniqueRulesHeading,
   stripAnsiSequences,
-  simplifyUrlForDisplay,
   normalizeInteractiveMessage,
   normalizeAvailabilityMessage,
   normalizeHttpMessage,
   normalizePerformanceMessage,
   normalizeVisualMessage,
+  renderSchemaMetricsMarkdown,
   renderInternalLinksPageCard,
   renderInteractivePageCard,
   renderAvailabilityPageCard,
@@ -745,12 +731,293 @@ module.exports = function createSiteQualityRenderers({
     });
 
 
+const renderInternalLinksGroupMarkdown = (group) => {
+  const buckets = collectSchemaProjects(group);
+  if (buckets.length === 0) return '';
+
+  const sections = buckets.map((bucket) => {
+    const runPayload = firstRunPayload(bucket);
+    const pages = bucket.pageEntries
+      .map((entry) => entry.payload || {})
+      .filter((payload) => payload.kind === KIND_PAGE_SUMMARY);
+    const projectLabel = runPayload?.metadata?.projectName || bucket.projectName || 'default';
+    const heading = `${group.title || 'Internal link audit summary'} – ${projectLabel}`;
+    const overview = runPayload?.overview ? renderSchemaMetricsMarkdown(runPayload.overview) : '';
+
+    const header = '| Page | Links found | Checked | Broken |';
+    const separator = '| --- | --- | --- | --- |';
+    const rows = pages.map((payload) => {
+      const summary = payload.summary || {};
+      return `| \`${payload.page || 'unknown'}\` | ${summary.totalLinks ?? '—'} | ${summary.uniqueChecked ?? '—'} | ${summary.brokenCount ?? 0} |`;
+    });
+
+    const brokenRows = [];
+    pages.forEach((payload) => {
+      const summary = payload.summary || {};
+      (summary.brokenSample || []).forEach((issue) => {
+        brokenRows.push(
+          `| \`${payload.page || 'unknown'}\` | ${issue.url || ''} | ${issue.status != null ? issue.status : issue.error || 'error'} | ${issue.methodTried || 'HEAD'} |`
+        );
+      });
+    });
+
+    const brokenSection = brokenRows.length
+      ? [
+          '## Broken links',
+          '',
+          '| Source page | URL | Status / Error | Method |',
+          '| --- | --- | --- | --- |',
+          ...brokenRows,
+        ].join('\n')
+      : '## Broken links\n\nNone 🎉';
+
+    const parts = [`## ${heading}`];
+    if (overview) parts.push(overview);
+    parts.push('', header, separator, ...rows);
+    parts.push('', brokenSection);
+    return parts.join('\n');
+  });
+
+  return sections.join('\n\n');
+};
+
+const renderInteractiveGroupMarkdown = (group) => {
+  const buckets = collectSchemaProjects(group);
+  if (buckets.length === 0) return '';
+
+  const sections = buckets.map((bucket) => {
+    const runPayload = firstRunPayload(bucket);
+    const pages = bucket.pageEntries
+      .map((entry) => entry.payload || {})
+      .filter((payload) => payload.kind === KIND_PAGE_SUMMARY);
+    const projectLabel = runPayload?.metadata?.projectName || bucket.projectName || 'default';
+    const heading = `${group.title || 'Interactive smoke summary'} – ${projectLabel}`;
+    const overview = runPayload?.overview ? renderSchemaMetricsMarkdown(runPayload.overview) : '';
+    const budget = runPayload?.overview?.resourceErrorBudget;
+
+    const header = '| Page | Status | Console | Resources | Notes |';
+    const separator = '| --- | --- | --- | --- | --- |';
+    const rows = pages.map((payload) => {
+      const summary = payload.summary || {};
+      const consoleOutput = (summary.consoleSample || [])
+        .map((entry) => `⚠️ ${entry.message || entry}`)
+        .join('<br />');
+      const consoleCell = summary.consoleErrors
+        ? consoleOutput || 'See captured sample'
+        : '✅ None';
+      const resourceOutput = (summary.resourceSample || [])
+        .map((entry) => {
+          const base =
+            entry.type === 'requestfailed'
+              ? `requestfailed ${entry.url} (${entry.failure || 'unknown'})`
+              : `${entry.type} ${entry.status || ''} ${entry.method || ''} ${entry.url}`;
+          return `⚠️ ${base.trim()}`;
+        })
+        .join('<br />');
+      const resourceCell = summary.resourceErrors
+        ? resourceOutput || 'See captured sample'
+        : '✅ None';
+      const noteItems = [];
+      (summary.warnings || []).forEach((message) => noteItems.push(`⚠️ ${message}`));
+      (summary.info || []).forEach((message) => noteItems.push(`ℹ️ ${message}`));
+      const notesCell = noteItems.length ? noteItems.join('<br />') : '—';
+      const statusLabel = summary.status == null ? 'n/a' : summary.status;
+      return `| \`${payload.page || 'unknown'}\` | ${statusLabel} | ${consoleCell || '—'} | ${resourceCell || '—'} | ${notesCell} |`;
+    });
+
+    const parts = [`## ${heading}`];
+    if (overview) parts.push(overview);
+    if (budget != null) parts.push('', `Resource error budget: **${budget}**`);
+    parts.push('', header, separator, ...rows);
+    return parts.join('\n');
+  });
+
+  return sections.join('\n\n');
+};
+
+const renderAvailabilityGroupMarkdown = (group) => {
+  const buckets = collectSchemaProjects(group);
+  if (buckets.length === 0) return '';
+
+  const sections = buckets.map((bucket) => {
+    const runPayload = firstRunPayload(bucket);
+    const detailPages = Array.isArray(runPayload?.details?.pages)
+      ? runPayload.details.pages.map((page) => ({
+          payload: {
+            page: page.page,
+            summary: page,
+          },
+        }))
+      : null;
+    const pages = (detailPages || bucket.pageEntries)
+      .map((entry) => entry.payload || {})
+      .filter((payload) => payload.kind === KIND_PAGE_SUMMARY || payload.summary);
+    const projectLabel = runPayload?.metadata?.projectName || bucket.projectName || 'default';
+    const heading = `${group.title || 'Availability & uptime summary'} – ${projectLabel}`;
+    const overview = runPayload?.overview ? renderSchemaMetricsMarkdown(runPayload.overview) : '';
+
+    const header = '| Page | Status | Warnings | Info |';
+    const separator = '| --- | --- | --- | --- |';
+    const rows = pages.map((payload) => {
+      const summary = payload.summary || {};
+      const warnings =
+        (summary.warnings || []).map((message) => `⚠️ ${message}`).join('<br />') || 'None';
+      const info = (summary.info || []).map((message) => `ℹ️ ${message}`).join('<br />') || 'None';
+      const statusLabel = summary.status == null ? 'n/a' : summary.status;
+      const hasStructureGap = Object.values(summary.elements || {}).some(
+        (value) => value === false
+      );
+      const severity = hasStructureGap || (summary.warnings || []).length ? '⚠️' : '✅';
+      return `| \`${payload.page || 'unknown'}\` | ${severity} ${statusLabel} | ${warnings} | ${info} |`;
+    });
+
+    const parts = [`## ${heading}`];
+    if (overview) parts.push(overview);
+    parts.push('', header, separator, ...rows);
+    return parts.join('\n');
+  });
+
+  return sections.join('\n\n');
+};
+
+const renderHttpGroupMarkdown = (group) => {
+  const buckets = collectSchemaProjects(group);
+  if (buckets.length === 0) return '';
+
+  const sections = buckets.map((bucket) => {
+    const runPayload = firstRunPayload(bucket);
+    const detailPages = Array.isArray(runPayload?.details?.pages)
+      ? runPayload.details.pages.map((page) => ({
+          payload: {
+            page: page.page,
+            summary: page,
+          },
+        }))
+      : null;
+    const pages = (detailPages || bucket.pageEntries)
+      .map((entry) => entry.payload || {})
+      .filter((payload) => payload.kind === KIND_PAGE_SUMMARY || payload.summary);
+    const projectLabel = runPayload?.metadata?.projectName || bucket.projectName || 'default';
+    const heading = `${group.title || 'HTTP response validation summary'} – ${projectLabel}`;
+    const overview = runPayload?.overview ? renderSchemaMetricsMarkdown(runPayload.overview) : '';
+
+    const header = '| Page | Status | Redirect | Failed checks |';
+    const separator = '| --- | --- | --- | --- |';
+    const rows = pages.map((payload) => {
+      const summary = payload.summary || {};
+      const failedChecks =
+        (summary.failedChecks || [])
+          .map(
+            (check) =>
+              `⚠️ ${check.label || 'Check failed'}${check.details ? ` — ${check.details}` : ''}`
+          )
+          .join('<br />') || 'None';
+      const statusLabel = summary.status == null ? 'n/a' : summary.status;
+      const redirect = summary.redirectLocation || '—';
+      const severity = (summary.failedChecks || []).length ? '⚠️' : '✅';
+      return `| \`${payload.page || 'unknown'}\` | ${severity} ${statusLabel} | ${redirect} | ${failedChecks} |`;
+    });
+
+    const parts = [`## ${heading}`];
+    if (overview) parts.push(overview);
+    parts.push('', header, separator, ...rows);
+    return parts.join('\n');
+  });
+
+  return sections.join('\n\n');
+};
+
+const renderPerformanceGroupMarkdown = (group) => {
+  const buckets = collectSchemaProjects(group);
+  if (buckets.length === 0) return '';
+
+  const sections = buckets.map((bucket) => {
+    const runPayload = firstRunPayload(bucket);
+    const pages = bucket.pageEntries
+      .map((entry) => entry.payload || {})
+      .filter((payload) => payload.kind === KIND_PAGE_SUMMARY);
+    const projectLabel = runPayload?.metadata?.projectName || bucket.projectName || 'default';
+    const heading = `${group.title || 'Performance monitoring summary'} – ${projectLabel}`;
+    const overview = runPayload?.overview ? renderSchemaMetricsMarkdown(runPayload.overview) : '';
+
+    const header = '| Page | Load (ms) | DOM Loaded | Load complete | FCP | FP | Breaches |';
+    const separator = '| --- | --- | --- | --- | --- | --- | --- |';
+    const rows = pages.map((payload) => {
+      const summary = payload.summary || {};
+      const breaches =
+        (summary.budgetBreaches || [])
+          .map(
+            (breach) =>
+              `${breach.metric}: ${Math.round(breach.value)}ms (budget ${Math.round(breach.budget)}ms)`
+          )
+          .join('<br />') || 'None';
+      return `| \`${payload.page || 'unknown'}\` | ${summary.loadTimeMs != null ? Math.round(summary.loadTimeMs) : '—'} | ${summary.domContentLoadedMs != null ? Math.round(summary.domContentLoadedMs) : '—'} | ${summary.loadCompleteMs != null ? Math.round(summary.loadCompleteMs) : '—'} | ${summary.firstContentfulPaintMs != null ? Math.round(summary.firstContentfulPaintMs) : '—'} | ${summary.firstPaintMs != null ? Math.round(summary.firstPaintMs) : '—'} | ${breaches} |`;
+    });
+
+    const parts = [`## ${heading}`];
+    if (overview) parts.push(overview);
+    parts.push('', header, separator, ...rows);
+    return parts.join('\n');
+  });
+
+  return sections.join('\n\n');
+};
+
+const renderVisualGroupMarkdown = (group) => {
+  const buckets = collectSchemaProjects(group);
+  if (buckets.length === 0) return '';
+
+  const sections = buckets.map((bucket) => {
+    const runPayload = firstRunPayload(bucket);
+    const pages = bucket.pageEntries
+      .map((entry) => entry.payload || {})
+      .filter((payload) => payload.kind === KIND_PAGE_SUMMARY);
+    const projectLabel = runPayload?.metadata?.projectName || bucket.projectName || 'default';
+    const heading = `${group.title || 'Visual regression summary'} – ${projectLabel}`;
+    const overview = runPayload?.overview ? renderSchemaMetricsMarkdown(runPayload.overview) : '';
+
+    const header = '| Page | Screenshot | Threshold | Result | Details |';
+    const separator = '| --- | --- | --- | --- | --- |';
+    const rows = pages.map((payload) => {
+      const summary = payload.summary || {};
+      const result = (summary.result || '').toLowerCase();
+      const diffDetails = [];
+      if (summary.pixelDiff != null)
+        diffDetails.push(`Pixel diff: ${summary.pixelDiff.toLocaleString()}`);
+      if (summary.pixelRatio != null)
+        diffDetails.push(`Diff ratio: ${(summary.pixelRatio * 100).toFixed(2)}%`);
+      if (summary.expectedSize && summary.actualSize) {
+        diffDetails.push(
+          `Expected ${summary.expectedSize.width}×${summary.expectedSize.height}px, got ${summary.actualSize.width}×${summary.actualSize.height}px`
+        );
+      }
+      if (summary.error) diffDetails.push(summary.error);
+      const detailsCell = diffDetails.length ? diffDetails.join('<br />') : 'Matched baseline';
+      const resultCell = result === 'diff' ? '⚠️ Diff detected' : '✅ Matched';
+      return `| \`${payload.page || 'unknown'}\` | ${summary.screenshot || '—'} | ${summary.threshold != null ? summary.threshold : '—'} | ${resultCell} | ${detailsCell} |`;
+    });
+
+    const parts = [`## ${heading}`];
+    if (overview) parts.push(overview);
+    parts.push('', header, separator, ...rows);
+    return parts.join('\n');
+  });
+
+  return sections.join('\n\n');
+};
+
   return {
     renderInternalLinksGroupHtml,
+    renderInternalLinksGroupMarkdown,
     renderInteractiveGroupHtml,
+    renderInteractiveGroupMarkdown,
     renderAvailabilityGroupHtml,
+    renderAvailabilityGroupMarkdown,
     renderHttpGroupHtml,
+    renderHttpGroupMarkdown,
     renderPerformanceGroupHtml,
+    renderPerformanceGroupMarkdown,
     renderVisualGroupHtml,
+    renderVisualGroupMarkdown,
   };
 };

@@ -1,9 +1,32 @@
-const { test, expect } = require('../utils/test-fixtures');
+const path = require('path');
 const fs = require('fs');
-const SiteLoader = require('../utils/site-loader');
+const { test, expect } = require('../utils/test-fixtures');
 const { safeNavigate, waitForPageStability } = require('../utils/test-helpers');
 const { attachSchemaSummary } = require('../utils/reporting-utils');
 const { createRunSummaryPayload, createPageSummaryPayload } = require('../utils/report-schema');
+const { getActiveSiteContext } = require('../utils/test-context');
+const { createAggregationStore } = require('../utils/report-aggregation-store');
+const { waitForReports: waitForReportsHelper } = require('../utils/a11y-aggregation-waiter');
+
+const { siteConfig } = getActiveSiteContext();
+const configuredPages = process.env.SMOKE ? siteConfig.testPages.slice(0, 1) : siteConfig.testPages;
+const totalPages = configuredPages.length;
+const RUN_TOKEN = process.env.VISUAL_REGRESSION_RUN_TOKEN || `${Date.now()}`;
+if (!process.env.VISUAL_REGRESSION_RUN_TOKEN) {
+  process.env.VISUAL_REGRESSION_RUN_TOKEN = RUN_TOKEN;
+}
+const AGGREGATION_PERSIST_ROOT = path.join(process.cwd(), 'test-results', '.visual-aggregation');
+const aggregationStore = createAggregationStore({
+  persistRoot: AGGREGATION_PERSIST_ROOT,
+  runToken: RUN_TOKEN,
+});
+const waitForReports = (projectName) =>
+  waitForReportsHelper({
+    store: aggregationStore,
+    projectName,
+    expectedCount: totalPages,
+    timeoutMs: Math.max(60000, totalPages * 5000),
+  });
 
 const slugify = (value) =>
   String(value || '')
@@ -33,17 +56,28 @@ const DEFAULT_VISUAL_THRESHOLDS = {
   dynamic: 0.05,
 };
 
+const waitForVisualSettle = async (page) => {
+  await page.evaluate(
+    () =>
+      new Promise((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(resolve));
+      })
+  );
+};
+
 const parseDiffMetrics = (message) => {
   if (typeof message !== 'string' || message.length === 0) return null;
 
-  const pixelsRegex = /([\d,]+)\s+pixels\s+\(ratio\s+([\d.]+)\s+of all image pixels\) are different/gi;
+  const pixelsRegex =
+    /([\d,]+)\s+pixels\s+\(ratio\s+([\d.]+)\s+of all image pixels\) are different/gi;
   let pixelsMatch;
   let lastPixelsMatch = null;
   while ((pixelsMatch = pixelsRegex.exec(message))) {
     lastPixelsMatch = pixelsMatch;
   }
 
-  const dimensionsRegex = /Expected an image\s+(\d+)px by (\d+)px,\s+received\s+(\d+)px by (\d+)px/gi;
+  const dimensionsRegex =
+    /Expected an image\s+(\d+)px by (\d+)px,\s+received\s+(\d+)px by (\d+)px/gi;
   let dimMatch;
   let lastDimensionsMatch = null;
   while ((dimMatch = dimensionsRegex.exec(message))) {
@@ -78,12 +112,9 @@ const buildVisualSchemaPayloads = ({ summaries, viewportName, projectName }) => 
     const diffMetrics = entry.diffMetrics || {};
     const pixelDiff = Number.isFinite(diffMetrics.pixelDiff) ? diffMetrics.pixelDiff : null;
     const pixelRatio = Number.isFinite(diffMetrics.pixelRatio) ? diffMetrics.pixelRatio : null;
-    const deltaPercent =
-      pixelRatio !== null ? Math.round(pixelRatio * 10000) / 100 : null;
+    const deltaPercent = pixelRatio !== null ? Math.round(pixelRatio * 10000) / 100 : null;
     const thresholdPercent =
-      typeof entry.threshold === 'number'
-        ? Math.round(entry.threshold * 10000) / 100
-        : null;
+      typeof entry.threshold === 'number' ? Math.round(entry.threshold * 10000) / 100 : null;
     const gating =
       entry.result === 'diff'
         ? [
@@ -95,6 +126,8 @@ const buildVisualSchemaPayloads = ({ summaries, viewportName, projectName }) => 
     const notes = [];
     if (entry.result === 'pass') {
       notes.push('Screenshot matched baseline within configured threshold.');
+    } else if (entry.result === 'skipped' && entry.status) {
+      notes.push(`Screenshot skipped after HTTP ${entry.status}.`);
     } else if (entry.error) {
       notes.push(entry.error);
     }
@@ -118,8 +151,9 @@ const buildVisualSchemaPayloads = ({ summaries, viewportName, projectName }) => 
     };
   });
 
-  const diffs = enrichedSummaries.filter((entry) => entry.result !== 'pass');
-  const passes = enrichedSummaries.length - diffs.length;
+  const diffs = enrichedSummaries.filter((entry) => entry.result === 'diff');
+  const passes = enrichedSummaries.filter((entry) => entry.result === 'pass').length;
+  const skipped = enrichedSummaries.filter((entry) => entry.result === 'skipped').length;
   const thresholds = Array.from(
     new Set(
       enrichedSummaries
@@ -128,7 +162,9 @@ const buildVisualSchemaPayloads = ({ summaries, viewportName, projectName }) => 
     )
   );
 
-  const pixelDiffs = diffs.map((entry) => entry.pixelDiff).filter((value) => Number.isFinite(value));
+  const pixelDiffs = diffs
+    .map((entry) => entry.pixelDiff)
+    .filter((value) => Number.isFinite(value));
   const pixelRatios = diffs
     .map((entry) => entry.pixelRatio)
     .filter((value) => Number.isFinite(value));
@@ -144,6 +180,7 @@ const buildVisualSchemaPayloads = ({ summaries, viewportName, projectName }) => 
       totalPages: enrichedSummaries.length,
       passes,
       diffs: diffs.length,
+      skipped,
       thresholdsUsed: thresholds,
       maxPixelDiff: pixelDiffs.length > 0 ? Math.max(...pixelDiffs) : null,
       maxPixelRatio: pixelRatios.length > 0 ? Math.max(...pixelRatios) : null,
@@ -163,6 +200,7 @@ const buildVisualSchemaPayloads = ({ summaries, viewportName, projectName }) => 
   runPayload.details = {
     pages: enrichedSummaries.map((entry) => ({
       page: entry.page,
+      status: entry.status ?? null,
       viewport: viewportName,
       result: entry.result,
       gating: entry.gating,
@@ -183,6 +221,7 @@ const buildVisualSchemaPayloads = ({ summaries, viewportName, projectName }) => 
       page: entry.page,
       viewport: viewportName,
       summary: {
+        status: entry.status ?? null,
         result: entry.result,
         threshold: entry.threshold,
         thresholdPercent: entry.thresholdPercent,
@@ -212,17 +251,6 @@ const buildVisualSchemaPayloads = ({ summaries, viewportName, projectName }) => 
 };
 
 test.describe('Visual Regression', () => {
-  let siteConfig;
-  let errorContext;
-
-  test.beforeEach(({ errorContext: sharedErrorContext }) => {
-    const siteName = process.env.SITE_NAME;
-    if (!siteName) throw new Error('SITE_NAME environment variable is required');
-    siteConfig = SiteLoader.loadSite(siteName);
-    SiteLoader.validateSiteConfig(siteConfig);
-    errorContext = sharedErrorContext;
-  });
-
   const enabledViewportKeys = resolveViewports();
 
   if (enabledViewportKeys.length === 0) {
@@ -232,60 +260,120 @@ test.describe('Visual Regression', () => {
   enabledViewportKeys.forEach((viewportKey) => {
     const viewport = VIEWPORTS[viewportKey];
     const viewportName = viewport.name;
+
     test.describe(`Visuals: ${viewportName} (${viewport.width}x${viewport.height})`, () => {
       test.beforeEach(async ({ page }) => {
         await page.setViewportSize({ width: viewport.width, height: viewport.height });
       });
 
-      test(`Visual regression - ${viewportName}`, async ({ page, browserName }, testInfo) => {
-        test.setTimeout(7200000);
-        errorContext.setTest(`Visual Regression - ${viewportName}`);
+      configuredPages.forEach((testPage, index) => {
+        test(`Visual regression ${viewportName} ${index + 1}/${totalPages}: ${testPage}`, async ({
+          page,
+          browserName,
+          errorContext,
+        }, testInfo) => {
+          errorContext.setTest(`Visual Regression - ${viewportName}`);
+          errorContext.setPage(testPage);
 
-        const pagesToTest = process.env.SMOKE
-          ? siteConfig.testPages.slice(0, 1)
-          : siteConfig.testPages;
-        const visualSummaries = [];
-        const diffEntries = [];
-        const pendingAttachments = [];
+          const pendingAttachments = [];
+          const pageReport = {
+            page: testPage,
+            viewportName,
+            status: null,
+            result: 'skipped',
+            threshold: null,
+            screenshot: null,
+            diffMetrics: null,
+            artifacts: null,
+            error: null,
+            index: index + 1,
+            runToken: RUN_TOKEN,
+          };
+          let failureMessage = null;
 
-        for (const testPage of pagesToTest) {
-          await test.step(`Visual ${viewportName}: ${testPage}`, async () => {
-            errorContext.setPage(testPage);
+          const pageName = testPage.replace(/\//g, '') || 'home';
+          const screenshotName = `${siteConfig.name
+            .toLowerCase()
+            .replace(/\s+/g, '-')}-${pageName}-${viewportName}-${browserName}.png`;
+          const artifactsLabel = `${screenshotName.replace(/\.png$/i, '')}`;
 
+          const collectVisualArtifacts = async (includeDiffArtifacts = false) => {
+            const artifactInfo = { baseline: null, actual: null, diff: null };
+            const registerAttachment = (label, filePath) => {
+              if (!filePath || !fs.existsSync(filePath)) return null;
+              const attachmentName = `${artifactsLabel}-${label}.png`;
+              pendingAttachments.push({ name: attachmentName, path: filePath });
+              return { name: attachmentName };
+            };
+
+            if (includeDiffArtifacts) {
+              const baselinePath = testInfo.snapshotPath(screenshotName);
+              artifactInfo.baseline = registerAttachment('baseline', baselinePath);
+
+              const baseName = artifactsLabel;
+              const actualCandidates = [
+                testInfo.outputPath(`${baseName}-actual.png`),
+                testInfo.outputPath(`${screenshotName}-actual.png`),
+              ];
+              const diffCandidates = [
+                testInfo.outputPath(`${baseName}-diff.png`),
+                testInfo.outputPath(`${screenshotName}-diff.png`),
+              ];
+
+              const findExisting = (candidates) =>
+                candidates.find((candidate) => candidate && fs.existsSync(candidate));
+
+              const actualPath = findExisting(actualCandidates);
+              const diffPath = findExisting(diffCandidates);
+
+              artifactInfo.actual = registerAttachment('actual', actualPath);
+              artifactInfo.diff = registerAttachment('diff', diffPath);
+            }
+
+            return artifactInfo;
+          };
+
+          try {
             const response = await safeNavigate(page, `${siteConfig.baseUrl}${testPage}`);
-            if (response.status() !== 200) return;
+            pageReport.status = response.status();
+            if (pageReport.status !== 200) {
+              pageReport.error = `HTTP ${pageReport.status}; screenshot skipped.`;
+              return;
+            }
             await waitForPageStability(page);
 
-            // Disable animations for consistent screenshots
             await page.addStyleTag({
               content: `
-                *, *::before, *::after {
-                  animation-duration: 0s !important;
-                  animation-delay: 0s !important;
-                  transition-duration: 0s !important;
-                  transition-delay: 0s !important;
-                }
-              `,
+                  *, *::before, *::after {
+                    animation-duration: 0s !important;
+                    animation-delay: 0s !important;
+                    transition-duration: 0s !important;
+                    transition-delay: 0s !important;
+                  }
+                `,
             });
-            await page.waitForTimeout(300);
-
-            const pageName = testPage.replace(/\//g, '') || 'home';
-            const screenshotName = `${siteConfig.name
-              .toLowerCase()
-              .replace(/\s+/g, '-')}-${pageName}-${viewportName}-${browserName}.png`;
+            await waitForVisualSettle(page);
 
             const thresholds = siteConfig.visualThresholds || DEFAULT_VISUAL_THRESHOLDS;
-            let threshold = testPage === '/' || testPage.includes('home')
-              ? thresholds.dynamic
-              : thresholds.content;
+            let threshold =
+              testPage === '/' || testPage.includes('home')
+                ? thresholds.dynamic
+                : thresholds.content;
+            pageReport.threshold = threshold;
+            pageReport.screenshot = screenshotName;
 
-            // Per-page visual overrides
-            const overrides = Array.isArray(siteConfig.visualOverrides) ? siteConfig.visualOverrides : [];
+            const overrides = Array.isArray(siteConfig.visualOverrides)
+              ? siteConfig.visualOverrides
+              : [];
             const matchOverride = overrides.find((ovr) => {
               if (ovr && typeof ovr.match === 'string' && ovr.match === testPage) return true;
               if (ovr && typeof ovr.page === 'string' && ovr.page === testPage) return true;
               if (ovr && typeof ovr.pattern === 'string') {
-                try { return new RegExp(ovr.pattern).test(testPage); } catch (_) { return false; }
+                try {
+                  return new RegExp(ovr.pattern).test(testPage);
+                } catch (_error) {
+                  return false;
+                }
               }
               return false;
             });
@@ -300,50 +388,14 @@ test.describe('Visual Regression', () => {
               'iframe',
               'video',
               'canvas',
-            ].concat(siteConfig.dynamicMasks || [])
+            ]
+              .concat(siteConfig.dynamicMasks || [])
               .concat(matchOverride?.masks || matchOverride?.maskSelectors || []);
             if (typeof matchOverride?.threshold === 'number') {
               threshold = matchOverride.threshold;
+              pageReport.threshold = threshold;
             }
-            const masks = maskSelectors.map((sel) => page.locator(sel));
-
-            const artifactsLabel = `${screenshotName.replace(/\.png$/i, '')}`;
-
-            const collectVisualArtifacts = async (includeDiffArtifacts = false) => {
-              const artifactInfo = { baseline: null, actual: null, diff: null };
-              const registerAttachment = (label, filePath) => {
-                if (!filePath || !fs.existsSync(filePath)) return null;
-                const attachmentName = `${artifactsLabel}-${label}.png`;
-                pendingAttachments.push({ name: attachmentName, path: filePath });
-                return { name: attachmentName };
-              };
-
-              if (includeDiffArtifacts) {
-                const baselinePath = testInfo.snapshotPath(screenshotName);
-                artifactInfo.baseline = registerAttachment('baseline', baselinePath);
-
-                const baseName = artifactsLabel;
-                const actualCandidates = [
-                  testInfo.outputPath(`${baseName}-actual.png`),
-                  testInfo.outputPath(`${screenshotName}-actual.png`),
-                ];
-                const diffCandidates = [
-                  testInfo.outputPath(`${baseName}-diff.png`),
-                  testInfo.outputPath(`${screenshotName}-diff.png`),
-                ];
-
-                const findExisting = (candidates) =>
-                  candidates.find((candidate) => candidate && fs.existsSync(candidate));
-
-                const actualPath = findExisting(actualCandidates);
-                const diffPath = findExisting(diffCandidates);
-
-                artifactInfo.actual = registerAttachment('actual', actualPath);
-                artifactInfo.diff = registerAttachment('diff', diffPath);
-              }
-
-              return artifactInfo;
-            };
+            const masks = maskSelectors.map((selector) => page.locator(selector));
 
             try {
               await expect(page).toHaveScreenshot(screenshotName, {
@@ -354,59 +406,70 @@ test.describe('Visual Regression', () => {
                 mask: masks,
               });
               console.log(`✅ Visual regression passed for ${testPage} (${viewportName})`);
-              visualSummaries.push({
-                page: testPage,
-                result: 'pass',
-                threshold,
-                screenshot: screenshotName,
-                artifacts: null,
-              });
+              pageReport.result = 'pass';
             } catch (error) {
               console.log(
                 `⚠️  Visual difference detected for ${testPage} (${viewportName}): ${error.message}`
               );
-              const artifacts = await collectVisualArtifacts(true);
-              const diffMetrics = parseDiffMetrics(String(error.message || ''));
-              visualSummaries.push({
-                page: testPage,
-                result: 'diff',
-                threshold,
-                screenshot: screenshotName,
-                error: String(error.message || '').slice(0, 200),
-                diffMetrics,
-                artifacts,
-              });
-              diffEntries.push({ page: testPage, metrics: diffMetrics });
+              pageReport.result = 'diff';
+              pageReport.artifacts = await collectVisualArtifacts(true);
+              pageReport.diffMetrics = parseDiffMetrics(String(error.message || ''));
+              pageReport.error = String(error.message || '').slice(0, 200);
+              failureMessage = `Visual differences detected on \`${testPage}\` (${viewportName}). Review attachments for details.`;
             }
-          });
-        }
-
-
-        const schemaPayloads = buildVisualSchemaPayloads({
-          summaries: visualSummaries,
-          viewportName,
-          projectName: testInfo.project.name,
-        });
-        if (schemaPayloads) {
-          await attachSchemaSummary(testInfo, schemaPayloads.runPayload);
-          for (const payload of schemaPayloads.pagePayloads) {
-            await attachSchemaSummary(testInfo, payload);
+          } finally {
+            aggregationStore.record(testInfo.project.name, pageReport);
           }
-        }
 
-        for (const artifact of pendingAttachments) {
-          await testInfo.attach(artifact.name, {
-            path: artifact.path,
-            contentType: 'image/png',
-          });
-        }
+          const pagePayload = buildVisualSchemaPayloads({
+            summaries: [pageReport],
+            viewportName,
+            projectName: testInfo.project.name,
+          })?.pagePayloads?.[0];
+          if (pagePayload) {
+            await attachSchemaSummary(testInfo, pagePayload);
+          }
 
-        if (diffEntries.length > 0) {
-          const pageList = diffEntries.map((entry) => `\`${entry.page}\``).join(', ');
-          throw new Error(
-            `Visual differences detected on ${pageList}. Review attachments for details.`
+          for (const artifact of pendingAttachments) {
+            await testInfo.attach(artifact.name, {
+              path: artifact.path,
+              contentType: 'image/png',
+            });
+          }
+
+          if (failureMessage) {
+            throw new Error(failureMessage);
+          }
+        });
+      });
+
+      test.describe.serial(`Visual summary ${viewportName}`, () => {
+        test('Aggregate results', async ({}, testInfo) => {
+          if (totalPages === 0) {
+            console.warn(`ℹ️  Visual suite executed with no configured pages for ${viewportName}.`);
+            return;
+          }
+
+          const reports = (await waitForReports(testInfo.project.name)).filter(
+            (report) =>
+              report.runToken === RUN_TOKEN &&
+              report.viewportName === viewportName &&
+              typeof report.index === 'number'
           );
-        }
+          if (reports.length === 0) {
+            console.warn(`ℹ️  Visual suite produced no page reports for ${viewportName}.`);
+            return;
+          }
+
+          const schemaPayloads = buildVisualSchemaPayloads({
+            summaries: reports,
+            viewportName,
+            projectName: testInfo.project.name,
+          });
+          if (schemaPayloads?.runPayload) {
+            await attachSchemaSummary(testInfo, schemaPayloads.runPayload);
+          }
+        });
       });
     });
   });

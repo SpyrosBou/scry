@@ -1,11 +1,8 @@
 const { test, expect } = require('../utils/test-fixtures');
-const SiteLoader = require('../utils/site-loader');
 
 test.use({ trace: 'off', video: 'off' });
-const {
-  safeNavigate,
-  waitForPageStability,
-} = require('../utils/test-helpers');
+const { safeNavigate, waitForPageStability } = require('../utils/test-helpers');
+const { waitForFormValidationState } = require('../utils/form-helpers');
 const { attachSchemaSummary } = require('../utils/reporting-utils');
 const { createRunSummaryPayload, createPageSummaryPayload } = require('../utils/report-schema');
 const { resolveAccessibilityMetadata, applyViewportMetadata } = require('../utils/a11y-shared');
@@ -170,7 +167,9 @@ const evaluatePostSubmitState = async (formLocator, fieldSelectors) => {
           .filter(Boolean);
 
         const fieldContainer =
-          field.closest('label, .form-field, .field, .gfield, .nf-field, .wpcf7-form-control-wrap') ||
+          field.closest(
+            'label, .form-field, .field, .gfield, .nf-field, .wpcf7-form-control-wrap'
+          ) ||
           field.parentElement ||
           form;
 
@@ -208,17 +207,11 @@ const evaluatePostSubmitState = async (formLocator, fieldSelectors) => {
 test.describe('Accessibility: Forms', () => {
   let siteConfig;
 
-  test.beforeEach(() => {
-    const siteName = process.env.SITE_NAME;
-    if (!siteName) throw new Error('SITE_NAME environment variable is required');
-
-    siteConfig = SiteLoader.loadSite(siteName);
-    SiteLoader.validateSiteConfig(siteConfig);
+  test.beforeEach(({ siteConfig: resolvedSiteConfig }) => {
+    siteConfig = resolvedSiteConfig;
   });
 
   test('Forms provide accessible labelling and validation feedback', async ({ page }, testInfo) => {
-    test.setTimeout(7200000);
-
     const formConfigs = Array.isArray(siteConfig.forms) ? siteConfig.forms : [];
     if (formConfigs.length === 0) {
       test.skip('Site config defines no forms to audit.');
@@ -270,7 +263,9 @@ test.describe('Accessibility: Forms', () => {
           return;
         }
 
-        const submitLocator = formLocator.locator(formConfig.submitButton || '[type="submit"]').first();
+        const submitLocator = formLocator
+          .locator(formConfig.submitButton || '[type="submit"]')
+          .first();
         if (!(await submitLocator.count())) {
           report.gating.push('Submit button not found inside the form.');
           return;
@@ -313,7 +308,9 @@ test.describe('Accessibility: Forms', () => {
 
           if (!accessibleInfo.hasAccessibleName) {
             report.gating.push(`Field "${fieldName}" is missing an accessible name.`);
-            fieldReport.issues.push('Accessible name not detected (no label/aria-label/aria-labelledby).');
+            fieldReport.issues.push(
+              'Accessible name not detected (no label/aria-label/aria-labelledby).'
+            );
           }
 
           if (accessibleInfo.placeholder && !accessibleInfo.hasAccessibleName) {
@@ -327,11 +324,13 @@ test.describe('Accessibility: Forms', () => {
 
         const submitInfo = await getAccessibleNameDetails(submitLocator);
         if (!submitInfo.hasAccessibleName) {
-          report.gating.push('Submit button lacks an accessible name (text, aria-label, or labelled-by).');
+          report.gating.push(
+            'Submit button lacks an accessible name (text, aria-label, or labelled-by).'
+          );
         }
 
         await submitLocator.dispatchEvent('click');
-        await page.waitForTimeout(1200);
+        await waitForFormValidationState(page, formLocator, { errorSelectors: ERROR_SELECTORS });
 
         const postSubmitState = await evaluatePostSubmitState(formLocator, fieldDetails);
 
@@ -343,15 +342,24 @@ test.describe('Accessibility: Forms', () => {
           const postField = postSubmitState.fields[fieldReport.name];
           if (!postField) continue;
 
-          if (fieldReport.required && !postField.ariaInvalid && !postField.inlineErrors.length && !postField.describedText.length) {
+          if (
+            fieldReport.required &&
+            !postField.ariaInvalid &&
+            !postField.inlineErrors.length &&
+            !postField.describedText.length
+          ) {
             report.gating.push(
               `Field "${fieldReport.name}" did not expose aria-invalid or inline error messaging after submitting empty.`
             );
-            fieldReport.issues.push('No aria-invalid or inline error detected after invalid submit.');
+            fieldReport.issues.push(
+              'No aria-invalid or inline error detected after invalid submit.'
+            );
           }
 
           if (!postField.inlineErrors.length && postField.describedText.length) {
-            fieldReport.issues.push('Validation message relies on aria-describedby only; ensure the referenced node stays visible.');
+            fieldReport.issues.push(
+              'Validation message relies on aria-describedby only; ensure the referenced node stays visible.'
+            );
           }
 
           if (postField.inlineErrors.length) {
@@ -368,7 +376,7 @@ test.describe('Accessibility: Forms', () => {
 
     const gatingTotal = reports.reduce((sum, report) => sum + report.gating.length, 0);
     const { siteLabel, viewportLabel } = resolveAccessibilityMetadata(siteConfig, testInfo);
-    applyViewportMetadata(reports, viewportLabel, siteLabel);
+    applyViewportMetadata(reports, { viewportLabel, siteLabel });
 
     const runPayload = createRunSummaryPayload({
       baseName: `a11y-forms-summary-${slugify(siteLabel)}`,
@@ -384,30 +392,30 @@ test.describe('Accessibility: Forms', () => {
       metadata: {
         spec: 'a11y.forms.validation',
         summaryType: 'forms',
-        projectName: siteLabel,
+        projectName: viewportLabel,
         siteName: siteLabel,
         viewports: [viewportLabel],
         suppressPageEntries: true,
         scope: 'project',
       },
     });
-  runPayload.details = {
-    forms: reports.map((report) => ({
-      formName: report.formName,
-      page: report.page,
-      selectorUsed: report.selectorUsed,
-      gating: report.gating,
-      warnings: report.warnings,
-      advisories: report.advisories,
-      fields: report.fields,
-      notes: report.notes,
-      projectName: viewportLabel,
-      browser: viewportLabel,
-      viewport: viewportLabel,
-      viewports: [viewportLabel],
-    })),
-    wcagReferences: FORMS_WCAG_REFERENCES,
-  };
+    runPayload.details = {
+      forms: reports.map((report) => ({
+        formName: report.formName,
+        page: report.page,
+        selectorUsed: report.selectorUsed,
+        gating: report.gating,
+        warnings: report.warnings,
+        advisories: report.advisories,
+        fields: report.fields,
+        notes: report.notes,
+        projectName: viewportLabel,
+        browser: viewportLabel,
+        viewport: viewportLabel,
+        viewports: [viewportLabel],
+      })),
+      wcagReferences: FORMS_WCAG_REFERENCES,
+    };
     await attachSchemaSummary(testInfo, runPayload);
 
     for (const report of reports) {
@@ -433,7 +441,7 @@ test.describe('Accessibility: Forms', () => {
         metadata: {
           spec: 'a11y.forms.validation',
           summaryType: 'forms',
-          projectName: siteLabel,
+          projectName: viewportLabel,
           siteName: siteLabel,
           viewports: [viewportLabel],
         },

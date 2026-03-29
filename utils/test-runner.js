@@ -4,7 +4,6 @@ const path = require('path');
 const fs = require('fs');
 const http = require('http');
 const https = require('https');
-const { ensureHomepagePresence } = require('./site-config-utils');
 
 const RUN_MANIFEST_THRESHOLD = 8192; // bytes
 
@@ -16,6 +15,8 @@ const sanitiseForFilename = (input) =>
     .substring(0, 60) || 'site';
 
 const toPosixPath = (value) => value.split(path.sep).join('/');
+
+const cloneSiteConfig = (siteConfig) => JSON.parse(JSON.stringify(siteConfig || {}));
 
 function normaliseSpecPattern(specInput) {
   const raw = String(specInput || '').trim();
@@ -87,6 +88,7 @@ function prepareRunManifestPayload({
       title: siteConfig.name,
       baseUrl: siteConfig.baseUrl,
     },
+    siteConfig: cloneSiteConfig(siteConfig),
     pages: Array.isArray(siteConfig.testPages) ? [...siteConfig.testPages] : [],
     specs: Array.isArray(testTargets) ? [...testTargets] : [],
     requestedSpecs: Array.isArray(requestedSpecs) ? [...requestedSpecs] : [],
@@ -155,16 +157,12 @@ class TestRunner {
         }
       : persistManifestIfNeeded(manifest, siteName);
 
-    const env = {
-      SITE_TEST_PAGES: JSON.stringify(manifest.pages),
-      ...(appliedPageLimit != null ? { SITE_TEST_PAGES_LIMIT: String(appliedPageLimit) } : {}),
-      ...persistence.env,
-    };
-
     return {
       manifest,
       manifestPath: persistence.manifestPath,
-      env,
+      env: {
+        ...persistence.env,
+      },
     };
   }
 
@@ -278,13 +276,6 @@ class TestRunner {
       if (options.local) {
         runtimeEnv = this.resolveLocalExecutionEnv(siteName, siteConfig, runtimeEnv);
       }
-
-      siteConfig.testPages = ensureHomepagePresence(
-        siteConfig.testPages,
-        siteConfig.name,
-        'runtime',
-        siteConfig.includeHomepage
-      );
 
       appliedPageLimit = null;
       if (options.limit != null) {
@@ -456,15 +447,7 @@ class TestRunner {
       ...runtimeEnv,
       ...(options.envOverrides || {}),
       ...manifestInfo.env,
-      SITE_NAME: siteName,
     };
-
-    if (siteConfig.baseUrl) {
-      spawnEnv.SITE_BASE_URL = siteConfig.baseUrl;
-      if (!spawnEnv.BASE_URL) {
-        spawnEnv.BASE_URL = siteConfig.baseUrl;
-      }
-    }
 
     if (options.workers) {
       spawnEnv.PWTEST_WORKERS = String(options.workers).trim() || 'auto';
@@ -729,6 +712,22 @@ class TestRunner {
   static async updateBaselines(siteName) {
     console.log(`Updating visual baselines for: ${siteName}`);
 
+    const siteConfig = SiteLoader.loadSite(siteName);
+    SiteLoader.validateSiteConfig(siteConfig, {
+      contextLabel: `Site configuration ${siteName}.json`,
+    });
+
+    const manifestInfo = TestRunner.prepareRunManifest({
+      siteName,
+      siteConfig,
+      appliedPageLimit: null,
+      options: { dryRun: false },
+      projectArgsList: [],
+      projectSpecifier: 'Chrome',
+      testTargets: ['tests/visual.regression.snapshots.spec.js'],
+      requestedSpecs: ['tests/visual.regression.snapshots.spec.js'],
+    });
+
     return new Promise((resolve, reject) => {
       const playwright = spawn(
         'npx',
@@ -741,7 +740,7 @@ class TestRunner {
         ],
         {
           stdio: 'inherit',
-          env: { ...process.env, SITE_NAME: siteName },
+          env: { ...process.env, ...manifestInfo.env },
         }
       );
 

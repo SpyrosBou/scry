@@ -1,8 +1,6 @@
 const { test } = require('@playwright/test');
 const { assertReportSummaryPayload } = require('./report-schema-validator');
 
-const SUMMARY_STYLES = '';
-
 const PER_PAGE_TOGGLE_SCRIPT = `
 (function () {
   const scriptEl = document.currentScript;
@@ -26,9 +24,13 @@ const PER_PAGE_TOGGLE_SCRIPT = `
 })();
 `;
 
-const DESCRIPTION_BYTE_LIMIT = 18_000_000;
-
-const wrapHtml = (content) => `${SUMMARY_STYLES}${content}`;
+const escapeHtml = (value) =>
+  String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 
 const renderPerPageAccordion = (items, options = {}) => {
   const entries = Array.isArray(items) ? items.filter(Boolean) : [];
@@ -73,10 +75,8 @@ const renderPerPageAccordion = (items, options = {}) => {
 
   if (!detailsHtml.trim()) return '';
 
-  const escapedContainerClass = escapeHtml(containerClass);
-
   return `
-    <section class="${escapedContainerClass}" data-per-page="list">
+    <section class="${escapeHtml(containerClass)}" data-per-page="list">
       <div class="summary-per-page-header">
         <h3>${escapeHtml(heading)}</h3>
         <div class="summary-toggle-controls">
@@ -91,7 +91,7 @@ const renderPerPageAccordion = (items, options = {}) => {
 };
 
 const renderSummaryMetrics = (entries) => {
-  const MISSING_DATA_LABEL = 'DATA MISSING';
+  const missingDataLabel = 'DATA MISSING';
   const items = Array.isArray(entries)
     ? entries
         .map((entry) => {
@@ -101,7 +101,7 @@ const renderSummaryMetrics = (entries) => {
           const rawValue = entry.value;
           let displayValue;
           if (rawValue === null || rawValue === undefined || rawValue === '') {
-            displayValue = MISSING_DATA_LABEL;
+            displayValue = missingDataLabel;
           } else if (typeof rawValue === 'number') {
             displayValue = rawValue.toLocaleString();
           } else {
@@ -119,17 +119,8 @@ const renderSummaryMetrics = (entries) => {
     : '';
 
   if (!items) return '';
-
   return `<dl class="schema-metrics">${items}</dl>`;
 };
-
-const escapeHtml = (value) =>
-  String(value || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
 
 const resolveTestInfo = (maybeTestInfo) => {
   if (maybeTestInfo) return maybeTestInfo;
@@ -137,65 +128,10 @@ const resolveTestInfo = (maybeTestInfo) => {
     return test.info();
   } catch (_error) {
     throw new Error(
-      'attachSummary must be called within a Playwright test or provided an explicit testInfo instance.'
+      'attachSchemaSummary must be called within a Playwright test or provided an explicit testInfo instance.'
     );
   }
 };
-
-async function attachSummary(testInfoOrOptions, maybeOptions) {
-  const hasExplicitTestInfo = Boolean(maybeOptions);
-  const testInfo = resolveTestInfo(hasExplicitTestInfo ? testInfoOrOptions : undefined);
-  const options = hasExplicitTestInfo ? maybeOptions : testInfoOrOptions;
-
-  if (!options || typeof options !== 'object') {
-    throw new Error('attachSummary requires an options object.');
-  }
-
-  const { baseName, htmlBody, markdown, setDescription = false, title = null } = options;
-  if (!baseName) {
-    throw new Error('attachSummary requires a baseName value.');
-  }
-
-  const payload = {
-    type: 'custom-report-summary',
-    baseName,
-    title: title ? String(title) : null,
-    setDescription: Boolean(setDescription),
-    htmlBody: htmlBody ? wrapHtml(htmlBody) : null,
-    markdown: markdown || null,
-    createdAt: new Date().toISOString(),
-  };
-
-  await testInfo.attach(`${baseName}.summary.json`, {
-    contentType: 'application/json',
-    body: Buffer.from(JSON.stringify(payload, null, 2), 'utf8'),
-  });
-
-  if (payload.htmlBody) {
-    const byteLength = Buffer.byteLength(payload.htmlBody, 'utf8');
-    if (byteLength <= DESCRIPTION_BYTE_LIMIT) {
-      await testInfo.attach(`${baseName}.summary.html`, {
-        contentType: 'text/html',
-        body: Buffer.from(payload.htmlBody, 'utf8'),
-      });
-    } else {
-      await testInfo.attach(`${baseName}.summary-truncated.txt`, {
-        contentType: 'text/plain',
-        body: Buffer.from(
-          `Summary HTML (${byteLength.toLocaleString()} bytes) exceeds inline byte limit (${DESCRIPTION_BYTE_LIMIT.toLocaleString()} bytes).`,
-          'utf8'
-        ),
-      });
-    }
-  }
-
-  if (payload.markdown) {
-    await testInfo.attach(`${baseName}.summary.md`, {
-      contentType: 'text/markdown',
-      body: Buffer.from(payload.markdown, 'utf8'),
-    });
-  }
-}
 
 async function attachSchemaSummary(testInfoOrPayload, maybePayload) {
   const hasExplicitTestInfo = Boolean(maybePayload);
@@ -216,12 +152,8 @@ async function attachSchemaSummary(testInfoOrPayload, maybePayload) {
 }
 
 module.exports = {
-  attachSummary,
   attachSchemaSummary,
   escapeHtml,
-  SUMMARY_STYLES,
-  PER_PAGE_TOGGLE_SCRIPT,
   renderPerPageAccordion,
   renderSummaryMetrics,
-  wrapHtml,
 };

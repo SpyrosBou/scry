@@ -1,22 +1,15 @@
 const { test, expect } = require('../utils/test-fixtures');
-const SiteLoader = require('../utils/site-loader');
 const { runPageTasks, resolveConcurrencyLimit } = require('../utils/concurrency-helpers');
 
 test.use({ trace: 'off', video: 'off' });
-const {
-  safeNavigate,
-  waitForPageStability,
-} = require('../utils/test-helpers');
+const { safeNavigate, waitForPageStability } = require('../utils/test-helpers');
 const { attachSchemaSummary } = require('../utils/reporting-utils');
 const { createRunSummaryPayload, createPageSummaryPayload } = require('../utils/report-schema');
 const {
   selectAccessibilityTestPages,
   DEFAULT_ACCESSIBILITY_SAMPLE,
 } = require('../utils/a11y-shared');
-const {
-  resolveReportMetadata,
-  applyViewportMetadata,
-} = require('../utils/report-metadata');
+const { resolveReportMetadata, applyViewportMetadata } = require('../utils/report-metadata');
 
 const STRUCTURE_WCAG_REFERENCES = [
   { id: '1.3.1', name: 'Info and Relationships', level: 'A' },
@@ -128,17 +121,13 @@ const evaluateStructure = async (page) => {
 test.describe('Accessibility: Structural landmarks', () => {
   let siteConfig;
 
-  test.beforeEach(() => {
-    const siteName = process.env.SITE_NAME;
-    if (!siteName) throw new Error('SITE_NAME environment variable is required');
-
-    siteConfig = SiteLoader.loadSite(siteName);
-    SiteLoader.validateSiteConfig(siteConfig);
+  test.beforeEach(({ siteConfig: resolvedSiteConfig }) => {
+    siteConfig = resolvedSiteConfig;
   });
 
-  test('Landmarks and headings meet baseline accessibility expectations', async ({ browser }, testInfo) => {
-    test.setTimeout(7200000);
-
+  test('Landmarks and headings meet baseline accessibility expectations', async ({
+    browser,
+  }, testInfo) => {
     const pages = selectAccessibilityTestPages(siteConfig, {
       defaultSize: DEFAULT_ACCESSIBILITY_SAMPLE,
       configKeys: ['a11yStructureSampleSize', 'a11yResponsiveSampleSize'],
@@ -173,7 +162,7 @@ test.describe('Accessibility: Structural landmarks', () => {
       metadata: {
         spec: 'a11y.structure.landmarks',
         summaryType: 'structure',
-        projectName: siteLabel,
+        projectName: viewportLabel,
         siteName: siteLabel,
         viewports: [viewportLabel],
         suppressPageEntries: true,
@@ -233,7 +222,7 @@ test.describe('Accessibility: Structural landmarks', () => {
         metadata: {
           spec: 'a11y.structure.landmarks',
           summaryType: 'structure',
-          projectName: siteLabel,
+          projectName: viewportLabel,
           siteName: siteLabel,
           viewports: [viewportLabel],
         },

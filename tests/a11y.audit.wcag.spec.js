@@ -1,14 +1,8 @@
 const path = require('path');
 const { test, expect } = require('../utils/test-fixtures');
-const {
-  safeNavigate,
-  waitForPageStability,
-} = require('../utils/test-helpers');
+const { safeNavigate, waitForPageStability } = require('../utils/test-helpers');
 const { attachSchemaSummary } = require('../utils/reporting-utils');
-const {
-  extractWcagLevels,
-  violationHasWcagCoverage,
-} = require('../utils/a11y-utils');
+const { extractWcagLevels, violationHasWcagCoverage } = require('../utils/a11y-utils');
 const { createAxeBuilder } = require('../utils/a11y-runner');
 const {
   selectAccessibilityTestPages,
@@ -101,8 +95,6 @@ const buildAccessibilityRunSchemaPayload = ({
   baseName,
   title,
   metadata,
-  htmlBody,
-  markdownBody,
 }) => {
   if (!Array.isArray(reports) || reports.length === 0) return null;
 
@@ -199,8 +191,6 @@ const buildAccessibilityRunSchemaPayload = ({
     viewports: Array.from(viewportSet),
   };
 
-  if (htmlBody) payload.htmlBody = htmlBody;
-  if (markdownBody) payload.markdownBody = markdownBody;
   return payload;
 };
 
@@ -280,9 +270,7 @@ if (!process.env.A11Y_RUN_TOKEN) {
 }
 
 if (accessibilitySampleSetting !== 'all') {
-  const sampleSource = process.env.A11Y_SAMPLE
-    ? ` (A11Y_SAMPLE=${process.env.A11Y_SAMPLE})`
-    : '';
+  const sampleSource = process.env.A11Y_SAMPLE ? ` (A11Y_SAMPLE=${process.env.A11Y_SAMPLE})` : '';
   console.log(
     `ℹ️  Accessibility sampling limited to ${accessibilitySampleSetting} page(s)${sampleSource}.`
   );
@@ -296,9 +284,7 @@ const failOnLabel = failOn.map((impact) => String(impact).toUpperCase()).join('/
 const A11Y_MODE = siteConfig.a11yMode === 'audit' ? 'audit' : 'gate';
 
 // Some Axe best-practice rules overlap ...
-const SUPPRESS_BEST_PRACTICE_RULES = new Set([
-  'heading-order',
-]);
+const SUPPRESS_BEST_PRACTICE_RULES = new Set(['heading-order']);
 const { createAggregationStore } = require('../utils/report-aggregation-store');
 
 const AGGREGATION_PERSIST_ROOT = path.join(process.cwd(), 'test-results', '.a11y-aggregation');
@@ -368,9 +354,9 @@ const maybeAttachGlobalSummary = async ({ testInfo, totalPagesExpected, failOnLa
   const combinedReports = [];
 
   for (const projectName of projectNames) {
-    const reports = aggregationStore.readProjectReports(projectName).filter(
-      (report) => report.runToken === RUN_TOKEN && typeof report.index === 'number'
-    );
+    const reports = aggregationStore
+      .readProjectReports(projectName)
+      .filter((report) => report.runToken === RUN_TOKEN && typeof report.index === 'number');
     if (reports.length === 0) {
       continue;
     }
@@ -413,29 +399,32 @@ const maybeAttachGlobalSummary = async ({ testInfo, totalPagesExpected, failOnLa
 test.describe('Functionality: Accessibility (WCAG)', () => {
   test.describe.parallel('Page scans', () => {
     accessibilityPages.forEach((testPage, index) => {
-      test(`WCAG 2.1 A/AA scan ${index + 1}/${totalPages}: ${testPage}`, async ({ page }, testInfo) => {
-        test.setTimeout(7200000);
-
+      test(`WCAG 2.1 A/AA scan ${index + 1}/${totalPages}: ${testPage}`, async ({
+        page,
+      }, testInfo) => {
         console.log(`➡️  [${index + 1}/${totalPages}] Accessibility scan for ${testPage}`);
 
-      const { siteLabel: pageSiteLabel, viewportLabel: pageViewportLabel } =
-        resolveAccessibilityMetadata(siteConfig, testInfo);
+        const { siteLabel: pageSiteLabel, viewportLabel: pageViewportLabel } =
+          resolveAccessibilityMetadata(siteConfig, testInfo);
 
-      const pageReport = {
-        page: testPage,
-        index: index + 1,
-        runToken: RUN_TOKEN,
-        status: 'skipped',
-        httpStatus: null,
-        stability: null,
-        notes: [],
-        violations: [],
-        advisory: [],
-        bestPractice: [],
-        gatingLabel: failOnLabel,
-      };
+        const pageReport = {
+          page: testPage,
+          index: index + 1,
+          runToken: RUN_TOKEN,
+          status: 'skipped',
+          httpStatus: null,
+          stability: null,
+          notes: [],
+          violations: [],
+          advisory: [],
+          bestPractice: [],
+          gatingLabel: failOnLabel,
+        };
 
-      applyViewportMetadata([pageReport], pageViewportLabel, pageSiteLabel);
+        applyViewportMetadata([pageReport], {
+          viewportLabel: pageViewportLabel,
+          siteLabel: pageSiteLabel,
+        });
 
         let response;
         try {
@@ -445,10 +434,10 @@ test.describe('Functionality: Accessibility (WCAG)', () => {
           pageReport.notes.push(`Navigation failed: ${error.message}`);
           console.error(`⚠️  Navigation failed for ${testPage}: ${error.message}`);
 
-        aggregationStore.record(testInfo.project.name, pageReport);
-        if (A11Y_MODE !== 'audit') {
-          throw new Error(`Navigation failed for ${testPage}: ${error.message}`);
-        }
+          aggregationStore.record(testInfo.project.name, pageReport);
+          if (A11Y_MODE !== 'audit') {
+            throw new Error(`Navigation failed for ${testPage}: ${error.message}`);
+          }
           return;
         }
 
@@ -499,11 +488,13 @@ test.describe('Functionality: Accessibility (WCAG)', () => {
               violationHasWcagCoverage(violation)
           );
 
-          const bestPracticeViolations = relevantViolations.filter(
-            (violation) =>
-              !failOnSet.has(String(violation.impact || '').toLowerCase()) &&
-              !violationHasWcagCoverage(violation)
-          ).filter((violation) => !SUPPRESS_BEST_PRACTICE_RULES.has(violation.id));
+          const bestPracticeViolations = relevantViolations
+            .filter(
+              (violation) =>
+                !failOnSet.has(String(violation.impact || '').toLowerCase()) &&
+                !violationHasWcagCoverage(violation)
+            )
+            .filter((violation) => !SUPPRESS_BEST_PRACTICE_RULES.has(violation.id));
 
           let cachedPageScreenshot = null;
           const capturePageScreenshot = async () => {
@@ -642,7 +633,9 @@ test.describe('Functionality: Accessibility (WCAG)', () => {
           }
 
           if (advisoryViolations.length > 0) {
-            console.warn(`ℹ️  ${advisoryViolations.length} non-gating WCAG finding(s) on ${testPage}`);
+            console.warn(
+              `ℹ️  ${advisoryViolations.length} non-gating WCAG finding(s) on ${testPage}`
+            );
           }
 
           if (bestPracticeViolations.length > 0) {
@@ -690,7 +683,7 @@ test.describe('Functionality: Accessibility (WCAG)', () => {
           );
         }
         const { siteLabel, viewportLabel } = resolveAccessibilityMetadata(siteConfig, testInfo);
-        applyViewportMetadata(reports, viewportLabel, siteLabel);
+        applyViewportMetadata(reports, { viewportLabel, siteLabel });
 
         const { aggregatedViolations, aggregatedAdvisories, aggregatedBestPractices } =
           deriveAggregatedFindings(reports);
@@ -705,7 +698,7 @@ test.describe('Functionality: Accessibility (WCAG)', () => {
           title: `WCAG findings – ${testInfo.project.name}`,
           metadata: {
             scope: 'project',
-            projectName: siteLabel,
+            projectName: viewportLabel,
             siteName: siteLabel,
             summaryType: 'wcag',
             suppressPageEntries: true,
@@ -719,7 +712,7 @@ test.describe('Functionality: Accessibility (WCAG)', () => {
         const schemaPagePayloads = buildAccessibilityPageSchemaPayloads(reports, {
           summaryType: 'wcag',
           gatingLabel: failOnLabel,
-          projectName: siteLabel,
+          projectName: viewportLabel,
           siteName: siteLabel,
           viewports: [viewportLabel],
         });
@@ -760,7 +753,9 @@ test.describe('Functionality: Accessibility (WCAG)', () => {
 
         if (totalViolations > 0) {
           if (A11Y_MODE === 'audit') {
-            console.warn('ℹ️ Accessibility audit summary available in the run report (summary section).');
+            console.warn(
+              'ℹ️ Accessibility audit summary available in the run report (summary section).'
+            );
           } else {
             expect(
               totalViolations,

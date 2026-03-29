@@ -13,7 +13,8 @@ const test = base.test.extend({
       await teardownTestPage(page, context, contextInstance, testInfo);
     }
   },
-  siteContext: async (_fixtures, use) => {
+  siteContext: async ({ browserName }, use) => {
+    void browserName;
     await use(getActiveSiteContext());
   },
   siteConfig: async ({ siteContext }, use) => {

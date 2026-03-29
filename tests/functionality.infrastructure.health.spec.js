@@ -1,18 +1,141 @@
+const path = require('path');
 const { test, expect } = require('../utils/test-fixtures');
-const SiteLoader = require('../utils/site-loader');
-const {
-  safeNavigate,
-  waitForPageStability,
-} = require('../utils/test-helpers');
-const { WordPressPageObjects } = require('../utils/wordpress-page-objects');
+const { waitForPageStability } = require('../utils/test-helpers');
 const { attachSchemaSummary } = require('../utils/reporting-utils');
 const { createRunSummaryPayload, createPageSummaryPayload } = require('../utils/report-schema');
+const { getActiveSiteContext } = require('../utils/test-context');
+const { createAggregationStore } = require('../utils/report-aggregation-store');
+const { waitForReports: waitForReportsHelper } = require('../utils/a11y-aggregation-waiter');
+const {
+  collectCriticalElements,
+  detect404LikePage,
+  getPageTitle,
+  waitForWordPressReady,
+} = require('../utils/page-audit-helpers');
+
+const { siteConfig } = getActiveSiteContext();
+const configuredPages = process.env.SMOKE
+  ? Array.isArray(siteConfig.testPages) && siteConfig.testPages.includes('/')
+    ? ['/']
+    : [siteConfig.testPages[0]].filter(Boolean)
+  : siteConfig.testPages;
+const performancePages = process.env.SMOKE
+  ? configuredPages
+  : configuredPages.slice(0, Math.min(configuredPages.length, 5));
 
 const slugify = (value) =>
   String(value || '')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '') || 'section';
+
+const extractStatusFromError = (error) => {
+  const message = String(error?.message || '');
+  const match = message.match(/status:\s*(\d+)/i);
+  return match ? Number(match[1]) : null;
+};
+
+const navigateForAudit = async (page, url) => {
+  const response = await page.goto(url, {
+    timeout: 20000,
+    waitUntil: 'domcontentloaded',
+  });
+
+  if (!response) {
+    throw new Error(`Navigation to ${url} returned null response`);
+  }
+
+  return response;
+};
+
+const capturePerformanceMetrics = async (page) => {
+  return await page.evaluate(() => {
+    const navigationEntry = performance.getEntriesByType('navigation')[0];
+    const legacyTiming = performance.timing;
+
+    const navigationStart =
+      typeof navigationEntry?.startTime === 'number'
+        ? navigationEntry.startTime
+        : typeof legacyTiming?.navigationStart === 'number'
+          ? legacyTiming.navigationStart
+          : 0;
+
+    const domContentLoaded = (() => {
+      if (typeof navigationEntry?.domContentLoadedEventEnd === 'number') {
+        return navigationEntry.domContentLoadedEventEnd - navigationStart;
+      }
+      if (legacyTiming && typeof legacyTiming.domContentLoadedEventEnd === 'number') {
+        return legacyTiming.domContentLoadedEventEnd - legacyTiming.navigationStart;
+      }
+      return Number.NaN;
+    })();
+
+    const loadComplete = (() => {
+      if (typeof navigationEntry?.loadEventEnd === 'number') {
+        return navigationEntry.loadEventEnd - navigationStart;
+      }
+      if (legacyTiming && typeof legacyTiming.loadEventEnd === 'number') {
+        return legacyTiming.loadEventEnd - legacyTiming.navigationStart;
+      }
+      return Number.NaN;
+    })();
+
+    const paints = performance.getEntriesByType('paint');
+    const firstPaint = paints.find((entry) => entry.name === 'first-paint')?.startTime;
+    const firstContentfulPaint = paints.find(
+      (entry) => entry.name === 'first-contentful-paint'
+    )?.startTime;
+
+    return {
+      domContentLoaded,
+      loadComplete,
+      firstPaint,
+      firstContentfulPaint,
+    };
+  });
+};
+
+const normaliseMetric = (value) => {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric < 0) {
+    return null;
+  }
+  return numeric;
+};
+
+const AVAILABILITY_RUN_TOKEN = process.env.INFRA_AVAILABILITY_RUN_TOKEN || `${Date.now()}`;
+if (!process.env.INFRA_AVAILABILITY_RUN_TOKEN) {
+  process.env.INFRA_AVAILABILITY_RUN_TOKEN = AVAILABILITY_RUN_TOKEN;
+}
+const HTTP_RUN_TOKEN = process.env.INFRA_HTTP_RUN_TOKEN || `${Date.now()}`;
+if (!process.env.INFRA_HTTP_RUN_TOKEN) {
+  process.env.INFRA_HTTP_RUN_TOKEN = HTTP_RUN_TOKEN;
+}
+const PERFORMANCE_RUN_TOKEN = process.env.INFRA_PERFORMANCE_RUN_TOKEN || `${Date.now()}`;
+if (!process.env.INFRA_PERFORMANCE_RUN_TOKEN) {
+  process.env.INFRA_PERFORMANCE_RUN_TOKEN = PERFORMANCE_RUN_TOKEN;
+}
+
+const availabilityStore = createAggregationStore({
+  persistRoot: path.join(process.cwd(), 'test-results', '.infra-availability-aggregation'),
+  runToken: AVAILABILITY_RUN_TOKEN,
+});
+const httpStore = createAggregationStore({
+  persistRoot: path.join(process.cwd(), 'test-results', '.infra-http-aggregation'),
+  runToken: HTTP_RUN_TOKEN,
+});
+const performanceStore = createAggregationStore({
+  persistRoot: path.join(process.cwd(), 'test-results', '.infra-performance-aggregation'),
+  runToken: PERFORMANCE_RUN_TOKEN,
+});
+
+const waitForReports = ({ store, projectName, expectedCount }) =>
+  waitForReportsHelper({
+    store,
+    projectName,
+    expectedCount,
+    timeoutMs: Math.max(60000, expectedCount * 5000),
+  });
 
 const buildAvailabilitySchemaPayloads = (results, projectName) => {
   if (!Array.isArray(results) || results.length === 0) return null;
@@ -22,12 +145,10 @@ const buildAvailabilitySchemaPayloads = (results, projectName) => {
     const warnings = entry.notes
       .filter((note) => note.type === 'warning')
       .map((note) => note.message);
-    const notes = entry.notes
-      .filter((note) => note.type !== 'warning')
-      .map((note) => note.message);
+    const notes = entry.notes.filter((note) => note.type !== 'warning').map((note) => note.message);
     const gating = [];
     if (entry.status === null || entry.status === undefined) {
-      gating.push('No HTTP response status captured for this request.');
+      if (entry.error) gating.push(entry.error);
     } else if (entry.status >= 500) {
       gating.push(`Server responded with ${entry.status}; page unavailable.`);
     }
@@ -128,9 +249,9 @@ const buildHttpSchemaPayloads = (results, projectName) => {
       }));
     const gating = [];
     const warnings = [];
-    if (entry.status >= 500) {
+    if ((entry.status || 0) >= 500) {
       gating.push(`Received ${entry.status} ${entry.statusText || ''}`.trim());
-    } else if (entry.status >= 400) {
+    } else if ((entry.status || 0) >= 400) {
       warnings.push(`Client error ${entry.status} ${entry.statusText || ''}`.trim());
     }
     if (failedChecks.length > 0) {
@@ -140,7 +261,7 @@ const buildHttpSchemaPayloads = (results, projectName) => {
       gating.push(entry.error);
     }
     const notes = [];
-    if (entry.status >= 300 && entry.status < 400 && entry.location) {
+    if ((entry.status || 0) >= 300 && (entry.status || 0) < 400 && entry.location) {
       notes.push(`Redirects to ${entry.location}`);
     }
     return {
@@ -155,11 +276,6 @@ const buildHttpSchemaPayloads = (results, projectName) => {
       notes,
     };
   });
-  const redirects = enrichedResults.filter(
-    (entry) => entry.status >= 300 && entry.status < 400
-  ).length;
-  const errors = enrichedResults.filter((entry) => entry.status >= 400).length;
-  const failedChecks = enrichedResults.filter((entry) => entry.failedChecks.length > 0).length;
 
   const runPayload = createRunSummaryPayload({
     baseName: runBaseName,
@@ -167,9 +283,11 @@ const buildHttpSchemaPayloads = (results, projectName) => {
     overview: {
       totalPages: enrichedResults.length,
       success2xx: enrichedResults.filter((entry) => entry.status === 200).length,
-      redirects,
-      errors,
-      pagesWithFailedChecks: failedChecks,
+      redirects: enrichedResults.filter((entry) => entry.status >= 300 && entry.status < 400)
+        .length,
+      errors: enrichedResults.filter((entry) => (entry.status || 0) >= 400).length,
+      pagesWithFailedChecks: enrichedResults.filter((entry) => entry.failedChecks.length > 0)
+        .length,
       pagesWithGatingIssues: enrichedResults.filter((entry) => entry.gating.length > 0).length,
     },
     metadata: {
@@ -225,7 +343,13 @@ const buildHttpSchemaPayloads = (results, projectName) => {
 const buildPerformanceSchemaPayloads = (data, breaches, projectName) => {
   if (!Array.isArray(data) || data.length === 0) return null;
 
-  const averageLoadTime = data.reduce((acc, entry) => acc + entry.loadTime, 0) / data.length;
+  const validLoadTimes = data
+    .map((entry) => Number(entry.loadTime))
+    .filter((value) => Number.isFinite(value));
+  const averageLoadTime =
+    validLoadTimes.length > 0
+      ? validLoadTimes.reduce((acc, entry) => acc + entry, 0) / validLoadTimes.length
+      : 0;
 
   const roundMetric = (value) => {
     if (value === null || value === undefined) return null;
@@ -250,10 +374,15 @@ const buildPerformanceSchemaPayloads = (data, breaches, projectName) => {
           breach.budget
         )}ms)`
     );
+    if (entry.error) {
+      gating.push(entry.error);
+    }
     const notes = [];
     const loadTime = roundMetric(entry.loadTime);
     if (Number.isFinite(loadTime)) {
       notes.push(`Observed load time: ${loadTime}ms`);
+    } else if (entry.status && entry.status !== 200) {
+      notes.push(`Performance metrics skipped because navigation returned ${entry.status}.`);
     }
     return {
       page: entry.page,
@@ -332,345 +461,280 @@ const buildPerformanceSchemaPayloads = (data, breaches, projectName) => {
 };
 
 test.describe('Functionality: Core Infrastructure', () => {
-  let siteConfig;
-  let errorContext;
-  let wpPageObjects;
+  configuredPages.forEach((testPage, index) => {
+    test(`Page availability ${index + 1}/${configuredPages.length}: ${testPage}`, async ({
+      page,
+    }, testInfo) => {
+      const pageReport = {
+        page: testPage,
+        status: null,
+        elements: null,
+        notes: [],
+        index: index + 1,
+        runToken: AVAILABILITY_RUN_TOKEN,
+      };
+      let pageTitle = '';
 
-  test.beforeEach(async ({ page, errorContext: sharedErrorContext }) => {
-    const siteName = process.env.SITE_NAME;
-    if (!siteName) throw new Error('SITE_NAME environment variable is required');
+      try {
+        const response = await navigateForAudit(page, `${siteConfig.baseUrl}${testPage}`);
+        pageReport.status = response.status();
+        await waitForWordPressReady(page);
 
-    siteConfig = SiteLoader.loadSite(siteName);
-    SiteLoader.validateSiteConfig(siteConfig);
-
-    errorContext = sharedErrorContext;
-    wpPageObjects = new WordPressPageObjects(page, siteConfig);
-  });
-
-  test('Page availability across configured pages', async ({ page }) => {
-    test.setTimeout(7200000);
-    errorContext.setTest('Page Availability Check');
-    const availabilityResults = [];
-
-    const pagesToTest = process.env.SMOKE
-      ? (Array.isArray(siteConfig.testPages) && siteConfig.testPages.includes('/'))
-        ? ['/']
-        : [siteConfig.testPages[0]]
-      : siteConfig.testPages;
-
-    for (const testPage of pagesToTest) {
-      await test.step(`Checking page availability: ${testPage}`, async () => {
-        errorContext.setPage(testPage);
-        errorContext.setAction('navigating to page');
-
-        const response = await safeNavigate(page, `${siteConfig.baseUrl}${testPage}`);
-        const entry = {
-          page: testPage,
-          status: response ? response.status() : null,
-          elements: null,
-          notes: [],
-        };
-        await wpPageObjects.basePage.waitForWordPressReady();
-        const is404 = await wpPageObjects.is404Page();
+        const is404 = await detect404LikePage(page);
         if (is404) {
-          entry.notes.push({ type: 'warning', message: '404 page detected' });
-          console.log(`⚠️  Page not found: ${testPage}`);
-          await page.screenshot({ path: `test-results/404-${testPage.replace(/\//g, '-')}.png` });
-          availabilityResults.push(entry);
-          return;
-        }
-        if (entry.status >= 500)
-          throw new Error(`Server error on ${testPage}: ${entry.status}`);
-        if (entry.status >= 400) {
-          console.log(`⚠️  Client error on ${testPage}: ${entry.status}`);
-          entry.notes.push({ type: 'warning', message: `Client error ${entry.status}` });
+          pageReport.notes.push({ type: 'warning', message: '404 page detected' });
         }
 
-        if (entry.status >= 200 && entry.status < 300) {
-          const elements = await wpPageObjects.verifyCriticalElements();
-          console.log(`✅ Page structure check for ${testPage}:`, elements);
-          const title = await wpPageObjects.getTitle();
-          expect(title).toBeTruthy();
-          entry.elements = elements;
-          entry.notes.push({ type: 'info', message: `Title present: ${Boolean(title)}` });
-          Object.entries(elements).forEach(([key, value]) => {
-            if (!value) entry.notes.push({ type: 'warning', message: `${key} missing` });
+        if (pageReport.status >= 500) {
+          throw new Error(`Server error on ${testPage}: ${pageReport.status}`);
+        }
+        if (pageReport.status >= 400) {
+          pageReport.notes.push({ type: 'warning', message: `Client error ${pageReport.status}` });
+        }
+
+        if (pageReport.status >= 200 && pageReport.status < 300) {
+          pageReport.elements = await collectCriticalElements(page);
+          pageTitle = await getPageTitle(page);
+          pageReport.notes.push({ type: 'info', message: `Title present: ${Boolean(pageTitle)}` });
+          Object.entries(pageReport.elements).forEach(([key, value]) => {
+            if (!value) {
+              pageReport.notes.push({ type: 'warning', message: `${key} missing` });
+            }
           });
         }
-        availabilityResults.push(entry);
-      });
-    }
-
-    if (availabilityResults.length > 0) {
-      const testInfo = test.info();
-      const schemaPayloads = buildAvailabilitySchemaPayloads(availabilityResults, testInfo.project.name);
-      if (schemaPayloads) {
-        await attachSchemaSummary(testInfo, schemaPayloads.runPayload);
-        for (const payload of schemaPayloads.pagePayloads) {
-          await attachSchemaSummary(testInfo, payload);
+      } catch (error) {
+        pageReport.error = error?.message || String(error);
+        pageReport.status ??= extractStatusFromError(error);
+      } finally {
+        availabilityStore.record(testInfo.project.name, pageReport);
+        const schemaPayloads = buildAvailabilitySchemaPayloads([pageReport], testInfo.project.name);
+        const pagePayload = schemaPayloads?.pagePayloads?.[0];
+        if (pagePayload) {
+          await attachSchemaSummary(testInfo, pagePayload);
         }
       }
-    }
+
+      if (pageReport.status && pageReport.status >= 500) {
+        expect.soft(pageReport.status).toBeLessThan(500);
+      }
+      if (pageReport.status >= 200 && pageReport.status < 300) {
+        expect.soft(pageTitle).toBeTruthy();
+      }
+    });
   });
 
-  test('HTTP response and content integrity', async ({ page }) => {
-    test.setTimeout(7200000);
-    errorContext.setTest('HTTP Response Validation');
-    const responseResults = [];
-    const pagesToTest = process.env.SMOKE
-      ? (Array.isArray(siteConfig.testPages) && siteConfig.testPages.includes('/'))
-        ? ['/']
-        : [siteConfig.testPages[0]]
-      : siteConfig.testPages;
+  configuredPages.forEach((testPage, index) => {
+    test(`HTTP response validation ${index + 1}/${configuredPages.length}: ${testPage}`, async ({
+      page,
+    }, testInfo) => {
+      const pageReport = {
+        page: testPage,
+        status: null,
+        statusText: '',
+        checks: [],
+        index: index + 1,
+        runToken: HTTP_RUN_TOKEN,
+      };
 
-    let deferredError = null;
-    for (const testPage of pagesToTest) {
+      const recordCheck = (label, passed, details = null) => {
+        pageReport.checks.push({
+          label,
+          passed,
+          details: details ? String(details) : null,
+        });
+      };
+
       try {
-        await test.step(`Validating response for: ${testPage}`, async () => {
-          errorContext.setPage(testPage);
-          const response = await safeNavigate(page, `${siteConfig.baseUrl}${testPage}`);
-          if (!response) {
-            throw new Error(`No HTTP response received for ${testPage}`);
-          }
+        const response = await navigateForAudit(page, `${siteConfig.baseUrl}${testPage}`);
+        pageReport.status = response.status();
+        pageReport.statusText = response.statusText ? response.statusText() : '';
 
-        const status = response.status();
-        const statusText = response.statusText ? response.statusText() : '';
-        const entry = {
-          page: testPage,
-          status,
-          statusText,
-          checks: [],
-        };
+        const acceptableStatus = [200, 301, 302].includes(pageReport.status);
+        recordCheck('HTTP status is acceptable (200/301/302)', acceptableStatus, pageReport.status);
 
-        const recordCheck = (label, passed, details) => {
-          entry.checks.push({
-            label,
-            passed,
-            details: details ? String(details) : null,
-          });
-        };
-
-        const runCheck = async (label, assertion) => {
-          try {
-            await assertion();
-            recordCheck(label, true);
-          } catch (error) {
-            recordCheck(label, false, error?.message || error);
-            throw error;
-          }
-        };
-
-        try {
-          await runCheck('HTTP status is acceptable (200/301/302)', () =>
-            expect([200, 301, 302]).toContain(status)
+        if (pageReport.status === 200) {
+          const contentType = response.headers()['content-type'] || '';
+          recordCheck(
+            'Content-Type includes text/html',
+            contentType.includes('text/html'),
+            contentType || 'missing'
+          );
+          recordCheck(
+            'html[lang] attribute present',
+            (await page.locator('html[lang]').count()) > 0
+          );
+          recordCheck(
+            'charset meta tag present',
+            (await page.locator('meta[charset], meta[http-equiv="Content-Type"]').count()) > 0
+          );
+          recordCheck(
+            'viewport meta tag present',
+            (await page.locator('meta[name="viewport"]').count()) > 0
           );
 
-          if (status === 200) {
-            const contentType = response.headers()['content-type'] || '';
-            await runCheck('Content-Type includes text/html', () =>
-              expect(contentType).toContain('text/html')
-            );
-
-            await runCheck('html[lang] attribute present', () =>
-              expect(page.locator('html[lang]')).toBeAttached()
-            );
-
-            await runCheck('charset meta tag present', () =>
-              expect(page.locator('meta[charset], meta[http-equiv="Content-Type"]')).toBeAttached()
-            );
-
-            await runCheck('viewport meta tag present', () =>
-              expect(page.locator('meta[name="viewport"]')).toBeAttached()
-            );
-
-            await runCheck('No PHP fatal/warning/notice text', async () => {
-              const bodyText = await page.locator('body').textContent();
-              const fatalErrorPresent = /Fatal error/i.test(bodyText || '');
-              const warningPresent = /Warning:/i.test(bodyText || '');
-              const noticePresent = /Notice:/i.test(bodyText || '');
-              expect(fatalErrorPresent).toBe(false);
-              expect(warningPresent).toBe(false);
-              expect(noticePresent).toBe(false);
-            });
-
-            console.log(`✅ Response validation passed for ${testPage}`);
-          }
-
-          if (status >= 300 && status < 400) {
-            entry.location = response.headers()['location'] || '';
-          }
-        } catch (error) {
-          entry.error = error?.message || String(error);
-          throw error;
-        } finally {
-          responseResults.push(entry);
+          const bodyText = await page.locator('body').textContent();
+          const fatalErrorPresent = /Fatal error/i.test(bodyText || '');
+          const warningPresent = /Warning:/i.test(bodyText || '');
+          const noticePresent = /Notice:/i.test(bodyText || '');
+          recordCheck(
+            'No PHP fatal/warning/notice text',
+            !fatalErrorPresent && !warningPresent && !noticePresent
+          );
         }
-      });
+
+        if (pageReport.status >= 300 && pageReport.status < 400) {
+          pageReport.location = response.headers()['location'] || '';
+        }
       } catch (error) {
-        if (!deferredError) {
-          deferredError = error;
+        pageReport.error = error?.message || String(error);
+        pageReport.status ??= extractStatusFromError(error);
+      } finally {
+        httpStore.record(testInfo.project.name, pageReport);
+        const schemaPayloads = buildHttpSchemaPayloads([pageReport], testInfo.project.name);
+        const pagePayload = schemaPayloads?.pagePayloads?.[0];
+        if (pagePayload) {
+          await attachSchemaSummary(testInfo, pagePayload);
         }
       }
-    }
 
-    if (responseResults.length > 0) {
-      const testInfo = test.info();
-      const schemaPayloads = buildHttpSchemaPayloads(responseResults, testInfo.project.name);
-      if (schemaPayloads) {
-        await attachSchemaSummary(testInfo, schemaPayloads.runPayload);
-        for (const payload of schemaPayloads.pagePayloads) {
-          await attachSchemaSummary(testInfo, payload);
-        }
-      }
-    }
-
-    if (deferredError) {
-      throw deferredError;
-    }
+      expect.soft(pageReport.checks.filter((check) => !check.passed)).toHaveLength(0);
+      expect.soft(pageReport.error || null).toBeNull();
+    });
   });
 
-  test('Performance monitoring (sample up to 5 pages)', async ({ page }) => {
-    test.setTimeout(7200000);
-    errorContext.setTest('Performance Monitoring');
-    const performanceData = [];
-    const perfBudgets =
-      typeof siteConfig.performanceBudgets === 'object' &&
-      siteConfig.performanceBudgets !== null
-        ? siteConfig.performanceBudgets
-        : null;
-    const performanceBreaches = [];
-    const perfPages = process.env.SMOKE
-      ? (Array.isArray(siteConfig.testPages) && siteConfig.testPages.includes('/'))
-        ? ['/']
-        : [siteConfig.testPages[0]]
-      : siteConfig.testPages.slice(0, 5);
+  const perfBudgets =
+    typeof siteConfig.performanceBudgets === 'object' && siteConfig.performanceBudgets !== null
+      ? siteConfig.performanceBudgets
+      : null;
 
-    for (const testPage of perfPages) {
-      await test.step(`Measuring performance for: ${testPage}`, async () => {
-        errorContext.setPage(testPage);
+  performancePages.forEach((testPage, index) => {
+    test(`Performance monitoring ${index + 1}/${performancePages.length}: ${testPage}`, async ({
+      page,
+    }, testInfo) => {
+      const pageReport = {
+        page: testPage,
+        status: null,
+        loadTime: null,
+        domContentLoaded: null,
+        loadComplete: null,
+        firstPaint: null,
+        firstContentfulPaint: null,
+        notes: [],
+        breaches: [],
+        index: index + 1,
+        runToken: PERFORMANCE_RUN_TOKEN,
+      };
+
+      try {
         const startTime = Date.now();
-        const response = await safeNavigate(page, `${siteConfig.baseUrl}${testPage}`);
-        if (response.status() !== 200) return;
+        const response = await navigateForAudit(page, `${siteConfig.baseUrl}${testPage}`);
+        pageReport.status = response.status();
+        if (pageReport.status !== 200) {
+          pageReport.notes.push({
+            type: 'warning',
+            message: `Performance metrics skipped because navigation returned ${pageReport.status}`,
+          });
+          return;
+        }
+
         await waitForPageStability(page, { timeout: 10000 });
-        const loadTime = Date.now() - startTime;
-        const metrics = await page.evaluate(() => {
-          const navigationEntry = performance.getEntriesByType('navigation')[0];
-          const legacyTiming = performance.timing;
+        pageReport.loadTime = Date.now() - startTime;
 
-          const navigationStart =
-            typeof navigationEntry?.startTime === 'number'
-              ? navigationEntry.startTime
-              : typeof legacyTiming?.navigationStart === 'number'
-                ? legacyTiming.navigationStart
-                : 0;
-
-          const domContentLoaded = (() => {
-            if (typeof navigationEntry?.domContentLoadedEventEnd === 'number') {
-              return navigationEntry.domContentLoadedEventEnd - navigationStart;
-            }
-            if (legacyTiming && typeof legacyTiming.domContentLoadedEventEnd === 'number') {
-              return legacyTiming.domContentLoadedEventEnd - legacyTiming.navigationStart;
-            }
-            return Number.NaN;
-          })();
-
-          const loadComplete = (() => {
-            if (typeof navigationEntry?.loadEventEnd === 'number') {
-              return navigationEntry.loadEventEnd - navigationStart;
-            }
-            if (legacyTiming && typeof legacyTiming.loadEventEnd === 'number') {
-              return legacyTiming.loadEventEnd - legacyTiming.navigationStart;
-            }
-            return Number.NaN;
-          })();
-
-          const paints = performance.getEntriesByType('paint');
-          const firstPaint = paints.find((p) => p.name === 'first-paint')?.startTime;
-          const firstContentfulPaint = paints.find((p) => p.name === 'first-contentful-paint')?.startTime;
-
-          return {
-            domContentLoaded,
-            loadComplete,
-            firstPaint,
-            firstContentfulPaint,
-          };
-        });
-        const normaliseMetric = (value) => {
-          const numeric = Number(value);
-          if (!Number.isFinite(numeric) || numeric < 0) {
-            return null;
-          }
-          return numeric;
-        };
-
-        const normalisedMetrics = {
-          domContentLoaded: normaliseMetric(metrics.domContentLoaded),
-          loadComplete: normaliseMetric(metrics.loadComplete),
-          firstPaint: normaliseMetric(metrics.firstPaint),
-          firstContentfulPaint: normaliseMetric(metrics.firstContentfulPaint),
-        };
-
-        performanceData.push({ page: testPage, loadTime, ...normalisedMetrics });
-
-        if (loadTime > 3000) console.log(`⚠️  ${testPage} took ${loadTime}ms (>3s)`);
-        else console.log(`✅ ${testPage} loaded in ${loadTime}ms`);
+        const metrics = await capturePerformanceMetrics(page);
+        pageReport.domContentLoaded = normaliseMetric(metrics.domContentLoaded);
+        pageReport.loadComplete = normaliseMetric(metrics.loadComplete);
+        pageReport.firstPaint = normaliseMetric(metrics.firstPaint);
+        pageReport.firstContentfulPaint = normaliseMetric(metrics.firstContentfulPaint);
 
         if (perfBudgets) {
           const budgetChecks = {
-            domContentLoaded: normalisedMetrics.domContentLoaded,
-            loadComplete: normalisedMetrics.loadComplete,
-            firstContentfulPaint: normalisedMetrics.firstContentfulPaint,
+            domContentLoaded: pageReport.domContentLoaded,
+            loadComplete: pageReport.loadComplete,
+            firstContentfulPaint: pageReport.firstContentfulPaint,
           };
 
           for (const [budgetKey, value] of Object.entries(budgetChecks)) {
             if (!Object.prototype.hasOwnProperty.call(perfBudgets, budgetKey)) continue;
             const budget = Number(perfBudgets[budgetKey]);
-            if (!Number.isFinite(budget) || budget <= 0) continue;
-            if (!Number.isFinite(value)) {
-              console.log(
-                `ℹ️  ${budgetKey} metric unavailable on ${testPage}; skipping budget comparison`
-              );
-              continue;
-            }
+            if (!Number.isFinite(budget) || budget <= 0 || !Number.isFinite(value)) continue;
             if (value > budget) {
-              console.log(
-                `❌  ${budgetKey} for ${testPage} exceeded budget: ${Math.round(value)}ms > ${budget}ms`
-              );
-              performanceBreaches.push({ page: testPage, metric: budgetKey, value, budget });
+              pageReport.breaches.push({ page: testPage, metric: budgetKey, value, budget });
               expect.soft(value).toBeLessThanOrEqual(budget);
-            } else {
-              console.log(
-                `✅  ${budgetKey} for ${testPage} within budget (${Math.round(value)}ms <= ${budget}ms)`
-              );
             }
           }
         }
-      });
-    }
-    if (performanceData.length > 0) {
-      const avg = performanceData.reduce((s, d) => s + d.loadTime, 0) / performanceData.length;
-      console.log(`📊 Average load time: ${Math.round(avg)}ms`);
-      if (performanceBreaches.length > 0) {
-        const details = performanceBreaches
-          .map(
-            (entry) =>
-              `${entry.metric} on ${entry.page}: ${Math.round(entry.value)}ms (budget ${entry.budget}ms)`
-          )
-          .join('\n');
-        console.error(`⚠️  Performance budgets exceeded:\n${details}`);
-      }
-      const testInfo = test.info();
-      const schemaPayloads = buildPerformanceSchemaPayloads(
-        performanceData,
-        performanceBreaches,
-        testInfo.project.name
-      );
-      if (schemaPayloads) {
-        await attachSchemaSummary(testInfo, schemaPayloads.runPayload);
-        for (const payload of schemaPayloads.pagePayloads) {
-          await attachSchemaSummary(testInfo, payload);
+      } catch (error) {
+        pageReport.error = error?.message || String(error);
+        pageReport.status ??= extractStatusFromError(error);
+      } finally {
+        performanceStore.record(testInfo.project.name, pageReport);
+        const schemaPayloads = buildPerformanceSchemaPayloads(
+          [pageReport],
+          pageReport.breaches,
+          testInfo.project.name
+        );
+        const pagePayload = schemaPayloads?.pagePayloads?.[0];
+        if (pagePayload) {
+          await attachSchemaSummary(testInfo, pagePayload);
         }
       }
-    }
+
+      expect.soft(pageReport.error || null).toBeNull();
+    });
+  });
+
+  test.describe.serial('Infrastructure summaries', () => {
+    test('Availability summary', async ({}, testInfo) => {
+      const reports = (
+        await waitForReports({
+          store: availabilityStore,
+          projectName: testInfo.project.name,
+          expectedCount: configuredPages.length,
+        })
+      ).filter((report) => report.runToken === AVAILABILITY_RUN_TOKEN);
+      const schemaPayloads = buildAvailabilitySchemaPayloads(reports, testInfo.project.name);
+      if (!schemaPayloads) return;
+      await attachSchemaSummary(testInfo, schemaPayloads.runPayload);
+      for (const payload of schemaPayloads.pagePayloads) {
+        await attachSchemaSummary(testInfo, payload);
+      }
+    });
+
+    test('HTTP summary', async ({}, testInfo) => {
+      const reports = (
+        await waitForReports({
+          store: httpStore,
+          projectName: testInfo.project.name,
+          expectedCount: configuredPages.length,
+        })
+      ).filter((report) => report.runToken === HTTP_RUN_TOKEN);
+      const schemaPayloads = buildHttpSchemaPayloads(reports, testInfo.project.name);
+      if (!schemaPayloads) return;
+      await attachSchemaSummary(testInfo, schemaPayloads.runPayload);
+      for (const payload of schemaPayloads.pagePayloads) {
+        await attachSchemaSummary(testInfo, payload);
+      }
+    });
+
+    test('Performance summary', async ({}, testInfo) => {
+      const reports = (
+        await waitForReports({
+          store: performanceStore,
+          projectName: testInfo.project.name,
+          expectedCount: performancePages.length,
+        })
+      ).filter((report) => report.runToken === PERFORMANCE_RUN_TOKEN);
+      const allBreaches = reports.flatMap((report) => report.breaches || []);
+      const schemaPayloads = buildPerformanceSchemaPayloads(
+        reports,
+        allBreaches,
+        testInfo.project.name
+      );
+      if (!schemaPayloads) return;
+      await attachSchemaSummary(testInfo, schemaPayloads.runPayload);
+      for (const payload of schemaPayloads.pagePayloads) {
+        await attachSchemaSummary(testInfo, payload);
+      }
+    });
   });
 });

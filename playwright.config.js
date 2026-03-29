@@ -50,8 +50,8 @@ module.exports = defineConfig({
   retries: process.env.CI ? 2 : 0,
   workers: resolveWorkerCount(),
   reporter,
-  // Disable per-test timeout so large accessibility runs can complete
-  timeout: 0,
+  // Keep the suite bounded even when individual pages are slow.
+  timeout: 20 * 60 * 1000,
   expect: {
     timeout: 15000,
   },

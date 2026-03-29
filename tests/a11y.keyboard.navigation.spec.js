@@ -4,7 +4,6 @@ const pixelmatch = require('pixelmatch');
 test.use({ trace: 'off', video: 'off' });
 
 const { PNG } = require('pngjs');
-const SiteLoader = require('../utils/site-loader');
 const { runPageTasks, resolveConcurrencyLimit } = require('../utils/concurrency-helpers');
 const {
   selectAccessibilityTestPages,
@@ -14,6 +13,7 @@ const {
 } = require('../utils/a11y-shared');
 const {
   safeNavigate,
+  waitForAnimationFrames,
   waitForPageStability,
 } = require('../utils/test-helpers');
 const { attachSchemaSummary } = require('../utils/reporting-utils');
@@ -128,7 +128,10 @@ const skipLinkMetadataScript = () => {
     const acceptableRoles = ['main', 'banner', 'contentinfo'];
     const role = target.getAttribute('role') || '';
     const idMatch = /^(main|content|primary|page)/i.test(target.id || '');
-    const isLandmark = target.tagName.toLowerCase() === 'main' || acceptableRoles.includes(role.toLowerCase()) || idMatch;
+    const isLandmark =
+      target.tagName.toLowerCase() === 'main' ||
+      acceptableRoles.includes(role.toLowerCase()) ||
+      idMatch;
     if (!isLandmark) return false;
 
     const rect = el.getBoundingClientRect();
@@ -142,7 +145,11 @@ const skipLinkMetadataScript = () => {
       focusedStyles.display !== 'none' &&
       !(focusedStyles.clipPath && focusedStyles.clipPath !== 'none') &&
       !(focusedStyles.clip && focusedStyles.clip !== 'auto');
-    if (previouslyFocused && previouslyFocused !== el && typeof previouslyFocused.focus === 'function') {
+    if (
+      previouslyFocused &&
+      previouslyFocused !== el &&
+      typeof previouslyFocused.focus === 'function'
+    ) {
       previouslyFocused.focus({ preventScroll: true });
     } else if (previouslyFocused && typeof previouslyFocused.blur === 'function') {
       previouslyFocused.blur();
@@ -154,7 +161,8 @@ const skipLinkMetadataScript = () => {
   if (!candidate) return null;
 
   return {
-    text: ((candidate.innerText || candidate.textContent || '').trim() || null)?.slice(0, 80) || null,
+    text:
+      ((candidate.innerText || candidate.textContent || '').trim() || null)?.slice(0, 80) || null,
     href: candidate.getAttribute('href') || null,
     id: candidate.id || null,
     tag: candidate.tagName.toLowerCase(),
@@ -192,7 +200,7 @@ const detectFocusIndicator = async (page, elementHandle) => {
   await elementHandle.evaluate((el) => {
     if (typeof el.blur === 'function') el.blur();
   });
-  await page.waitForTimeout(75);
+  await waitForAnimationFrames(page, 4);
 
   let unfocusedBuffer;
   try {
@@ -201,23 +209,20 @@ const detectFocusIndicator = async (page, elementHandle) => {
     await elementHandle.evaluate((el) => {
       if (typeof el.focus === 'function') el.focus();
     });
-    await page.waitForTimeout(50);
+    await waitForAnimationFrames(page, 3);
     return { hasIndicator: false, diffRatio: 0 };
   }
 
   await elementHandle.evaluate((el) => {
     if (typeof el.focus === 'function') el.focus();
   });
-  await page.waitForTimeout(50);
+  await waitForAnimationFrames(page, 3);
 
   try {
     const focusedPng = PNG.sync.read(focusedBuffer);
     const unfocusedPng = PNG.sync.read(unfocusedBuffer);
 
-    if (
-      focusedPng.width !== unfocusedPng.width ||
-      focusedPng.height !== unfocusedPng.height
-    ) {
+    if (focusedPng.width !== unfocusedPng.width || focusedPng.height !== unfocusedPng.height) {
       return { hasIndicator: false, diffRatio: 0 };
     }
 
@@ -284,17 +289,11 @@ const describeFocusTarget = (snapshot) => {
 test.describe('Accessibility: Keyboard navigation', () => {
   let siteConfig;
 
-  test.beforeEach(() => {
-    const siteName = process.env.SITE_NAME;
-    if (!siteName) throw new Error('SITE_NAME environment variable is required');
-
-    siteConfig = SiteLoader.loadSite(siteName);
-    SiteLoader.validateSiteConfig(siteConfig);
+  test.beforeEach(({ siteConfig: resolvedSiteConfig }) => {
+    siteConfig = resolvedSiteConfig;
   });
 
   test('Keyboard focus flows are accessible', async ({ browser }, testInfo) => {
-    test.setTimeout(7200000);
-
     const pages = selectAccessibilityTestPages(siteConfig, {
       defaultSize: DEFAULT_ACCESSIBILITY_SAMPLE,
       configKeys: ['a11yKeyboardSampleSize', 'a11yResponsiveSampleSize'],
@@ -318,7 +317,7 @@ test.describe('Accessibility: Keyboard navigation', () => {
 
     const gatingTotal = reports.reduce((total, report) => total + report.gating.length, 0);
     const { siteLabel, viewportLabel } = resolveAccessibilityMetadata(siteConfig, testInfo);
-    applyViewportMetadata(reports, viewportLabel, siteLabel);
+    applyViewportMetadata(reports, { viewportLabel, siteLabel });
 
     const runPayload = createRunSummaryPayload({
       baseName: `a11y-keyboard-summary-${slugify(siteLabel)}`,
@@ -332,32 +331,32 @@ test.describe('Accessibility: Keyboard navigation', () => {
       metadata: {
         spec: 'a11y.keyboard.navigation',
         summaryType: 'keyboard',
-        projectName: siteLabel,
+        projectName: viewportLabel,
         siteName: siteLabel,
         viewports: [viewportLabel],
         suppressPageEntries: true,
         scope: 'project',
       },
     });
-  runPayload.details = {
-    viewports: [viewportLabel],
-    pages: reports.map((report) => ({
-      page: report.page,
-      focusableCount: report.focusableCount,
-      visitedCount: report.visitedCount,
-      skipLink: report.skipLink,
-      gating: report.gating,
-      warnings: report.warnings,
-      advisories: report.advisories,
-      focusSequence: report.sequence,
-      notes: report.notes,
-      projectName: viewportLabel,
-      browser: viewportLabel,
-      viewport: viewportLabel,
+    runPayload.details = {
       viewports: [viewportLabel],
-    })),
-    wcagReferences: KEYBOARD_WCAG_REFERENCES,
-  };
+      pages: reports.map((report) => ({
+        page: report.page,
+        focusableCount: report.focusableCount,
+        visitedCount: report.visitedCount,
+        skipLink: report.skipLink,
+        gating: report.gating,
+        warnings: report.warnings,
+        advisories: report.advisories,
+        focusSequence: report.sequence,
+        notes: report.notes,
+        projectName: viewportLabel,
+        browser: viewportLabel,
+        viewport: viewportLabel,
+        viewports: [viewportLabel],
+      })),
+      wcagReferences: KEYBOARD_WCAG_REFERENCES,
+    };
     await attachSchemaSummary(testInfo, runPayload);
 
     for (const report of reports) {
@@ -384,7 +383,7 @@ test.describe('Accessibility: Keyboard navigation', () => {
         metadata: {
           spec: 'a11y.keyboard.navigation',
           summaryType: 'keyboard',
-          projectName: siteLabel,
+          projectName: viewportLabel,
           siteName: siteLabel,
           viewports: [viewportLabel],
         },
@@ -448,7 +447,7 @@ async function runKeyboardAudit(page, siteConfig, testPage, { maxTabIterations }
 
     for (let step = 0; step < Math.min(maxTabIterations, focusable.length); step += 1) {
       await page.keyboard.press('Tab');
-      await page.waitForTimeout(75);
+      await waitForAnimationFrames(page, 4);
 
       const snapshot = await page.evaluate(activeElementSnapshotScript);
       if (!snapshot || snapshot.type === 'none') {
@@ -510,13 +509,15 @@ async function runKeyboardAudit(page, siteConfig, testPage, { maxTabIterations }
 
     if (visited.length > 1) {
       await page.keyboard.press('Shift+Tab');
-      await page.waitForTimeout(75);
+      await waitForAnimationFrames(page, 4);
       const reverseSnapshot = await page.evaluate(activeElementSnapshotScript);
       if (!reverseSnapshot || reverseSnapshot.isBody) {
-        report.gating.push('Reverse tabbing returned focus to <body>; keyboard users may get trapped.');
+        report.gating.push(
+          'Reverse tabbing returned focus to <body>; keyboard users may get trapped.'
+        );
       }
       await page.keyboard.press('Tab');
-      await page.waitForTimeout(50);
+      await waitForAnimationFrames(page, 3);
     }
 
     report.notes.push(

@@ -9,6 +9,7 @@ const {
   normaliseBaseUrlString,
   resolveUrl,
 } = require('./site-config-utils');
+const { assertValidSiteConfig } = require('./site-config-validator');
 
 function loadSiteConfig(sitePath) {
   const raw = fs.readFileSync(sitePath, 'utf8');
@@ -54,6 +55,9 @@ async function refreshSiteConfig(sitePath, options = {}) {
     ...persisted,
   });
   const siteConfig = hydratedSiteConfig;
+  assertValidSiteConfig(siteConfig, {
+    contextLabel: `Discovery config ${path.basename(sitePath)}`,
+  });
 
   if (createdDefaultDiscover) {
     logger.log(
@@ -151,6 +155,9 @@ async function refreshSiteConfig(sitePath, options = {}) {
       ? { testPages: siteConfig.testPages }
       : {}),
   };
+  assertValidSiteConfig(nextConfig, {
+    contextLabel: `Discovery output ${path.basename(sitePath)}`,
+  });
 
   if (createdDefaultDiscover || baseUrlUpdated || sitemapUrlUpdated || discovered.length > 0) {
     writeSiteConfig(sitePath, nextConfig);

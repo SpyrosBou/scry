@@ -1,4 +1,3 @@
-/* eslint-env node, browser */
 /* global window */
 /**
  * Enhanced Test Helpers for Scry
@@ -241,6 +240,39 @@ async function retryOperation(operation, operationName, options = {}) {
   throw lastError;
 }
 
+async function waitForAnimationFrames(page, frameCount = 2) {
+  if (!page || page.isClosed()) return;
+
+  await page
+    .evaluate(async (count) => {
+      const frames = Math.max(Number(count) || 1, 1);
+      await new Promise((resolve) => {
+        let remaining = frames;
+        const step = () => {
+          remaining -= 1;
+          if (remaining <= 0) {
+            resolve();
+            return;
+          }
+          window.requestAnimationFrame(step);
+        };
+        window.requestAnimationFrame(step);
+      });
+    }, frameCount)
+    .catch(() => {});
+}
+
+async function waitForPageSettle(page, options = {}) {
+  const { loadState = null, timeout = 5000, frames = 2 } = options;
+  if (!page || page.isClosed()) return;
+
+  if (loadState) {
+    await page.waitForLoadState(loadState, { timeout }).catch(() => {});
+  }
+
+  await waitForAnimationFrames(page, frames);
+}
+
 /**
  * Perform recovery actions based on error type
  * @param {Error} error - The error that occurred
@@ -255,30 +287,29 @@ async function performErrorRecovery(error, errorType, context = {}) {
   try {
     switch (errorType) {
       case ErrorTypes.TIMEOUT:
-        // Clear any pending operations
-        await page.waitForLoadState('domcontentloaded', { timeout: 5000 }).catch(() => {});
+        await waitForPageSettle(page, { loadState: 'domcontentloaded', timeout: 5000, frames: 3 });
         break;
 
       case ErrorTypes.ELEMENT_NOT_FOUND:
-        // Wait for potential animations to complete
-        await page.waitForTimeout(500);
+        await waitForPageSettle(page, { frames: 4 });
         break;
 
       case ErrorTypes.NAVIGATION:
-        // Ensure page is in a good state for navigation
         if (!page.isClosed()) {
-          await page.waitForLoadState('domcontentloaded', { timeout: 5000 }).catch(() => {});
+          await waitForPageSettle(page, {
+            loadState: 'domcontentloaded',
+            timeout: 5000,
+            frames: 2,
+          });
         }
         break;
 
       case ErrorTypes.NETWORK:
-        // Wait for network to stabilize
-        await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+        await waitForPageSettle(page, { loadState: 'networkidle', timeout: 5000, frames: 2 });
         break;
 
       default:
-        // Generic recovery - just wait a bit
-        await page.waitForTimeout(200);
+        await waitForPageSettle(page, { frames: 2 });
         break;
     }
   } catch (recoveryError) {
@@ -402,99 +433,6 @@ async function waitForPageStability(page, options = {}) {
   }
 
   return result; // Soft-fail so callers can decide how to report
-}
-
-/**
- * Enhanced element interaction with comprehensive safety checks and retries
- * @param {Locator} element - Playwright locator
- * @param {string} action - Action to perform (click, fill, hover, etc.)
- * @param {Object} options - Action options including retry configuration
- */
-async function safeElementInteraction(element, action, options = {}) {
-  const { timeout = 5000, retries = true, text, force = false, ...actionOptions } = options;
-
-  const interactionFunction = async () => {
-    // Enhanced pre-interaction checks
-    const checks = await Promise.allSettled([
-      element.count(),
-      element.isVisible(),
-      element.isEnabled(),
-    ]);
-
-    const isAttached = checks[0].status === 'fulfilled' ? checks[0].value > 0 : false;
-    const isVisible = checks[1].status === 'fulfilled' ? checks[1].value : false;
-    const isEnabled = checks[2].status === 'fulfilled' ? checks[2].value : false;
-
-    if (!isAttached) {
-      throw new Error('Element is not attached to DOM');
-    }
-
-    if (!isVisible && !force) {
-      throw new Error('Element is not visible');
-    }
-
-    if (!isEnabled && !force && ['click', 'fill'].includes(action)) {
-      throw new Error('Element is not enabled for interaction');
-    }
-
-    // Scroll element into view if needed
-    try {
-      await element.scrollIntoViewIfNeeded({ timeout: 2000 });
-    } catch (scrollError) {
-      console.log(`⚠️  Could not scroll element into view: ${scrollError.message}`);
-    }
-
-    // Perform the action with enhanced options
-    const actionOptionsWithTimeout = { timeout, ...actionOptions };
-
-    switch (action) {
-      case 'click':
-        await element.click(actionOptionsWithTimeout);
-        break;
-      case 'fill':
-        if (!text) throw new Error('Text is required for fill action');
-        await element.fill(text, actionOptionsWithTimeout);
-        break;
-      case 'hover':
-        await element.hover(actionOptionsWithTimeout);
-        break;
-      case 'focus':
-        await element.focus(actionOptionsWithTimeout);
-        break;
-      case 'blur':
-        await element.blur(actionOptionsWithTimeout);
-        break;
-      case 'check':
-        await element.check(actionOptionsWithTimeout);
-        break;
-      case 'uncheck':
-        await element.uncheck(actionOptionsWithTimeout);
-        break;
-      case 'selectOption':
-        if (!options.value) throw new Error('Value is required for selectOption action');
-        await element.selectOption(options.value, actionOptionsWithTimeout);
-        break;
-      default:
-        throw new Error(`Unsupported action: ${action}`);
-    }
-
-    return true;
-  };
-
-  if (retries) {
-    return await retryOperation(interactionFunction, `Element ${action} interaction`, {
-      ...RetryConfig.ELEMENT_INTERACTION,
-      operation: 'element_interaction',
-      context: { element, action },
-    });
-  } else {
-    try {
-      return await interactionFunction();
-    } catch (error) {
-      console.log(`⚠️  Element ${action} failed: ${error.message}`);
-      return false;
-    }
-  }
 }
 
 // Page cleanup utility
@@ -640,12 +578,13 @@ module.exports = {
   classifyError,
   isRetryableError,
   performErrorRecovery,
+  waitForAnimationFrames,
+  waitForPageSettle,
   // Existing functionality with enhancements
   debugBrowserState,
   retryOperation,
   safeNavigate,
   waitForPageStability,
-  safeElementInteraction,
   cleanupPage,
   ErrorContext,
   setupTestPage,

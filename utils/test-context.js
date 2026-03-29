@@ -1,17 +1,12 @@
 'use strict';
 
-const SiteLoader = require('./site-loader');
+const { getManifestSiteContext } = require('./run-manifest');
 
 let cachedContext = null;
 
 const getActiveSiteContext = () => {
   if (cachedContext) return cachedContext;
-  const siteName = process.env.SITE_NAME;
-  if (!siteName) {
-    throw new Error('SITE_NAME environment variable is required');
-  }
-  const siteConfig = SiteLoader.loadSite(siteName);
-  SiteLoader.validateSiteConfig(siteConfig);
+  const { siteName, siteConfig } = getManifestSiteContext();
   cachedContext = { siteName, siteConfig };
   return cachedContext;
 };

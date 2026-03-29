@@ -6,9 +6,9 @@ const {
   renderReportHtml,
   formatBytes,
   renderSchemaSummariesMarkdown,
-  renderRunSummariesMarkdown,
 } = require('./report-templates');
 const { SCHEMA_ID: SUMMARY_SCHEMA_ID } = require('./report-schema');
+const { loadManifest } = require('./run-manifest');
 
 const ATTACHMENT_DIR = path.posix.join('data', 'attachments');
 const CONTENT_TYPE_EXTENSIONS = {
@@ -173,7 +173,6 @@ class CustomHtmlReporter {
       durationMs: result.duration || 0,
       durationFriendly: formatDuration(result.duration || 0),
       attachments: processedAttachments.attachments,
-      summaries: processedAttachments.summaries,
       schemaSummaries: processedAttachments.schemaSummaries,
       stdout: (result.stdout || []).map((entry) => this.normaliseStd(entry)),
       stderr: (result.stderr || []).map((entry) => this.normaliseStd(entry)),
@@ -188,10 +187,6 @@ class CustomHtmlReporter {
     };
 
     entry.attempts.push(attempt);
-
-    if (processedAttachments.summaries.length > 0) {
-      entry.summaryBlocks = processedAttachments.summaries;
-    }
 
     if (processedAttachments.schemaSummaries.length > 0) {
       entry.schemaSummaries = (entry.schemaSummaries || []).concat(
@@ -243,11 +238,10 @@ class CustomHtmlReporter {
 
   processAttachments(attachments) {
     if (!this.options.includeAttachments) {
-      return { attachments: [], summaries: [], schemaSummaries: [] };
+      return { attachments: [], schemaSummaries: [] };
     }
 
     const processed = [];
-    const summaries = [];
     const schemaSummaries = [];
     const limit = this.imageAttachmentLimit;
     const enforceLimit = Number.isFinite(limit);
@@ -301,17 +295,6 @@ class CustomHtmlReporter {
             const parsed = JSON.parse(jsonBuffer.toString('utf8'));
             if (parsed?.schema === SUMMARY_SCHEMA_ID) {
               schemaSummaries.push(parsed);
-              continue;
-            }
-            if (parsed?.type === 'custom-report-summary') {
-              summaries.push({
-                baseName: parsed.baseName || name.replace(/\.summary\.json$/, ''),
-                title: parsed.title || parsed.baseName || name,
-                html: parsed.htmlBody || null,
-                markdown: parsed.markdown || null,
-                setDescription: Boolean(parsed.setDescription),
-                createdAt: parsed.createdAt || null,
-              });
               continue;
             }
           } catch (_error) {
@@ -399,7 +382,7 @@ class CustomHtmlReporter {
       processed.push(attachmentEntry);
     }
 
-    return { attachments: processed, summaries, schemaSummaries };
+    return { attachments: processed, schemaSummaries };
   }
 
   buildRunData() {
@@ -410,41 +393,6 @@ class CustomHtmlReporter {
     const serialisedTests = Array.from(this.testEntries.values())
       .sort((a, b) => a.order - b.order)
       .map((entry) => this.serialiseTest(entry));
-
-    const summaryByKey = new Map();
-    for (const test of serialisedTests) {
-      if (!Array.isArray(test.summaryBlocks) || test.summaryBlocks.length === 0) continue;
-      test.summaryBlocks.forEach((block, index) => {
-        if (!block) return;
-        const key = block.baseName || `${test.anchorId}-${index}`;
-        const record = {
-          baseName: block.baseName || key,
-          title: block.title || block.baseName || 'Summary',
-          html: block.html || null,
-          markdown: block.markdown || null,
-          createdAt: block.createdAt || null,
-          source: {
-            anchorId: test.anchorId,
-            testTitle: test.title,
-            projectName: test.projectName,
-          },
-        };
-
-        if (block.setDescription) {
-          summaryByKey.set(key, { ...record, setDescription: true });
-        } else if (!summaryByKey.has(key)) {
-          summaryByKey.set(key, { ...record, setDescription: false });
-        }
-      });
-    }
-
-    const runSummaries = Array.from(summaryByKey.values())
-      .filter((summary) => summary.setDescription)
-      .sort((a, b) => {
-        const left = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-        const right = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-        return right - left;
-      });
 
     const statusCounts = STATUS_KEYS.reduce((acc, key) => ({ ...acc, [key]: 0 }), {});
     let flakyCount = 0;
@@ -459,20 +407,11 @@ class CustomHtmlReporter {
     statusCounts.flaky = flakyCount;
 
     const projects = Array.from(this.projectSet).sort();
+    const manifest = loadManifest();
+    const siteKey = manifest?.site?.name || null;
+    const siteLabel = manifest?.site?.title || manifest?.siteConfig?.name || siteKey;
+    const siteBaseUrl = manifest?.site?.baseUrl || manifest?.siteConfig?.baseUrl || null;
 
-    const siteName = process.env.SITE_NAME || process.env.SITE;
-    let siteBaseUrl = process.env.SITE_BASE_URL || process.env.BASE_URL || null;
-    if (!siteBaseUrl && siteName) {
-      const siteConfigPath = path.join(process.cwd(), 'sites', `${siteName}.json`);
-      if (fs.existsSync(siteConfigPath)) {
-        try {
-          const parsed = JSON.parse(fs.readFileSync(siteConfigPath, 'utf8'));
-          if (parsed?.baseUrl) siteBaseUrl = parsed.baseUrl;
-        } catch (error) {
-          console.warn(`⚠️  Unable to read baseUrl from ${siteConfigPath}: ${error.message}`);
-        }
-      }
-    }
     let profile =
       process.env.PROFILE ||
       process.env.TEST_PROFILE ||
@@ -481,7 +420,7 @@ class CustomHtmlReporter {
       (process.env.NIGHTLY ? 'nightly' : null);
 
     const runData = {
-      title: siteName ? `${siteName} – Playwright Test Run` : 'Playwright Test Run',
+      title: siteLabel ? `${siteLabel} – Playwright Test Run` : 'Playwright Test Run',
       runId: this.runId,
       startedAt,
       startedAtFriendly: formatDateTime(startedAt),
@@ -492,7 +431,13 @@ class CustomHtmlReporter {
       statusCounts,
       totalTests: serialisedTests.length,
       totalTestsPlanned: this.totalTestsPlanned,
-      site: siteName ? { name: siteName, baseUrl: siteBaseUrl } : null,
+      site: siteLabel
+        ? {
+            key: siteKey,
+            name: siteLabel,
+            baseUrl: siteBaseUrl,
+          }
+        : null,
       profile,
       projects,
       environment: {
@@ -512,7 +457,6 @@ class CustomHtmlReporter {
         }
         return acc;
       }, []),
-      runSummaries,
     };
 
     return runData;
@@ -553,7 +497,6 @@ class CustomHtmlReporter {
         startTimeFriendly: attempt.startTimeFriendly,
         durationFriendly: attempt.durationFriendly,
       })),
-      summaryBlocks: entry.summaryBlocks || [],
       schemaSummaries: entry.schemaSummaries || [],
       stdout: entry.stdout || [],
       stderr: entry.stderr || [],
@@ -614,15 +557,9 @@ class CustomHtmlReporter {
     for (const test of runData.tests) {
       fs.writeFileSync(path.join(testsDir, `${test.anchorId}.json`), JSON.stringify(test, null, 2));
     }
-
-    const schemaMarkdownRender = renderSchemaSummariesMarkdown(runData.schemaSummaries || []);
-    const schemaMarkdown = schemaMarkdownRender.markdown || '';
-    const schemaPromotedBaseNames = schemaMarkdownRender.promotedBaseNames || new Set();
-    const filteredMarkdownSummaries = (runData.runSummaries || []).filter((summary) =>
-      summary?.baseName ? !schemaPromotedBaseNames.has(summary.baseName) : true
-    );
-    const runSummariesMarkdown = renderRunSummariesMarkdown(filteredMarkdownSummaries);
-    const markdownSections = [schemaMarkdown, runSummariesMarkdown]
+    const schemaMarkdown =
+      renderSchemaSummariesMarkdown(runData.schemaSummaries || []).markdown || '';
+    const markdownSections = [schemaMarkdown]
       .map((section) => (section || '').trim())
       .filter((section) => section.length > 0);
 
@@ -634,7 +571,12 @@ class CustomHtmlReporter {
       ];
       if (runData.durationFriendly) headerLines.push(`- Duration: ${runData.durationFriendly}`);
       headerLines.push(`- Total Tests: ${runData.totalTests}`);
-      if (runData.site) headerLines.push(`- Site: ${runData.site}`);
+      if (runData.site) {
+        const siteLabel = runData.site.baseUrl
+          ? `${runData.site.name} (${runData.site.baseUrl})`
+          : runData.site.name;
+        headerLines.push(`- Site: ${siteLabel}`);
+      }
       if (runData.profile) headerLines.push(`- Profile: ${runData.profile}`);
 
       const markdownContent = `${headerLines.join('\n')}\n\n${markdownSections.join('\n\n')}\n`;

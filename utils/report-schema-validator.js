@@ -4,28 +4,15 @@ const {
   KIND_RUN_SUMMARY,
   KIND_PAGE_SUMMARY,
 } = require('./report-schema');
+const { ACTIVE_SUMMARY_TYPES, STANDARD_FINDING_SUMMARY_TYPES } = require('./report-summary-types');
 
 const isPlainObject = (value) =>
   Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 
 const normaliseKey = (key) => String(key || '');
 
-const SUMMARY_TYPES_WITH_STANDARD_FINDINGS = new Set([
-  'forms',
-  'keyboard',
-  'reduced-motion',
-  'reflow',
-  'iframe-metadata',
-  'structure',
-  'interactive',
-  'internal-links',
-  'availability',
-  'http',
-  'performance',
-  'responsive-structure',
-  'wp-features',
-  'visual',
-]);
+const SUMMARY_TYPES_WITH_STANDARD_FINDINGS = new Set(STANDARD_FINDING_SUMMARY_TYPES);
+const KNOWN_SUMMARY_TYPES = new Set(ACTIVE_SUMMARY_TYPES);
 
 const REQUIRED_FINDING_KEYS = ['gating', 'warnings', 'advisories', 'notes'];
 
@@ -63,12 +50,29 @@ const validateMetadata = (metadata, errors) => {
   if (metadata == null) return;
   if (!isPlainObject(metadata)) {
     errors.push('`metadata` must be an object when provided.');
+    return;
+  }
+
+  const summaryType = metadata.summaryType;
+  if (!summaryType) {
+    errors.push('`metadata.summaryType` is required.');
+    return;
+  }
+
+  if (!KNOWN_SUMMARY_TYPES.has(summaryType)) {
+    errors.push(`Unsupported metadata.summaryType: ${normaliseKey(summaryType)}.`);
   }
 };
 
 const validateRunSummary = (payload, errors) => {
   if (!payload.baseName) {
     errors.push('`baseName` is required for run summary payloads.');
+  }
+  if (payload.htmlBody != null) {
+    errors.push('`htmlBody` is no longer supported on report summary payloads.');
+  }
+  if (payload.markdownBody != null) {
+    errors.push('`markdownBody` is no longer supported on report summary payloads.');
   }
   validateOverview(payload.overview, errors);
   validateRuleSnapshots(payload.ruleSnapshots, errors);
@@ -89,6 +93,12 @@ const validatePageSummary = (payload, errors) => {
     errors.push('`summary` must be an object when provided for page summaries.');
   }
   if (isPlainObject(payload.summary)) {
+    if (payload.summary.cardHtml != null) {
+      errors.push('`summary.cardHtml` is no longer supported.');
+    }
+    if (payload.summary.cardMarkdown != null) {
+      errors.push('`summary.cardMarkdown` is no longer supported.');
+    }
     const summaryType = payload.metadata && payload.metadata.summaryType;
     if (SUMMARY_TYPES_WITH_STANDARD_FINDINGS.has(summaryType)) {
       REQUIRED_FINDING_KEYS.forEach((key) => {
