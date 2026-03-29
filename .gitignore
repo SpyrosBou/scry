@@ -64,3 +64,6 @@ Thumbs.db
 
 # Terminal Paste Image folder
 .cp-images/
+
+# Superpowers brainstorm sessions
+.superpowers/
