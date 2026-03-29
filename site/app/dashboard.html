@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#0a0e1a" />
+  <title>Scry &mdash; Dashboard</title>
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="styles/app.css" />
+</head>
+<body>
+
+  <a class="skip-link" href="#main-content">Skip to content</a>
+
+  <div class="flex flex-col h-screen">
+
+    <!-- ================================================================ -->
+    <!-- TOP BAR                                                          -->
+    <!-- ================================================================ -->
+    <header class="fixed top-0 inset-x-0 z-100 h-14 px-5 flex items-center gap-4 bg-primary border-b border-border-subtle transition-all duration-300">
+      <a href="dashboard.html" class="font-display italic text-[1.35rem] text-text-primary no-underline tracking-tight mr-auto">Scry</a>
+      <nav class="flex items-center gap-1" aria-label="Primary">
+        <a href="dashboard.html" class="px-3 py-1.5 rounded-sm text-[0.85rem] font-medium no-underline transition-all duration-150 text-gold bg-gold-bg">Dashboard</a>
+        <a href="report.html" class="px-3 py-1.5 rounded-sm text-[0.85rem] font-medium text-text-secondary no-underline transition-all duration-150 hover:text-text-primary hover:bg-white/[0.04]">Reports</a>
+      </nav>
+      <div class="flex items-center gap-2 ml-2">
+        <button class="flex items-center justify-center size-9 rounded-sm border-none bg-transparent text-text-secondary cursor-pointer transition-all duration-150 hover:bg-white/[0.06] hover:text-text-primary [&>svg]:size-[18px]" aria-label="Settings" onclick="window.location='site-settings.html'">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+            <circle cx="10" cy="10" r="3" />
+            <path d="M10 1.5v2M10 16.5v2M1.5 10h2M16.5 10h2M3.4 3.4l1.4 1.4M15.2 15.2l1.4 1.4M3.4 16.6l1.4-1.4M15.2 4.8l1.4-1.4" />
+          </svg>
+        </button>
+        <button class="size-8 rounded-full bg-elevated border border-border-default cursor-pointer transition-all duration-150 hover:border-border-strong" aria-label="Account menu"></button>
+      </div>
+    </header>
+
+    <div class="flex flex-1 overflow-hidden mt-14">
+
+      <!-- ============================================================== -->
+      <!-- SIDEBAR                                                        -->
+      <!-- ============================================================== -->
+      <aside class="w-[220px] min-w-[220px] h-full bg-primary border-r border-border-subtle overflow-y-auto overflow-x-hidden overscroll-contain py-3 flex flex-col" aria-label="Site navigation">
+        <ul role="tree" aria-label="Projects and sites">
+
+          <!-- Project: Acme Corp -->
+          <li role="treeitem" aria-expanded="true" tabindex="0">
+            <span class="px-4 pt-3 pb-1 text-[0.65rem] font-semibold uppercase tracking-[0.08em] text-text-tertiary font-body block">Acme Corp</span>
+            <ul role="group">
+              <li role="treeitem" aria-selected="true" tabindex="-1">
+                <button class="sidebar-item group active" data-site="acme">
+                  <span class="health-dot health-dot--green"></span>
+                  <span class="flex-1 min-w-0 truncate">acme.com</span>
+                  <span class="flex items-center gap-1 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                    <button class="flex items-center justify-center size-6 rounded-[4px] border-none bg-transparent text-text-tertiary cursor-pointer p-0 text-[0.7rem] transition-all duration-100 hover:bg-white/[0.08] hover:text-text-primary" aria-label="acme.com settings" onclick="event.stopPropagation(); window.location='site-settings.html'">
+                      <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="8" cy="8" r="2.5"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2"/></svg>
+                    </button>
+                  </span>
+                </button>
+              </li>
+              <li role="treeitem" aria-selected="false" tabindex="-1">
+                <button class="sidebar-item group" data-site="blog-acme">
+                  <span class="health-dot health-dot--yellow"></span>
+                  <span class="flex-1 min-w-0 truncate">blog.acme.com</span>
+                  <span class="flex items-center gap-1 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                    <button class="flex items-center justify-center size-6 rounded-[4px] border-none bg-transparent text-text-tertiary cursor-pointer p-0 text-[0.7rem] transition-all duration-100 hover:bg-white/[0.08] hover:text-text-primary" aria-label="blog.acme.com settings" onclick="event.stopPropagation(); window.location='site-settings.html'">
+                      <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="8" cy="8" r="2.5"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2"/></svg>
+                    </button>
+                  </span>
+                </button>
+              </li>
+            </ul>
+          </li>
+
+          <!-- Project: Bella Design -->
+          <li role="treeitem" aria-expanded="true" tabindex="-1">
+            <span class="px-4 pt-3 pb-1 text-[0.65rem] font-semibold uppercase tracking-[0.08em] text-text-tertiary font-body block">Bella Design</span>
+            <ul role="group">
+              <li role="treeitem" aria-selected="false" tabindex="-1">
+                <button class="sidebar-item group" data-site="bella">
+                  <span class="health-dot health-dot--green"></span>
+                  <span class="flex-1 min-w-0 truncate">belladesign.co</span>
+                  <span class="flex items-center gap-1 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                    <button class="flex items-center justify-center size-6 rounded-[4px] border-none bg-transparent text-text-tertiary cursor-pointer p-0 text-[0.7rem] transition-all duration-100 hover:bg-white/[0.08] hover:text-text-primary" aria-label="belladesign.co settings" onclick="event.stopPropagation(); window.location='site-settings.html'">
+                      <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="8" cy="8" r="2.5"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2"/></svg>
+                    </button>
+                  </span>
+                </button>
+              </li>
+              <li role="treeitem" aria-selected="false" tabindex="-1">
+                <button class="sidebar-item group" data-site="shop-bella">
+                  <span class="health-dot health-dot--red"></span>
+                  <span class="flex-1 min-w-0 truncate">shop.bella.co</span>
+                  <span class="flex items-center gap-1 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                    <button class="flex items-center justify-center size-6 rounded-[4px] border-none bg-transparent text-text-tertiary cursor-pointer p-0 text-[0.7rem] transition-all duration-100 hover:bg-white/[0.08] hover:text-text-primary" aria-label="shop.bella.co settings" onclick="event.stopPropagation(); window.location='site-settings.html'">
+                      <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="8" cy="8" r="2.5"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2"/></svg>
+                    </button>
+                  </span>
+                </button>
+              </li>
+            </ul>
+          </li>
+
+        </ul>
+
+        <button class="flex items-center gap-1.5 px-4 py-3 mt-auto text-[0.8rem] font-medium text-gold cursor-pointer border-none bg-transparent w-full text-left font-body transition-all duration-100 hover:bg-gold-bg">+ New Project</button>
+      </aside>
+
+      <!-- ============================================================== -->
+      <!-- MAIN PANEL                                                     -->
+      <!-- ============================================================== -->
+      <main class="main" id="main-content">
+
+        <!-- ---- Dashboard view (default) ---- -->
+        <div id="view-dashboard">
+
+          <!-- Site header -->
+          <div class="flex items-start justify-between mb-6">
+            <div class="[&>h1]:mb-1">
+              <h1>acme.com</h1>
+              <div class="flex items-center gap-2 text-[0.8rem] text-text-secondary">
+                <span>Last run: 2 hours ago</span>
+                <span>&middot;</span>
+                <span class="text-xs text-text-tertiary">Scheduled: Daily at 6:00 AM</span>
+              </div>
+            </div>
+            <button class="btn btn--primary" id="btn-run-audit">Run Audit</button>
+          </div>
+
+          <!-- Score cards -->
+          <div class="grid grid-cols-4 gap-3 mb-5 max-md:grid-cols-2 max-sm:grid-cols-1">
+            <a href="report-detail.html" class="score-card score-card--functionality">
+              <div class="text-[2rem] font-bold font-body tabular-nums text-text-primary leading-none mb-1 text-status-green">98</div>
+              <div class="text-xs text-text-secondary font-medium">Functionality</div>
+              <div class="mt-1 badge badge--ok">Pass</div>
+            </a>
+            <a href="report-detail.html" class="score-card score-card--accessibility">
+              <div class="text-[2rem] font-bold font-body tabular-nums text-text-primary leading-none mb-1 text-status-yellow">74</div>
+              <div class="text-xs text-text-secondary font-medium">Accessibility</div>
+              <div class="mt-1 badge badge--warning">Warn</div>
+            </a>
+            <a href="report-detail.html" class="score-card score-card--responsive">
+              <div class="text-[2rem] font-bold font-body tabular-nums text-text-primary leading-none mb-1 text-status-green">91</div>
+              <div class="text-xs text-text-secondary font-medium">Responsive</div>
+              <div class="mt-1 badge badge--ok">Pass</div>
+            </a>
+            <a href="report-detail.html" class="score-card score-card--visual">
+              <div class="text-[2rem] font-bold font-body tabular-nums text-text-primary leading-none mb-1 text-status-green">100</div>
+              <div class="text-xs text-text-secondary font-medium">Visual</div>
+              <div class="mt-1 badge badge--ok">Pass</div>
+            </a>
+          </div>
+
+          <!-- Trend chart -->
+          <div class="bg-elevated border border-border-subtle rounded-md p-4 mb-5">
+            <div class="text-xs font-medium text-text-secondary mb-3">Score Trend (30 days)</div>
+            <svg class="w-full h-20" viewBox="0 0 600 80" preserveAspectRatio="none">
+              <!-- Functionality (blue) -->
+              <polyline fill="none" stroke="#268bd2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                points="0,12 40,14 80,10 120,16 160,8 200,12 240,10 280,14 320,8 360,6 400,10 440,8 480,6 520,8 560,4 600,4" />
+              <!-- Accessibility (green) -->
+              <polyline fill="none" stroke="#859900" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                points="0,40 40,42 80,38 120,44 160,36 200,34 240,32 280,30 320,28 360,32 400,28 440,24 480,22 520,20 560,22 600,20" />
+              <!-- Responsive (yellow) -->
+              <polyline fill="none" stroke="#b58900" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                points="0,20 40,18 80,22 120,16 160,20 200,18 240,14 280,16 320,12 360,10 400,12 440,10 480,8 520,10 560,8 600,8" />
+              <!-- Visual (red) -->
+              <polyline fill="none" stroke="#dc322f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                points="0,2 40,2 80,2 120,2 160,2 200,2 240,2 280,2 320,2 360,2 400,2 440,2 480,2 520,2 560,2 600,2" />
+            </svg>
+          </div>
+
+          <!-- Recent runs -->
+          <div>
+            <div class="text-xs font-medium text-text-secondary mb-2">Recent Runs</div>
+
+            <a href="report.html" class="run-row">
+              <span class="text-[0.8rem] tabular-nums min-w-[140px]">Mar 29, 6:00 AM</span>
+              <span class="flex items-center gap-1.5 text-xs font-medium">
+                <span class="health-dot health-dot--green"></span> Pass
+              </span>
+              <span class="flex items-center gap-3 ml-auto text-xs text-text-tertiary tabular-nums">
+                <span>4 suites</span>
+                <span>12 pages</span>
+                <span>2m 14s</span>
+              </span>
+            </a>
+
+            <a href="report.html" class="run-row">
+              <span class="text-[0.8rem] tabular-nums min-w-[140px]">Mar 28, 6:00 AM</span>
+              <span class="flex items-center gap-1.5 text-xs font-medium">
+                <span class="health-dot health-dot--yellow"></span> Warn
+              </span>
+              <span class="flex items-center gap-3 ml-auto text-xs text-text-tertiary tabular-nums">
+                <span>4 suites</span>
+                <span>12 pages</span>
+                <span>2m 31s</span>
+              </span>
+            </a>
+
+            <a href="report.html" class="run-row">
+              <span class="text-[0.8rem] tabular-nums min-w-[140px]">Mar 27, 6:00 AM</span>
+              <span class="flex items-center gap-1.5 text-xs font-medium">
+                <span class="health-dot health-dot--green"></span> Pass
+              </span>
+              <span class="flex items-center gap-3 ml-auto text-xs text-text-tertiary tabular-nums">
+                <span>4 suites</span>
+                <span>12 pages</span>
+                <span>2m 08s</span>
+              </span>
+            </a>
+
+            <a href="report.html" class="run-row">
+              <span class="text-[0.8rem] tabular-nums min-w-[140px]">Mar 26, 6:00 AM</span>
+              <span class="flex items-center gap-1.5 text-xs font-medium">
+                <span class="health-dot health-dot--green"></span> Pass
+              </span>
+              <span class="flex items-center gap-3 ml-auto text-xs text-text-tertiary tabular-nums">
+                <span>4 suites</span>
+                <span>12 pages</span>
+                <span>1m 58s</span>
+              </span>
+            </a>
+          </div>
+
+        </div><!-- /view-dashboard -->
+
+        <!-- ---- Empty state: no projects ---- -->
+        <div id="view-empty-projects" style="display:none;">
+          <div class="empty-state">
+            <div class="font-display text-[1.3rem] text-text-primary mb-2">No projects yet</div>
+            <div class="text-[0.9rem] text-text-secondary mb-6 max-w-xs">Add your first site to start auditing.</div>
+            <button class="btn btn--primary" id="btn-empty-add">Add Site</button>
+          </div>
+        </div>
+
+        <!-- ---- Empty state: no runs ---- -->
+        <div id="view-empty-runs" style="display:none;">
+          <div class="flex items-start justify-between mb-6">
+            <div class="[&>h1]:mb-1">
+              <h1>acme.com</h1>
+              <div class="flex items-center gap-2 text-[0.8rem] text-text-secondary">
+                <span class="text-xs text-text-tertiary">No schedule &middot; <a href="site-settings.html">Set up</a></span>
+              </div>
+            </div>
+            <button class="btn btn--primary" id="btn-empty-run">Run Audit</button>
+          </div>
+          <div class="empty-state">
+            <div class="font-display text-[1.3rem] text-text-primary mb-2">No audits run yet</div>
+            <div class="text-[0.9rem] text-text-secondary mb-6 max-w-xs">Run your first audit to see how your site is doing.</div>
+            <button class="btn btn--primary">Run Your First Audit</button>
+          </div>
+        </div>
+
+        <!-- ---- Live run view ---- -->
+        <div id="view-live-run" style="display:none;">
+          <div class="mb-6">
+            <div class="font-display text-[1.3rem] text-text-primary mb-1">Running audit on acme.com&hellip;</div>
+            <div class="text-[0.8rem] text-text-tertiary">Started <span id="run-elapsed">0s</span> ago</div>
+          </div>
+
+          <div class="mb-6">
+            <div class="progress-bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="Audit progress">
+              <div class="progress-bar__fill" id="progress-fill" style="width: 0%"></div>
+            </div>
+            <div class="text-xs text-text-tertiary tabular-nums text-right" id="progress-label">0%</div>
+          </div>
+
+          <div aria-live="polite" id="suite-status-live">
+
+            <!-- Accessibility -->
+            <div class="mb-2">
+              <button class="flex items-center gap-2 px-3 py-2.5 bg-elevated rounded-sm cursor-pointer font-body w-full text-left text-text-primary text-[0.85rem] border-none" aria-expanded="true" data-suite="a11y">
+                <span class="w-[18px] text-center shrink-0" id="icon-a11y">&#9675;</span>
+                <span class="flex-1 font-medium">Accessibility</span>
+                <span class="text-xs text-text-tertiary tabular-nums" id="progress-a11y">0/12 pages</span>
+                <span class="text-[0.7rem] text-text-tertiary tabular-nums min-w-9 text-right" id="time-a11y"></span>
+              </button>
+              <div class="pt-1 pb-1 pl-8">
+                <div class="flex items-center gap-2 py-1 text-[0.8rem] text-text-secondary"><span class="w-4 text-center shrink-0 text-[0.7rem]" id="sub-wcag">&#9675;</span> WCAG audit</div>
+                <div class="flex items-center gap-2 py-1 text-[0.8rem] text-text-secondary"><span class="w-4 text-center shrink-0 text-[0.7rem]" id="sub-keyboard">&#9675;</span> Keyboard navigation</div>
+                <div class="flex items-center gap-2 py-1 text-[0.8rem] text-text-secondary"><span class="w-4 text-center shrink-0 text-[0.7rem]" id="sub-forms">&#9675;</span> Forms validation</div>
+                <div class="flex items-center gap-2 py-1 text-[0.8rem] text-text-secondary"><span class="w-4 text-center shrink-0 text-[0.7rem]" id="sub-landmarks">&#9675;</span> Landmarks</div>
+              </div>
+            </div>
+
+            <!-- Functionality -->
+            <div class="mb-2">
+              <button class="flex items-center gap-2 px-3 py-2.5 bg-elevated rounded-sm cursor-pointer font-body w-full text-left text-text-primary text-[0.85rem] border-none" aria-expanded="false" data-suite="func">
+                <span class="w-[18px] text-center shrink-0" id="icon-func">&#9675;</span>
+                <span class="flex-1 font-medium">Functionality</span>
+                <span class="text-xs text-text-tertiary tabular-nums" id="progress-func">0/12 pages</span>
+                <span class="text-[0.7rem] text-text-tertiary tabular-nums min-w-9 text-right" id="time-func"></span>
+              </button>
+              <div class="pt-1 pb-1 pl-8" style="display:none;">
+                <div class="flex items-center gap-2 py-1 text-[0.8rem] text-text-secondary"><span class="w-4 text-center shrink-0 text-[0.7rem]" id="sub-links">&#9675;</span> Internal links</div>
+                <div class="flex items-center gap-2 py-1 text-[0.8rem] text-text-secondary"><span class="w-4 text-center shrink-0 text-[0.7rem]" id="sub-smoke">&#9675;</span> Interactive smoke</div>
+                <div class="flex items-center gap-2 py-1 text-[0.8rem] text-text-secondary"><span class="w-4 text-center shrink-0 text-[0.7rem]" id="sub-infra">&#9675;</span> Infrastructure</div>
+              </div>
+            </div>
+
+            <!-- Responsive -->
+            <div class="mb-2">
+              <button class="flex items-center gap-2 px-3 py-2.5 bg-elevated rounded-sm cursor-pointer font-body w-full text-left text-text-primary text-[0.85rem] border-none" aria-expanded="false" data-suite="resp">
+                <span class="w-[18px] text-center shrink-0" id="icon-resp">&#9675;</span>
+                <span class="flex-1 font-medium">Responsive</span>
+                <span class="text-xs text-text-tertiary tabular-nums" id="progress-resp">queued</span>
+                <span class="text-[0.7rem] text-text-tertiary tabular-nums min-w-9 text-right" id="time-resp"></span>
+              </button>
+            </div>
+
+            <!-- Visual -->
+            <div class="mb-2">
+              <button class="flex items-center gap-2 px-3 py-2.5 bg-elevated rounded-sm cursor-pointer font-body w-full text-left text-text-primary text-[0.85rem] border-none" aria-expanded="false" data-suite="visual">
+                <span class="w-[18px] text-center shrink-0" id="icon-visual">&#9675;</span>
+                <span class="flex-1 font-medium">Visual Regression</span>
+                <span class="text-xs text-text-tertiary tabular-nums" id="progress-visual">queued</span>
+                <span class="text-[0.7rem] text-text-tertiary tabular-nums min-w-9 text-right" id="time-visual"></span>
+              </button>
+            </div>
+
+          </div>
+
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-top:1.5rem;">
+            <button class="btn btn--secondary btn--sm" id="btn-show-log">Show Log</button>
+            <button class="btn btn--danger btn--sm" id="btn-cancel-run">Cancel Run</button>
+          </div>
+
+          <div class="bg-deep border border-border-subtle rounded-sm px-4 py-3 font-mono text-xs text-text-tertiary max-h-[200px] overflow-y-auto leading-relaxed hidden [&.open]:block" id="log-viewer">
+            <div>[06:00:01] Starting accessibility suite&hellip;</div>
+            <div>[06:00:02] Running WCAG audit on / (homepage)</div>
+            <div>[06:00:04] Running WCAG audit on /about</div>
+            <div>[06:00:06] Running WCAG audit on /services</div>
+          </div>
+        </div><!-- /view-live-run -->
+
+      </main>
+
+    </div><!-- /flex body -->
+
+  </div><!-- /flex app shell -->
+
+  <!-- ==================================================================== -->
+  <!-- WIZARD OVERLAY                                                       -->
+  <!-- ==================================================================== -->
+  <div class="wizard-scrim" id="wizard-scrim"></div>
+  <div class="wizard-panel" id="wizard-panel" role="dialog" aria-modal="true" aria-labelledby="wizard-title" aria-hidden="true">
+
+    <!-- Step 1: Pick site -->
+    <div id="wizard-step-1">
+      <div class="px-6 pt-6">
+        <div class="font-display text-[1.3rem] text-text-primary mb-1" id="wizard-title">Run Audit</div>
+        <div class="text-xs text-text-tertiary">Step 1 of 2</div>
+      </div>
+      <div class="flex-1 overflow-y-auto px-6 py-5 overscroll-contain">
+        <label for="wizard-search" class="sr-only">Search sites</label>
+        <input type="search" id="wizard-search" class="w-full px-3.5 py-2.5 bg-elevated border border-border-subtle rounded-sm text-text-primary font-body text-[0.85rem] mb-4 transition-all duration-150 placeholder:text-text-tertiary focus:border-gold-muted" placeholder="Search sites&hellip;" aria-label="Search sites" />
+
+        <div class="mb-3">
+          <div class="text-[0.6rem] font-semibold uppercase tracking-[0.08em] text-text-tertiary py-1 mb-1">Acme Corp</div>
+          <div class="wizard-site-row selected" data-wizard-site="acme" tabindex="0">
+            <span class="health-dot health-dot--green"></span>
+            <span class="text-[0.85rem] text-text-primary">acme.com</span>
+            <span class="text-[0.7rem] text-text-tertiary ml-auto">Last: 2h ago</span>
+          </div>
+          <div class="wizard-site-row" data-wizard-site="blog-acme" tabindex="0">
+            <span class="health-dot health-dot--yellow"></span>
+            <span class="text-[0.85rem] text-text-primary">blog.acme.com</span>
+            <span class="text-[0.7rem] text-text-tertiary ml-auto">Last: 1d ago</span>
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <div class="text-[0.6rem] font-semibold uppercase tracking-[0.08em] text-text-tertiary py-1 mb-1">Bella Design</div>
+          <div class="wizard-site-row" data-wizard-site="bella" tabindex="0">
+            <span class="health-dot health-dot--green"></span>
+            <span class="text-[0.85rem] text-text-primary">belladesign.co</span>
+            <span class="text-[0.7rem] text-text-tertiary ml-auto">Last: 5h ago</span>
+          </div>
+          <div class="wizard-site-row" data-wizard-site="shop-bella" tabindex="0">
+            <span class="health-dot health-dot--red"></span>
+            <span class="text-[0.85rem] text-text-primary">shop.bella.co</span>
+            <span class="text-[0.7rem] text-text-tertiary ml-auto">Last: 3d ago</span>
+          </div>
+        </div>
+
+        <button class="flex items-center justify-center gap-1.5 py-3 border border-dashed border-border-default rounded-sm text-text-tertiary text-[0.8rem] cursor-pointer bg-transparent w-full font-body mt-2 transition-all duration-150 hover:border-gold-muted hover:text-gold">+ Add new site</button>
+      </div>
+      <div class="px-6 py-4 border-t border-border-subtle flex items-center justify-between">
+        <span></span>
+        <button class="btn btn--primary btn--sm" id="btn-wizard-next" disabled>Choose Suites</button>
+      </div>
+    </div>
+
+    <!-- Step 2: Choose suites -->
+    <div id="wizard-step-2" style="display:none;">
+      <div class="px-6 pt-6">
+        <div class="font-display text-[1.3rem] text-text-primary mb-1">acme.com</div>
+        <div class="text-xs text-text-tertiary">Step 2 of 2</div>
+      </div>
+      <div class="flex-1 overflow-y-auto px-6 py-5 overscroll-contain">
+        <h3 style="margin-bottom: 0.25rem;">What do you want to test?</h3>
+        <p style="font-size: 0.8rem; margin-bottom: 1rem;">
+          <a href="#" id="btn-select-all" style="font-size: 0.75rem;">Select All</a>
+          &middot;
+          <a href="#" id="btn-deselect-all" style="font-size: 0.75rem;">Deselect All</a>
+        </p>
+
+        <div class="grid grid-cols-2 gap-2.5 max-md:grid-cols-1">
+          <button class="suite-toggle suite-toggle--accessibility" aria-pressed="true" data-suite="a11y">
+            <span class="text-[0.85rem] font-semibold">Accessibility</span>
+            <span class="text-[0.7rem] text-text-tertiary leading-snug">WCAG, keyboard, forms, landmarks</span>
+          </button>
+          <button class="suite-toggle suite-toggle--functionality" aria-pressed="true" data-suite="func">
+            <span class="text-[0.85rem] font-semibold">Functionality</span>
+            <span class="text-[0.7rem] text-text-tertiary leading-snug">Links, console, infrastructure</span>
+          </button>
+          <button class="suite-toggle suite-toggle--responsive" aria-pressed="false" data-suite="resp">
+            <span class="text-[0.85rem] font-semibold">Responsive</span>
+            <span class="text-[0.7rem] text-text-tertiary leading-snug">Layout across viewports</span>
+          </button>
+          <button class="suite-toggle suite-toggle--visual" aria-pressed="false" data-suite="visual">
+            <span class="text-[0.85rem] font-semibold">Visual Regression</span>
+            <span class="text-[0.7rem] text-text-tertiary leading-snug">Pixel diffs vs baseline</span>
+          </button>
+        </div>
+
+        <div class="flex items-center gap-3 mt-4">
+          <span class="text-[0.8rem] font-medium text-text-secondary">Pages</span>
+          <select class="form-select" aria-label="Pages to test">
+            <option>All (12)</option>
+            <option>Homepage only</option>
+            <option>Top 5</option>
+            <option>Custom&hellip;</option>
+          </select>
+        </div>
+      </div>
+      <div class="px-6 py-4 border-t border-border-subtle flex items-center justify-between">
+        <button class="btn btn--secondary btn--sm" id="btn-wizard-back">&larr; Back</button>
+        <button class="btn btn--primary btn--sm" id="btn-wizard-run">Run Audit</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ==================================================================== -->
+  <!-- CONFIRMATION DIALOG                                                  -->
+  <!-- ==================================================================== -->
+  <div class="confirm-dialog" id="confirm-cancel" role="dialog" aria-modal="true" aria-labelledby="confirm-cancel-title" aria-hidden="true">
+    <div class="absolute inset-0 bg-black/60"></div>
+    <div class="relative bg-primary border border-border-default rounded-lg p-6 max-w-[400px] w-[90%] shadow-lg">
+      <div class="font-body text-base font-semibold text-text-primary mb-2" id="confirm-cancel-title">Cancel the running audit?</div>
+      <div class="text-[0.85rem] text-text-secondary mb-5">The audit on acme.com will be stopped. Any partial results will be discarded.</div>
+      <div class="flex justify-end gap-2">
+        <button class="btn btn--secondary btn--sm" id="btn-confirm-keep">Keep Running</button>
+        <button class="btn btn--danger btn--sm" id="btn-confirm-cancel">Cancel Audit</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/app.js"></script>
+</body>
+</html>

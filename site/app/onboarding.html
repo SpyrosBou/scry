@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#0a0e1a" />
+  <title>Scry &mdash; Welcome</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles/app.css" />
+</head>
+<body>
+
+  <div class="flex flex-col items-center justify-center min-h-screen p-8 relative overflow-hidden">
+
+    <!-- Atmospheric background (same as landing page hero) -->
+    <div class="bg-mesh" aria-hidden="true"></div>
+    <div class="bg-noise" aria-hidden="true">
+      <svg><filter id="noise"><feTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="3" stitchTiles="stitch"/></filter><rect width="100%" height="100%" filter="url(#noise)"/></svg>
+    </div>
+    <div class="bg-orb bg-orb--gold" aria-hidden="true"></div>
+    <div class="bg-orb bg-orb--cyan" aria-hidden="true"></div>
+
+    <!-- Logo -->
+    <div class="font-display italic text-[1.8rem] text-text-primary mb-8">Scry</div>
+
+    <!-- Card -->
+    <div class="onboarding-card">
+
+      <!-- Title -->
+      <div class="font-display text-[1.5rem] text-text-primary mb-2 text-center">Welcome to Scry</div>
+      <div class="text-[0.9rem] text-text-secondary text-center mb-8">Let&rsquo;s audit your first site.</div>
+
+      <!-- Progress steps -->
+      <div class="flex items-center justify-center gap-3 mb-8">
+        <span class="onboarding__step-dot size-7 rounded-full border-[1.5px] border-border-default flex items-center justify-center text-[0.7rem] font-semibold text-text-tertiary font-display [&.active]:border-gold [&.active]:text-gold [&.active]:bg-gold-bg [&.done]:border-gold [&.done]:text-gold [&.done]:bg-gold-bg active">1</span>
+        <span class="w-[30px] h-px bg-border-default"></span>
+        <span class="onboarding__step-dot size-7 rounded-full border-[1.5px] border-border-default flex items-center justify-center text-[0.7rem] font-semibold text-text-tertiary font-display [&.active]:border-gold [&.active]:text-gold [&.active]:bg-gold-bg [&.done]:border-gold [&.done]:text-gold [&.done]:bg-gold-bg">2</span>
+        <span class="w-[30px] h-px bg-border-default"></span>
+        <span class="onboarding__step-dot size-7 rounded-full border-[1.5px] border-border-default flex items-center justify-center text-[0.7rem] font-semibold text-text-tertiary font-display [&.active]:border-gold [&.active]:text-gold [&.active]:bg-gold-bg [&.done]:border-gold [&.done]:text-gold [&.done]:bg-gold-bg">3</span>
+      </div>
+
+      <!-- Step 1: Create project -->
+      <div class="onboarding__step-content" id="onboard-step-1">
+        <label for="onboard-project" class="block text-[0.85rem] font-medium text-text-primary mb-2">
+          What&rsquo;s your first project called?
+        </label>
+        <input type="text" id="onboard-project" class="form-input w-full mb-4" placeholder="e.g., Acme Corp&hellip;" autocomplete="organization" />
+        <button class="btn btn--primary w-full" onclick="goToOnboardingStep(2)">Continue</button>
+      </div>
+
+      <!-- Step 2: Add site -->
+      <div class="onboarding__step-content" id="onboard-step-2" style="display:none;">
+        <label for="onboard-url" class="block text-[0.85rem] font-medium text-text-primary mb-2">
+          Site URL
+        </label>
+        <input type="url" id="onboard-url" class="form-input w-full mb-2" placeholder="https://&hellip;" autocomplete="url" />
+        <p class="text-[0.8rem] text-text-tertiary mb-1" id="discovery-count">
+          We&rsquo;ll discover your pages automatically from your sitemap.
+        </p>
+        <button class="btn btn--primary w-full" id="btn-onboard-add-site" onclick="simulateDiscovery()">Add Site</button>
+      </div>
+
+      <!-- Step 3: Choose suites & run -->
+      <div class="onboarding__step-content" id="onboard-step-3" style="display:none;">
+        <p class="text-[0.85rem] text-text-primary font-medium mb-3">
+          Choose your test suites
+        </p>
+        <div class="grid grid-cols-2 gap-2.5 mb-4">
+          <button class="suite-toggle suite-toggle--accessibility" aria-pressed="true">
+            <span class="suite-toggle__name">Accessibility</span>
+            <span class="suite-toggle__desc">WCAG, keyboard, forms</span>
+          </button>
+          <button class="suite-toggle suite-toggle--functionality" aria-pressed="true">
+            <span class="suite-toggle__name">Functionality</span>
+            <span class="suite-toggle__desc">Links, console, health</span>
+          </button>
+          <button class="suite-toggle suite-toggle--responsive" aria-pressed="true">
+            <span class="suite-toggle__name">Responsive</span>
+            <span class="suite-toggle__desc">Layout, viewports</span>
+          </button>
+          <button class="suite-toggle suite-toggle--visual" aria-pressed="true">
+            <span class="suite-toggle__name">Visual</span>
+            <span class="suite-toggle__desc">Pixel diffs, baselines</span>
+          </button>
+        </div>
+        <a href="dashboard.html" class="btn btn--primary w-full text-center">Run Your First Audit</a>
+      </div>
+
+      <!-- Skip -->
+      <a href="dashboard.html" class="block text-right mt-6 text-[0.8rem] text-text-tertiary no-underline transition-colors duration-150 hover:text-text-secondary">Skip for now &rarr;</a>
+
+    </div>
+
+  </div>
+
+  <script src="js/app.js"></script>
+</body>
+</html>

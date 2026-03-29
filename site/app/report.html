@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#0a0e1a" />
+  <title>Scry &mdash; Report Overview</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles/app.css" />
+</head>
+<body>
+
+  <a class="skip-link" href="#main-content">Skip to content</a>
+
+  <div class="flex flex-col h-screen">
+
+    <!-- Top bar -->
+    <header class="fixed top-0 left-0 right-0 z-100 h-[56px] px-5 flex items-center gap-4 bg-primary border-b border-border-subtle transition-all duration-300">
+      <a href="dashboard.html" class="font-display italic text-[1.35rem] text-text-primary no-underline tracking-tight mr-auto">Scry</a>
+      <nav class="flex items-center gap-1" aria-label="Primary">
+        <a href="dashboard.html" class="px-3 py-1.5 rounded-sm text-[0.85rem] font-medium text-text-secondary no-underline transition-all duration-150 hover:text-text-primary hover:bg-white/[0.04]">Dashboard</a>
+        <a href="report.html" class="px-3 py-1.5 rounded-sm text-[0.85rem] font-medium no-underline transition-all duration-150 text-gold bg-gold-bg active">Reports</a>
+      </nav>
+      <div class="flex items-center gap-2 ml-2">
+        <button class="flex items-center justify-center size-9 rounded-sm border-none bg-transparent text-text-secondary cursor-pointer transition-all duration-150 hover:bg-white/[0.06] hover:text-text-primary [&>svg]:size-[18px]" aria-label="Settings">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="10" cy="10" r="3"/><path d="M10 1.5v2M10 16.5v2M1.5 10h2M16.5 10h2M3.4 3.4l1.4 1.4M15.2 15.2l1.4 1.4M3.4 16.6l1.4-1.4M15.2 4.8l1.4-1.4"/></svg>
+        </button>
+        <button class="size-8 rounded-full bg-elevated border border-border-default cursor-pointer transition-all duration-150 hover:border-border-strong" aria-label="Account menu"></button>
+      </div>
+    </header>
+
+    <div class="flex flex-1 overflow-hidden mt-[56px]">
+
+      <!-- Sidebar -->
+      <aside class="w-[220px] min-w-[220px] h-full bg-primary border-r border-border-subtle overflow-y-auto overflow-x-hidden overscroll-contain py-3 flex flex-col" aria-label="Site navigation">
+        <ul role="tree" aria-label="Projects and sites">
+          <li role="treeitem" aria-expanded="true" tabindex="0">
+            <span class="px-4 pt-3 pb-1 text-[0.65rem] font-semibold uppercase tracking-widest text-text-tertiary font-body">Acme Corp</span>
+            <ul role="group">
+              <li role="treeitem" aria-selected="true" tabindex="-1">
+                <button class="sidebar-item active" data-site="acme">
+                  <span class="health-dot health-dot--green"></span>
+                  <span class="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">acme.com</span>
+                </button>
+              </li>
+              <li role="treeitem" aria-selected="false" tabindex="-1">
+                <button class="sidebar-item" data-site="blog-acme">
+                  <span class="health-dot health-dot--yellow"></span>
+                  <span class="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">blog.acme.com</span>
+                </button>
+              </li>
+            </ul>
+          </li>
+          <li role="treeitem" aria-expanded="true" tabindex="-1">
+            <span class="px-4 pt-3 pb-1 text-[0.65rem] font-semibold uppercase tracking-widest text-text-tertiary font-body">Bella Design</span>
+            <ul role="group">
+              <li role="treeitem" aria-selected="false" tabindex="-1">
+                <button class="sidebar-item" data-site="bella">
+                  <span class="health-dot health-dot--green"></span>
+                  <span class="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">belladesign.co</span>
+                </button>
+              </li>
+              <li role="treeitem" aria-selected="false" tabindex="-1">
+                <button class="sidebar-item" data-site="shop-bella">
+                  <span class="health-dot health-dot--red"></span>
+                  <span class="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">shop.bella.co</span>
+                </button>
+              </li>
+            </ul>
+          </li>
+        </ul>
+        <button class="flex items-center gap-1.5 px-4 py-3 mt-auto text-[0.8rem] font-medium text-gold cursor-pointer border-none bg-transparent w-full text-left font-body transition-all duration-100 hover:bg-gold-bg">+ New Project</button>
+      </aside>
+
+      <!-- Main: Report Overview -->
+      <main class="flex-1 overflow-y-auto overflow-x-hidden px-8 py-6 overscroll-contain" id="main-content">
+
+        <div class="mb-4">
+          <a href="dashboard.html" class="text-[0.8rem]">&larr; All Runs</a>
+        </div>
+
+        <!-- Run header -->
+        <div class="flex items-start justify-between mb-6">
+          <div>
+            <h1 class="mb-1">acme.com</h1>
+            <div class="flex items-center gap-2 text-[0.8rem] text-text-secondary">
+              <span>Mar 29, 2026 &middot; 6:00 AM</span>
+              <span>&middot;</span>
+              <span>12 pages</span>
+              <span>&middot;</span>
+              <span>4 suites</span>
+              <span>&middot;</span>
+              <span>2m 14s</span>
+            </div>
+          </div>
+          <button class="btn btn--secondary btn--sm">Export Report</button>
+        </div>
+
+        <!-- Score cards with status labels -->
+        <div class="grid grid-cols-4 gap-3 mb-5 max-md:grid-cols-2 max-sm:grid-cols-1">
+          <a href="report-detail.html" class="score-card score-card--functionality">
+            <div class="text-[2rem] font-bold font-body tabular-nums text-status-green leading-none mb-1">98</div>
+            <div class="text-xs text-text-secondary font-medium">Functionality</div>
+            <div class="text-[0.65rem] font-semibold uppercase tracking-wide mt-1 badge badge--ok">Pass</div>
+          </a>
+          <a href="report-detail.html#a11y" class="score-card score-card--accessibility">
+            <div class="text-[2rem] font-bold font-body tabular-nums text-status-yellow leading-none mb-1">74</div>
+            <div class="text-xs text-text-secondary font-medium">Accessibility</div>
+            <div class="text-[0.65rem] font-semibold uppercase tracking-wide mt-1 badge badge--warning">Warn</div>
+          </a>
+          <a href="report-detail.html" class="score-card score-card--responsive">
+            <div class="text-[2rem] font-bold font-body tabular-nums text-status-green leading-none mb-1">91</div>
+            <div class="text-xs text-text-secondary font-medium">Responsive</div>
+            <div class="text-[0.65rem] font-semibold uppercase tracking-wide mt-1 badge badge--ok">Pass</div>
+          </a>
+          <a href="report-detail.html" class="score-card score-card--visual">
+            <div class="text-[2rem] font-bold font-body tabular-nums text-status-green leading-none mb-1">100</div>
+            <div class="text-xs text-text-secondary font-medium">Visual</div>
+            <div class="text-[0.65rem] font-semibold uppercase tracking-wide mt-1 badge badge--ok">Pass</div>
+          </a>
+        </div>
+
+        <!-- Findings -->
+        <h2 class="text-[1.1rem] mb-3">Findings</h2>
+
+        <!-- Blockers -->
+        <div class="mb-4">
+          <button class="findings-section__header" aria-expanded="true">
+            <span class="health-dot health-dot--red"></span>
+            <span>Blockers</span>
+            <span class="text-[0.7rem] font-semibold tabular-nums badge badge--error">3</span>
+            <span class="findings-section__chevron">&#9654;</span>
+          </button>
+          <div class="findings-section__body">
+            <a href="report-detail.html#missing-alt-text" class="finding-row finding-row--blocker">
+              <span class="flex-1 text-[0.85rem] min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">Missing alt text</span>
+              <span class="text-[0.7rem] text-text-tertiary tabular-nums whitespace-nowrap">4 pages</span>
+              <span class="text-[0.6rem] badge badge--ok">A11y</span>
+            </a>
+            <a href="report-detail.html#color-contrast" class="finding-row finding-row--blocker">
+              <span class="flex-1 text-[0.85rem] min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">Color contrast ratio below 4.5:1</span>
+              <span class="text-[0.7rem] text-text-tertiary tabular-nums whitespace-nowrap">2 pages</span>
+              <span class="text-[0.6rem] badge badge--ok">A11y</span>
+            </a>
+            <a href="report-detail.html#broken-link" class="finding-row finding-row--blocker">
+              <span class="flex-1 text-[0.85rem] min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">Broken link: /old-page returns 404</span>
+              <span class="text-[0.7rem] text-text-tertiary tabular-nums whitespace-nowrap">1 page</span>
+              <span class="text-[0.6rem] badge badge--info">Func</span>
+            </a>
+          </div>
+        </div>
+
+        <!-- Warnings -->
+        <div class="mb-4">
+          <button class="findings-section__header" aria-expanded="true">
+            <span class="health-dot health-dot--yellow"></span>
+            <span>Warnings</span>
+            <span class="text-[0.7rem] font-semibold tabular-nums badge badge--warning">7</span>
+            <span class="findings-section__chevron">&#9654;</span>
+          </button>
+          <div class="findings-section__body">
+            <a href="report-detail.html" class="finding-row finding-row--warning">
+              <span class="flex-1 text-[0.85rem] min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">Heading hierarchy gaps</span>
+              <span class="text-[0.7rem] text-text-tertiary tabular-nums whitespace-nowrap">3 pages</span>
+              <span class="text-[0.6rem] badge badge--ok">A11y</span>
+            </a>
+            <a href="report-detail.html" class="finding-row finding-row--warning">
+              <span class="flex-1 text-[0.85rem] min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">Missing form labels</span>
+              <span class="text-[0.7rem] text-text-tertiary tabular-nums whitespace-nowrap">2 pages</span>
+              <span class="text-[0.6rem] badge badge--ok">A11y</span>
+            </a>
+            <a href="report-detail.html" class="finding-row finding-row--warning">
+              <span class="flex-1 text-[0.85rem] min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">Layout shift on tablet viewport</span>
+              <span class="text-[0.7rem] text-text-tertiary tabular-nums whitespace-nowrap">1 page</span>
+              <span class="text-[0.6rem] badge badge--warning">Resp</span>
+            </a>
+            <div class="px-3 py-1.5 text-[0.8rem] text-text-tertiary">
+              + 4 more warnings&hellip;
+            </div>
+          </div>
+        </div>
+
+        <!-- Passed -->
+        <div class="mb-4">
+          <button class="findings-section__header" aria-expanded="false">
+            <span class="health-dot health-dot--green"></span>
+            <span>Passed</span>
+            <span class="text-[0.7rem] font-semibold tabular-nums badge badge--ok">12</span>
+            <span class="findings-section__chevron">&#9654;</span>
+          </button>
+          <div class="findings-section__body" style="display:none;">
+            <div class="finding-row finding-row--passed">
+              <span class="flex-1 text-[0.85rem] min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">All internal links resolve</span>
+            </div>
+            <div class="finding-row finding-row--passed">
+              <span class="flex-1 text-[0.85rem] min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">No console errors detected</span>
+            </div>
+            <div class="finding-row finding-row--passed">
+              <span class="flex-1 text-[0.85rem] min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">Visual baseline match across all viewports</span>
+            </div>
+            <div class="px-3 py-1.5 text-[0.8rem] text-text-tertiary">
+              + 9 more passed&hellip;
+            </div>
+          </div>
+        </div>
+
+        <!-- Navigation -->
+        <div class="flex justify-between mt-6">
+          <a href="dashboard.html" class="text-[0.85rem]">&larr; All Runs</a>
+          <a href="report-detail.html" class="btn btn--ghost text-[0.85rem]">View Full Report</a>
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+  <script src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,110 @@
+/* ---------------------------------------------------------------------------
+ * Scry design tokens — maps to Tailwind v4 @theme directive.
+ * All values become utility classes (e.g., bg-deep, text-gold, font-display).
+ * ------------------------------------------------------------------------ */
+
+@theme {
+  /* -- Colors: Backgrounds -- */
+  --color-deep: #0a0e1a;
+  --color-primary: #0f1629;
+  --color-elevated: #151d35;
+  --color-surface: #1a2340;
+  --color-subtle: #1e2a4a;
+
+  /* -- Colors: Text -- */
+  --color-text-primary: #e8e6e1;
+  --color-text-secondary: #9ca3b4;
+  --color-text-tertiary: #8891a0;
+  --color-text-inverse: #0a0e1a;
+
+  /* -- Colors: Gold accent -- */
+  --color-gold: #d4a574;
+  --color-gold-light: #f0c987;
+  --color-gold-muted: #a67c52;
+  --color-gold-glow: rgba(212, 165, 116, 0.15);
+  --color-gold-bg: rgba(212, 165, 116, 0.08);
+
+  /* -- Colors: Cyan accent -- */
+  --color-cyan: #4ecdc4;
+  --color-cyan-light: #7eddd6;
+  --color-cyan-muted: #2a8f89;
+  --color-cyan-glow: rgba(78, 205, 196, 0.12);
+  --color-cyan-bg: rgba(78, 205, 196, 0.06);
+
+  /* -- Colors: Solarized status -- */
+  --color-status-blue: #268bd2;
+  --color-status-yellow: #b58900;
+  --color-status-green: #859900;
+  --color-status-red: #dc322f;
+
+  /* -- Colors: Borders -- */
+  --color-border-subtle: rgba(255, 255, 255, 0.06);
+  --color-border-default: rgba(255, 255, 255, 0.10);
+  --color-border-strong: rgba(255, 255, 255, 0.16);
+  --color-border-gold: rgba(212, 165, 116, 0.25);
+
+  /* -- Typography -- */
+  --font-display: 'Instrument Serif', Georgia, 'Times New Roman', serif;
+  --font-body: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+
+  /* -- Spacing -- */
+  --spacing-section: clamp(4rem, 8vw, 8rem);
+
+  /* -- Shadows -- */
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.5);
+  --shadow-glow: 0 0 40px rgba(212, 165, 116, 0.08);
+
+  /* -- Radius -- */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
+
+  /* -- Layout -- */
+  --width-content: 1200px;
+  --width-sidebar: 220px;
+  --width-wizard: 480px;
+  --height-topbar: 56px;
+
+  /* -- Animations -- */
+  --animate-pulse-dot: pulse-dot 1.5s ease-in-out infinite;
+  --animate-spin: spin 0.6s linear infinite;
+  --animate-shimmer: shimmer 1.5s ease-in-out;
+  --animate-mesh-drift: mesh-drift 20s ease-in-out infinite;
+  --animate-orb-float-1: orb-float-1 18s ease-in-out infinite;
+  --animate-orb-float-2: orb-float-2 22s ease-in-out infinite;
+
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(1.3); }
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  @keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+
+  @keyframes mesh-drift {
+    0% { transform: scale(1) translate(0, 0); }
+    33% { transform: scale(1.05) translate(-2%, 1%); }
+    66% { transform: scale(0.98) translate(1%, -1%); }
+    100% { transform: scale(1) translate(0, 0); }
+  }
+
+  @keyframes orb-float-1 {
+    0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.6; }
+    50% { transform: translate(30px, -20px) scale(1.1); opacity: 0.8; }
+  }
+
+  @keyframes orb-float-2 {
+    0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.4; }
+    50% { transform: translate(-25px, 15px) scale(1.05); opacity: 0.6; }
+  }
+}

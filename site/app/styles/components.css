@@ -1,0 +1,295 @@
+/* ---------------------------------------------------------------------------
+ * Component layer: reusable UI patterns that can't be expressed as pure
+ * utility classes without excessive repetition.
+ *
+ * Rule: only extract a component when the same combination of utilities
+ * appears 3+ times across files. Prefer utilities in markup first.
+ * ------------------------------------------------------------------------ */
+
+@layer components {
+
+  /* -- Skip link -- */
+  .skip-link {
+    @apply absolute -top-full left-4 z-[1000] rounded-sm bg-gold px-5 py-3 font-semibold text-text-inverse transition-all;
+    &:focus { @apply top-4; }
+  }
+
+  /* -- Buttons -- */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-md font-body text-sm font-semibold leading-none no-underline cursor-pointer transition-all duration-200;
+    min-height: 44px;
+    padding: 0.75rem 1.5rem;
+    border: none;
+    &:hover { transform: translateY(-2px); }
+    &:active { transform: translateY(0); }
+  }
+
+  .btn--primary {
+    @apply bg-gold text-text-inverse;
+    box-shadow: var(--shadow-sm), 0 0 24px var(--color-gold-glow);
+    &:hover {
+      @apply bg-gold-light text-text-inverse;
+      box-shadow: var(--shadow-md), 0 0 40px var(--color-gold-glow);
+    }
+    &:disabled { @apply opacity-40 cursor-not-allowed; transform: none; box-shadow: none; }
+  }
+
+  .btn--secondary {
+    @apply bg-transparent text-text-secondary border border-border-default;
+    &:hover { @apply text-text-primary border-border-strong bg-white/[0.03]; }
+  }
+
+  .btn--ghost {
+    @apply bg-transparent text-cyan px-0 py-3;
+    &:hover { @apply text-cyan-light; }
+    &::after { content: '\2192'; @apply transition-transform duration-200; }
+    &:hover::after { transform: translateX(4px); }
+  }
+
+  .btn--danger {
+    @apply bg-transparent text-status-red;
+    border: 1px solid rgba(220, 50, 47, 0.3);
+    &:hover { border-color: var(--color-status-red); background: rgba(220, 50, 47, 0.1); }
+  }
+
+  .btn--sm {
+    @apply text-xs;
+    min-height: 36px;
+    padding: 0.5rem 1rem;
+  }
+
+  /* -- Badge / pill -- */
+  .badge {
+    @apply inline-flex items-center gap-1.5 rounded-[4px] px-2 py-0.5 font-mono text-[0.65rem] font-semibold uppercase leading-none tracking-wide;
+  }
+  .badge--error   { background: rgba(220, 50, 47, 0.15); @apply text-status-red; }
+  .badge--warning { background: rgba(181, 137, 0, 0.15); @apply text-status-yellow; }
+  .badge--ok      { background: rgba(133, 153, 0, 0.15); @apply text-status-green; }
+  .badge--info    { background: rgba(38, 139, 210, 0.15); @apply text-status-blue; }
+
+  /* -- Health dots -- */
+  .health-dot {
+    @apply size-2 shrink-0 rounded-full;
+  }
+  .health-dot--green   { @apply bg-status-green; }
+  .health-dot--yellow  { @apply bg-status-yellow; }
+  .health-dot--red     { @apply bg-status-red; }
+  .health-dot--none    { @apply bg-text-tertiary opacity-40; }
+  .health-dot--running { @apply bg-gold animate-pulse-dot; }
+
+  /* -- Score cards -- */
+  .score-card {
+    @apply block rounded-md bg-elevated border border-border-subtle p-4 no-underline transition-all duration-200;
+    border-top: 3px solid var(--color-border-subtle);
+    &:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+  }
+  .score-card--functionality { border-top-color: var(--color-status-blue); }
+  .score-card--accessibility { border-top-color: var(--color-status-green); }
+  .score-card--responsive    { border-top-color: var(--color-status-yellow); }
+  .score-card--visual        { border-top-color: var(--color-status-red); }
+
+  /* -- Sidebar tree items -- */
+  .sidebar-item {
+    @apply flex items-center gap-2 w-full text-left py-1.5 px-4 text-sm text-text-secondary font-body bg-transparent border-none cursor-pointer no-underline transition-all duration-100;
+    min-height: 36px;
+    border-left: 3px solid transparent;
+    &:hover { @apply bg-white/[0.03] text-text-primary; }
+    &[aria-selected="true"], &.active {
+      background: var(--color-gold-bg);
+      @apply text-text-primary;
+      border-left-color: var(--color-gold);
+    }
+  }
+
+  /* -- Wizard panel -- */
+  .wizard-scrim {
+    @apply fixed inset-0 z-[200] bg-black/50 opacity-0 invisible transition-all duration-250;
+    &.open { @apply opacity-100 visible; }
+  }
+
+  .wizard-panel {
+    @apply fixed top-0 right-0 bottom-0 z-[201] flex flex-col bg-primary border-l border-border-subtle opacity-0 transition-all duration-300;
+    width: var(--width-wizard);
+    max-width: 100vw;
+    transform: translateX(100%);
+    overscroll-behavior: contain;
+    &.open { @apply opacity-100; transform: translateX(0); }
+  }
+
+  /* -- Wizard site row -- */
+  .wizard-site-row {
+    @apply flex items-center gap-2 rounded-sm px-3 py-2.5 cursor-pointer border border-transparent transition-colors duration-100;
+    &:hover { @apply bg-white/[0.03]; }
+    &.selected { background: var(--color-gold-bg); border-color: var(--color-border-gold); }
+  }
+
+  /* -- Suite toggle -- */
+  .suite-toggle {
+    @apply flex flex-col gap-1.5 rounded-md bg-elevated border border-border-subtle p-3.5 cursor-pointer text-left font-body text-text-primary transition-all duration-150;
+    border-left: 3px solid var(--color-border-subtle);
+    &[aria-pressed="true"] { background: var(--color-gold-bg); border-color: var(--color-border-gold); }
+  }
+  .suite-toggle--functionality { border-left-color: var(--color-status-blue); }
+  .suite-toggle--accessibility { border-left-color: var(--color-status-green); }
+  .suite-toggle--responsive    { border-left-color: var(--color-status-yellow); }
+  .suite-toggle--visual        { border-left-color: var(--color-status-red); }
+
+  /* -- Progress bar -- */
+  .progress-bar {
+    @apply h-2 rounded-full bg-elevated overflow-hidden;
+  }
+  .progress-bar__fill {
+    @apply h-full rounded-full bg-gold transition-[width] duration-400;
+    &--complete { @apply bg-status-green; }
+  }
+
+  /* -- Run row -- */
+  .run-row {
+    @apply flex items-center gap-3 rounded-md bg-elevated border border-border-subtle px-4 py-3 mb-2 no-underline text-text-primary transition-all duration-150;
+    &:hover { transform: translateY(-1px); box-shadow: var(--shadow-sm); }
+  }
+
+  /* -- Code block -- */
+  .code-block {
+    @apply block rounded-sm bg-deep border border-border-subtle px-4 py-3 font-mono text-sm text-text-secondary overflow-x-auto leading-relaxed;
+  }
+
+  /* -- Finding accordion -- */
+  .finding-accordion {
+    @apply rounded-md border border-border-subtle mb-2 overflow-hidden;
+  }
+
+  .finding-accordion__trigger {
+    @apply flex items-center gap-3 w-full text-left bg-elevated px-4 py-3 border-none cursor-pointer font-body text-sm text-text-primary transition-colors duration-100;
+    &:hover { @apply bg-surface; }
+  }
+  .finding-accordion__trigger[aria-expanded="true"] .finding-accordion__chevron {
+    transform: rotate(90deg);
+  }
+
+  .finding-accordion__body {
+    @apply hidden bg-primary border-t border-border-subtle p-4;
+  }
+  .finding-accordion__trigger[aria-expanded="true"] + .finding-accordion__body {
+    @apply block;
+  }
+
+  /* -- Findings section -- */
+  .findings-section__header {
+    @apply flex items-center gap-2 py-2 text-sm font-semibold text-text-primary cursor-pointer border-none bg-transparent w-full text-left font-body;
+  }
+  .findings-section__header[aria-expanded="true"] .findings-section__chevron {
+    transform: rotate(90deg);
+  }
+  .findings-section__body {
+    @apply hidden pl-1;
+  }
+  .findings-section__header[aria-expanded="true"] + .findings-section__body {
+    @apply block;
+  }
+
+  /* -- Finding row -- */
+  .finding-row {
+    @apply flex items-center gap-3 rounded-r-sm px-3 py-2.5 cursor-pointer no-underline text-text-primary transition-colors duration-100;
+    border-left: 3px solid transparent;
+    &:hover { @apply bg-white/[0.03]; }
+    &--blocker  { border-left-color: var(--color-status-red); }
+    &--warning  { border-left-color: var(--color-status-yellow); }
+    &--passed   { border-left-color: var(--color-status-green); }
+  }
+
+  /* -- Settings section -- */
+  .settings-section {
+    @apply rounded-md bg-elevated border border-border-subtle p-5 mb-4;
+    &--danger { border-left: 3px solid var(--color-status-red); }
+  }
+
+  /* -- Form controls -- */
+  .form-input {
+    @apply rounded-sm bg-elevated border border-border-subtle px-3 py-2 font-body text-sm text-text-primary transition-colors duration-150;
+    &::placeholder { @apply text-text-tertiary; }
+    &:focus { border-color: var(--color-gold-muted); }
+  }
+
+  .form-select {
+    @apply rounded-sm bg-elevated border border-border-subtle px-3 py-2 pr-8 font-body text-sm text-text-primary cursor-pointer appearance-none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%239ca3b4' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.6rem center;
+    background-color: var(--color-elevated);
+    &:focus { border-color: var(--color-gold-muted); }
+  }
+
+  .form-toggle {
+    @apply relative w-10 h-[22px] rounded-[11px] bg-surface border border-border-subtle cursor-pointer transition-colors duration-200;
+    &::after {
+      content: '';
+      @apply absolute top-0.5 left-0.5 size-4 rounded-full bg-text-tertiary transition-all duration-200;
+    }
+    &.active {
+      @apply bg-gold border-gold;
+      &::after { @apply bg-text-inverse; transform: translateX(18px); }
+    }
+  }
+
+  /* -- Confirm dialog -- */
+  .confirm-dialog {
+    @apply fixed inset-0 z-[300] flex items-center justify-center opacity-0 invisible transition-all duration-200;
+    &.open { @apply opacity-100 visible; }
+  }
+
+  /* -- Empty state -- */
+  .empty-state {
+    @apply flex flex-col items-center justify-center text-center px-8 py-12;
+    min-height: 300px;
+  }
+
+  /* -- Onboarding card -- */
+  .onboarding-card {
+    @apply relative z-10 w-full rounded-lg bg-primary border border-border-subtle p-10;
+    max-width: 500px;
+  }
+
+  /* -- Background effects -- */
+  .bg-mesh {
+    @apply absolute inset-0 pointer-events-none animate-mesh-drift;
+    background:
+      radial-gradient(ellipse at 20% 50%, var(--color-gold-glow) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 20%, var(--color-cyan-glow) 0%, transparent 50%),
+      radial-gradient(ellipse at 50% 80%, rgba(38, 139, 210, 0.06) 0%, transparent 50%);
+  }
+
+  .bg-orb {
+    @apply absolute rounded-full pointer-events-none;
+    filter: blur(80px);
+    &--gold {
+      @apply animate-orb-float-1;
+      width: 350px; height: 350px;
+      background: var(--color-gold-glow);
+      top: 10%; left: 15%;
+    }
+    &--cyan {
+      @apply animate-orb-float-2;
+      width: 280px; height: 280px;
+      background: var(--color-cyan-glow);
+      bottom: 20%; right: 10%;
+    }
+  }
+
+  .bg-noise {
+    @apply absolute inset-0 pointer-events-none opacity-[0.035];
+    & svg { @apply size-full; }
+  }
+}
+
+/* -- Reduced motion -- */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  .bg-mesh, .bg-orb { animation: none; }
+  .wizard-panel, .wizard-scrim { transition: none; }
+  .health-dot--running { animation: none; }
+}

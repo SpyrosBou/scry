@@ -1,0 +1,16 @@
+/* ---------------------------------------------------------------------------
+ * Scry in-app styles entry point — Tailwind CSS v4.
+ *
+ * Organization:
+ *   theme.css      → @theme design tokens (colors, fonts, spacing, etc.)
+ *   base.css       → @layer base (typography, resets, global defaults)
+ *   components.css → @layer components (reusable UI patterns)
+ *
+ * Build:
+ *   npx @tailwindcss/cli -i site/app/styles/input.css -o site/app/styles/app.css
+ * ------------------------------------------------------------------------ */
+
+@import "tailwindcss";
+@import "./theme.css";
+@import "./base.css";
+@import "./components.css";

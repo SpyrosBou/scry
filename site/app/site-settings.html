@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#0a0e1a" />
+  <title>Scry &mdash; Site Settings</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles/app.css" />
+</head>
+<body>
+
+  <a class="skip-link" href="#main-content">Skip to content</a>
+
+  <div class="flex flex-col h-screen">
+    <header class="fixed top-0 inset-x-0 z-100 h-[var(--height-topbar)] px-5 flex items-center gap-4 bg-primary border-b border-border-subtle transition-all duration-300">
+      <a href="dashboard.html" class="font-display italic text-[1.35rem] text-text-primary no-underline tracking-tight mr-auto">Scry</a>
+      <nav class="flex items-center gap-1" aria-label="Primary">
+        <a href="dashboard.html" class="px-3 py-1.5 rounded-sm text-[0.85rem] font-medium text-gold bg-gold-bg no-underline transition-all duration-150 hover:text-text-primary hover:bg-white/[0.04]">Dashboard</a>
+        <a href="report.html" class="px-3 py-1.5 rounded-sm text-[0.85rem] font-medium text-text-secondary no-underline transition-all duration-150 hover:text-text-primary hover:bg-white/[0.04]">Reports</a>
+      </nav>
+      <div class="flex items-center gap-2 ml-2">
+        <button class="flex items-center justify-center size-9 rounded-sm border-none bg-transparent text-text-secondary cursor-pointer transition-all duration-150 hover:bg-white/[0.06] hover:text-text-primary [&_svg]:size-[18px]" aria-label="Settings">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="10" cy="10" r="3"/><path d="M10 1.5v2M10 16.5v2M1.5 10h2M16.5 10h2M3.4 3.4l1.4 1.4M15.2 15.2l1.4 1.4M3.4 16.6l1.4-1.4M15.2 4.8l1.4-1.4"/></svg>
+        </button>
+        <button class="size-8 rounded-full bg-elevated border border-border-default cursor-pointer transition-colors duration-150 hover:border-border-strong" aria-label="Account menu"></button>
+      </div>
+    </header>
+
+    <div class="flex flex-1 overflow-hidden mt-[var(--height-topbar)]">
+      <aside class="w-[var(--width-sidebar)] min-w-[var(--width-sidebar)] h-full bg-primary border-r border-border-subtle overflow-y-auto overflow-x-hidden overscroll-contain py-3 flex flex-col" aria-label="Site navigation">
+        <ul role="tree" aria-label="Projects and sites">
+          <li role="treeitem" aria-expanded="true" tabindex="0">
+            <span class="px-4 pt-3 pb-1 text-[0.65rem] font-semibold uppercase tracking-widest text-text-tertiary font-body">Acme Corp</span>
+            <ul role="group">
+              <li role="treeitem" aria-selected="true" tabindex="-1">
+                <button class="sidebar-item sidebar__item active"><span class="health-dot health-dot--green"></span><span class="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">acme.com</span></button>
+              </li>
+              <li role="treeitem" aria-selected="false" tabindex="-1">
+                <button class="sidebar-item sidebar__item"><span class="health-dot health-dot--yellow"></span><span class="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">blog.acme.com</span></button>
+              </li>
+            </ul>
+          </li>
+          <li role="treeitem" aria-expanded="true" tabindex="-1">
+            <span class="px-4 pt-3 pb-1 text-[0.65rem] font-semibold uppercase tracking-widest text-text-tertiary font-body">Bella Design</span>
+            <ul role="group">
+              <li role="treeitem" aria-selected="false" tabindex="-1"><button class="sidebar-item sidebar__item"><span class="health-dot health-dot--green"></span><span class="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">belladesign.co</span></button></li>
+              <li role="treeitem" aria-selected="false" tabindex="-1"><button class="sidebar-item sidebar__item"><span class="health-dot health-dot--red"></span><span class="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">shop.bella.co</span></button></li>
+            </ul>
+          </li>
+        </ul>
+        <button class="flex items-center gap-1.5 px-4 py-3 mt-auto text-[0.8rem] font-medium text-gold cursor-pointer border-none bg-transparent w-full text-left font-body transition-colors duration-150 hover:bg-gold-bg">+ New Project</button>
+      </aside>
+
+      <main class="flex-1 overflow-y-auto overflow-x-hidden px-8 py-6 overscroll-contain" id="main-content">
+
+        <div class="mb-4">
+          <a href="dashboard.html" class="text-[0.8rem]">&larr; Back to Dashboard</a>
+        </div>
+
+        <h1 class="mb-6">acme.com &middot; Settings</h1>
+
+        <!-- General -->
+        <div class="settings-section">
+          <div class="text-[0.85rem] font-semibold text-text-primary font-body mb-4">General</div>
+          <div class="flex items-center gap-4 py-2 border-b border-border-subtle">
+            <label class="text-[0.8rem] text-text-secondary min-w-[120px] shrink-0" for="setting-url">Site URL</label>
+            <div class="text-[0.85rem] text-text-primary flex-1">
+              <input type="url" id="setting-url" class="form-input w-full max-w-xs" value="https://acme.com" />
+            </div>
+          </div>
+          <div class="flex items-center gap-4 py-2 border-b border-border-subtle">
+            <label class="text-[0.8rem] text-text-secondary min-w-[120px] shrink-0" for="setting-project">Project</label>
+            <div class="text-[0.85rem] text-text-primary flex-1">
+              <select id="setting-project" class="form-select">
+                <option selected>Acme Corp</option>
+                <option>Bella Design</option>
+                <option>Create new&hellip;</option>
+              </select>
+            </div>
+          </div>
+          <div class="flex items-center gap-4 py-2">
+            <span class="text-[0.8rem] text-text-secondary min-w-[120px] shrink-0">Pages</span>
+            <div class="text-[0.85rem] text-text-primary flex-1 flex items-center gap-3">
+              <span class="tabular-nums">12 discovered</span>
+              <button class="btn btn--secondary btn--sm">Rediscover Pages</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Scheduled Audits -->
+        <div class="settings-section">
+          <div class="text-[0.85rem] font-semibold text-text-primary font-body mb-4">Scheduled Audits</div>
+          <div class="flex items-center gap-4 py-2 border-b border-border-subtle">
+            <span class="text-[0.8rem] text-text-secondary min-w-[120px] shrink-0">Status</span>
+            <div class="text-[0.85rem] text-text-primary flex-1 flex items-center gap-3">
+              <button class="form-toggle active" aria-label="Toggle schedule" aria-pressed="true"></button>
+              <span class="text-[0.8rem] text-status-green">Active</span>
+            </div>
+          </div>
+          <div class="flex items-center gap-4 py-2 border-b border-border-subtle">
+            <label class="text-[0.8rem] text-text-secondary min-w-[120px] shrink-0" for="setting-freq">Frequency</label>
+            <div class="text-[0.85rem] text-text-primary flex-1">
+              <select id="setting-freq" class="form-select">
+                <option selected>Daily</option>
+                <option>Weekly</option>
+                <option>Monthly</option>
+                <option>Off</option>
+              </select>
+            </div>
+          </div>
+          <div class="flex items-center gap-4 py-2 border-b border-border-subtle">
+            <label class="text-[0.8rem] text-text-secondary min-w-[120px] shrink-0" for="setting-time">Time</label>
+            <div class="text-[0.85rem] text-text-primary flex-1 flex items-center gap-2">
+              <input type="time" id="setting-time" class="form-input" value="06:00" />
+              <span class="text-[0.75rem] text-text-tertiary">UTC</span>
+            </div>
+          </div>
+          <div class="flex items-center gap-4 py-2 border-b border-border-subtle">
+            <span class="text-[0.8rem] text-text-secondary min-w-[120px] shrink-0">Suites</span>
+            <div class="text-[0.85rem] text-text-primary flex-1">
+              <div class="flex flex-col gap-1.5">
+                <label class="flex items-center gap-2 text-[0.85rem] cursor-pointer">
+                  <input type="checkbox" checked /> Accessibility
+                </label>
+                <label class="flex items-center gap-2 text-[0.85rem] cursor-pointer">
+                  <input type="checkbox" checked /> Functionality
+                </label>
+                <label class="flex items-center gap-2 text-[0.85rem] cursor-pointer">
+                  <input type="checkbox" /> Responsive
+                </label>
+                <label class="flex items-center gap-2 text-[0.85rem] cursor-pointer">
+                  <input type="checkbox" /> Visual Regression
+                </label>
+              </div>
+            </div>
+          </div>
+          <div class="flex items-center gap-4 py-2">
+            <label class="text-[0.8rem] text-text-secondary min-w-[120px] shrink-0" for="setting-sched-pages">Pages</label>
+            <div class="text-[0.85rem] text-text-primary flex-1">
+              <select id="setting-sched-pages" class="form-select">
+                <option selected>All (12)</option>
+                <option>Homepage only</option>
+                <option>Top 5</option>
+              </select>
+            </div>
+          </div>
+          <div class="pt-3 text-[0.75rem] text-text-tertiary">
+            Next run: Mar 30, 2026 at 6:00 AM UTC
+          </div>
+        </div>
+
+        <!-- Visual Baselines -->
+        <div class="settings-section">
+          <div class="text-[0.85rem] font-semibold text-text-primary font-body mb-4">Visual Baselines</div>
+          <div class="flex items-center gap-4 py-2 border-b border-border-subtle">
+            <span class="text-[0.8rem] text-text-secondary min-w-[120px] shrink-0">Last updated</span>
+            <span class="text-[0.85rem] text-text-primary flex-1">Mar 25, 2026</span>
+          </div>
+          <div class="flex items-center gap-4 py-2">
+            <span class="text-[0.8rem] text-text-secondary min-w-[120px] shrink-0">Snapshots</span>
+            <span class="text-[0.85rem] text-text-primary flex-1 tabular-nums">12 pages &middot; 3 viewports &middot; 36 snapshots</span>
+          </div>
+          <div class="pt-3">
+            <button class="btn btn--secondary btn--sm" id="btn-refresh-baselines">Refresh Baselines</button>
+          </div>
+        </div>
+
+        <!-- Danger Zone -->
+        <div class="settings-section settings-section--danger">
+          <div class="text-[0.85rem] font-semibold text-status-red font-body mb-4">Danger Zone</div>
+          <div class="flex items-center justify-between">
+            <p class="text-[0.85rem] max-w-[300px]">Permanently remove this site and all its run history. This action cannot be undone.</p>
+            <button class="btn btn--danger btn--sm">Remove Site</button>
+          </div>
+        </div>
+
+        <!-- Save -->
+        <div class="flex justify-end mt-4">
+          <button class="btn btn--primary" id="btn-save-settings" disabled>Save Changes</button>
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+  <script src="js/app.js"></script>
+</body>
+</html>
