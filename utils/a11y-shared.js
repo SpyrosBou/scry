@@ -22,6 +22,11 @@ const ensureHomepageFirst = (pages = []) => {
   return unique;
 };
 
+const uniquePagesPreserveOrder = (pages = []) => {
+  const filtered = Array.isArray(pages) ? pages.filter((page) => typeof page === 'string') : [];
+  return Array.from(new Set(filtered));
+};
+
 const parseSampleSetting = (value) => {
   if (value === null || value === undefined) return null;
   if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
@@ -66,7 +71,10 @@ const resolveSampleSetting = (
 };
 
 const selectAccessibilityTestPages = (siteConfig, options = {}) => {
-  const pages = ensureHomepageFirst(siteConfig?.testPages || []);
+  const pages =
+    siteConfig?.includeHomepage === false
+      ? uniquePagesPreserveOrder(siteConfig?.testPages || [])
+      : ensureHomepageFirst(siteConfig?.testPages || []);
   const sampleSetting = resolveSampleSetting(siteConfig, options);
 
   if (sampleSetting === 'all') {

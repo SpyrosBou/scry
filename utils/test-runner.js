@@ -102,7 +102,7 @@ function normaliseSpecPattern(specInput) {
   return toPosixPath(raw);
 }
 
-function ensureHomepagePresence(pages, siteName, contextLabel = 'runtime') {
+function ensureHomepagePresence(pages, siteName, contextLabel = 'runtime', includeHomepage = true) {
   const sourceList = Array.isArray(pages) ? pages.filter((item) => typeof item === 'string') : [];
   const unique = Array.from(new Set(sourceList));
 
@@ -111,6 +111,10 @@ function ensureHomepagePresence(pages, siteName, contextLabel = 'runtime') {
       `⚠️  ${contextLabel}: ${siteName} has no testPages configured; injecting '/' to keep coverage aligned.`
     );
     return ['/'];
+  }
+
+  if (includeHomepage === false) {
+    return unique;
   }
 
   const hasRoot = unique.includes('/');
@@ -447,7 +451,8 @@ class TestRunner {
               siteConfig.testPages = ensureHomepagePresence(
                 updated,
                 siteConfig.name,
-                'sitemap discovery'
+                'sitemap discovery',
+                siteConfig.includeHomepage
               );
 
               if (added.length === 0 && removed.length === 0) {
@@ -497,7 +502,8 @@ class TestRunner {
       siteConfig.testPages = ensureHomepagePresence(
         siteConfig.testPages,
         siteConfig.name,
-        'runtime'
+        'runtime',
+        siteConfig.includeHomepage
       );
 
       appliedPageLimit = null;
