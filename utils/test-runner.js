@@ -4,7 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const http = require('http');
 const https = require('https');
-const { discoverFromSitemap } = require('./sitemap-loader');
+const { ensureHomepagePresence } = require('./site-config-utils');
 
 const RUN_MANIFEST_THRESHOLD = 8192; // bytes
 
@@ -16,48 +16,6 @@ const sanitiseForFilename = (input) =>
     .substring(0, 60) || 'site';
 
 const toPosixPath = (value) => value.split(path.sep).join('/');
-
-const trimTrailingSlash = (value) =>
-  typeof value === 'string' ? value.replace(/\/+$/, '') : value;
-
-const normaliseBaseUrlString = (value) => {
-  if (!value) return '';
-  try {
-    const parsed = new URL(value);
-    parsed.hash = '';
-    parsed.search = '';
-    if (parsed.pathname === '/') {
-      parsed.pathname = '';
-    }
-    return trimTrailingSlash(parsed.toString());
-  } catch (_error) {
-    return trimTrailingSlash(String(value));
-  }
-};
-
-const resolveUrl = (input, base) => {
-  if (!input) return null;
-  try {
-    return new URL(input);
-  } catch (_error) {
-    if (!base) return null;
-    try {
-      return new URL(input, base);
-    } catch (_error2) {
-      return null;
-    }
-  }
-};
-
-const normaliseHost = (value) =>
-  String(value || '')
-    .trim()
-    .toLowerCase();
-const stripWww = (host) => normaliseHost(host).replace(/^www\./, '');
-const hostsShareBaseLabel = (a, b) => {
-  if (!a || !b) return false;
-  return stripWww(a) === stripWww(b);
-};
 
 function normaliseSpecPattern(specInput) {
   const raw = String(specInput || '').trim();
@@ -100,35 +58,6 @@ function normaliseSpecPattern(specInput) {
   }
 
   return toPosixPath(raw);
-}
-
-function ensureHomepagePresence(pages, siteName, contextLabel = 'runtime', includeHomepage = true) {
-  const sourceList = Array.isArray(pages) ? pages.filter((item) => typeof item === 'string') : [];
-  const unique = Array.from(new Set(sourceList));
-
-  if (unique.length === 0) {
-    console.log(
-      `⚠️  ${contextLabel}: ${siteName} has no testPages configured; injecting '/' to keep coverage aligned.`
-    );
-    return ['/'];
-  }
-
-  if (includeHomepage === false) {
-    return unique;
-  }
-
-  const hasRoot = unique.includes('/');
-  if (!hasRoot) {
-    console.log(
-      `⚠️  ${contextLabel}: ${siteName} testPages missing homepage '/'; injecting for this run.`
-    );
-    unique.unshift('/');
-  } else if (unique[0] !== '/') {
-    unique.splice(unique.indexOf('/'), 1);
-    unique.unshift('/');
-  }
-
-  return unique;
 }
 
 function prepareRunManifestPayload({
@@ -217,7 +146,14 @@ class TestRunner {
       requestedSpecs,
     });
 
-    const persistence = persistManifestIfNeeded(manifest, siteName);
+    const persistence = options.dryRun
+      ? {
+          env: {
+            SITE_RUN_MANIFEST_INLINE: JSON.stringify(manifest),
+          },
+          manifestPath: null,
+        }
+      : persistManifestIfNeeded(manifest, siteName);
 
     const env = {
       SITE_TEST_PAGES: JSON.stringify(manifest.pages),
@@ -299,204 +235,48 @@ class TestRunner {
     console.log('  node run-tests.js --site=daygroup-live       # Test live production');
   }
 
+  static resolveLocalExecutionEnv(siteName, siteConfig, baseEnv = process.env) {
+    const resolvedEnv = { ...baseEnv };
+
+    if (!/\.ddev\.site|localhost|127\.0\.0\.1/.test(siteConfig.baseUrl || '')) {
+      return resolvedEnv;
+    }
+
+    if (
+      String(resolvedEnv.ENABLE_DDEV || '').toLowerCase() === 'true' &&
+      resolvedEnv.DDEV_PROJECT_PATH
+    ) {
+      console.log(
+        `🛠  --local: Using DDEV project path from env: ${resolvedEnv.DDEV_PROJECT_PATH}`
+      );
+      return resolvedEnv;
+    }
+
+    resolvedEnv.ENABLE_DDEV = 'true';
+    const inferred = this.inferDdevProjectPath(siteName, siteConfig.baseUrl);
+    if (inferred) {
+      resolvedEnv.DDEV_PROJECT_PATH = inferred;
+      console.log(`🛠  --local: Using inferred DDEV project path: ${inferred}`);
+    } else {
+      console.log(
+        'ℹ️  --local provided but unable to infer DDEV project path. You can set DDEV_PROJECT_PATH explicitly.'
+      );
+    }
+
+    return resolvedEnv;
+  }
+
   static async runTestsForSite(siteName, options = {}) {
     // Validate site exists
     let siteConfig;
     let appliedPageLimit = null;
+    let runtimeEnv = { ...process.env };
     try {
       siteConfig = SiteLoader.loadSite(siteName);
       SiteLoader.validateSiteConfig(siteConfig);
 
-      // Handle convenience flag for local DDEV sites
       if (options.local) {
-        // Always enable DDEV when --local is passed
-        process.env.ENABLE_DDEV = 'true';
-        // If a project path is not supplied, try to infer it from SITE_NAME or baseUrl
-        if (!process.env.DDEV_PROJECT_PATH) {
-          const inferred = this.inferDdevProjectPath(siteName, siteConfig.baseUrl);
-          if (inferred) {
-            process.env.DDEV_PROJECT_PATH = inferred;
-            console.log(`🛠  --local: Using inferred DDEV project path: ${inferred}`);
-          } else {
-            console.log(
-              'ℹ️  --local provided but unable to infer DDEV project path. You can set DDEV_PROJECT_PATH explicitly.'
-            );
-          }
-        } else {
-          console.log(
-            `🛠  --local: Using DDEV project path from env: ${process.env.DDEV_PROJECT_PATH}`
-          );
-        }
-      }
-
-      let createdDefaultDiscover = false;
-      let discoverySkipped = false;
-
-      if (options.discover && (!siteConfig.discover || !siteConfig.discover.strategy)) {
-        if (!siteConfig.baseUrl) {
-          console.log(
-            '⚠️  --discover requested but site config has no baseUrl; skipping sitemap discovery.'
-          );
-          discoverySkipped = true;
-        } else {
-          const defaultSitemapUrl = `${siteConfig.baseUrl.replace(/\/$/, '')}/sitemap.xml`;
-          siteConfig.discover = {
-            strategy: 'sitemap',
-            sitemapUrl: defaultSitemapUrl,
-          };
-          createdDefaultDiscover = true;
-          console.log(
-            `ℹ️  --discover: Default sitemap discovery enabled using ${defaultSitemapUrl}`
-          );
-        }
-      }
-
-      if (options.discover && !discoverySkipped) {
-        if (siteConfig.discover && siteConfig.discover.strategy === 'sitemap') {
-          try {
-            const discovered = await discoverFromSitemap(siteConfig, siteConfig.discover);
-            const discoveryMeta =
-              discovered && typeof discovered === 'object' ? discovered.meta || {} : {};
-
-            const currentBaseUrl = normaliseBaseUrlString(siteConfig.baseUrl);
-            let baseUrlUpdated = false;
-            let sitemapUrlUpdated = false;
-
-            if (discoveryMeta.hostAdjusted && discoveryMeta.resolvedBaseUrl) {
-              const resolvedBase = normaliseBaseUrlString(discoveryMeta.resolvedBaseUrl);
-              if (resolvedBase && resolvedBase !== currentBaseUrl) {
-                console.log(
-                  `ℹ️  Aligning baseUrl host from ${currentBaseUrl} to ${resolvedBase} based on sitemap discovery.`
-                );
-                siteConfig.baseUrl = resolvedBase;
-                baseUrlUpdated = true;
-              }
-            }
-
-            if (
-              discoveryMeta.hostAdjusted &&
-              discoveryMeta.resolvedHost &&
-              siteConfig.discover &&
-              siteConfig.discover.sitemapUrl
-            ) {
-              const sitemapUrlObj = resolveUrl(siteConfig.discover.sitemapUrl, siteConfig.baseUrl);
-              if (sitemapUrlObj) {
-                const previousHost = sitemapUrlObj.host;
-                if (
-                  previousHost !== discoveryMeta.resolvedHost &&
-                  hostsShareBaseLabel(previousHost, discoveryMeta.resolvedHost)
-                ) {
-                  sitemapUrlObj.host = discoveryMeta.resolvedHost;
-                  siteConfig.discover.sitemapUrl = sitemapUrlObj.toString();
-                  sitemapUrlUpdated = true;
-                  console.log(
-                    `ℹ️  Aligning sitemapUrl host from ${previousHost} to ${discoveryMeta.resolvedHost} based on sitemap discovery.`
-                  );
-                }
-              }
-            }
-
-            if (discovered.length === 0) {
-              console.log('ℹ️  Sitemap discovery returned no pages. Test list unchanged.');
-
-              if (createdDefaultDiscover) {
-                try {
-                  const sitePath = path.join(process.cwd(), 'sites', `${siteName}.json`);
-                  const raw = fs.readFileSync(sitePath, 'utf8');
-                  const parsed = JSON.parse(raw);
-                  if (!parsed.discover) {
-                    parsed.discover = { ...siteConfig.discover };
-                    fs.writeFileSync(sitePath, `${JSON.stringify(parsed, null, 2)}\n`);
-                    console.log(
-                      `📄 Added default sitemap discovery config to sites/${siteName}.json.`
-                    );
-                  }
-                } catch (writeError) {
-                  console.log(
-                    `⚠️  Unable to persist default sitemap config: ${writeError.message}`
-                  );
-                }
-              }
-
-              if (baseUrlUpdated || sitemapUrlUpdated) {
-                try {
-                  const sitePath = path.join(process.cwd(), 'sites', `${siteName}.json`);
-                  const raw = fs.readFileSync(sitePath, 'utf8');
-                  const parsed = JSON.parse(raw);
-                  if (baseUrlUpdated) {
-                    parsed.baseUrl = siteConfig.baseUrl;
-                  }
-                  if (sitemapUrlUpdated && siteConfig.discover) {
-                    parsed.discover = {
-                      ...(parsed.discover || {}),
-                      ...siteConfig.discover,
-                    };
-                  }
-                  fs.writeFileSync(sitePath, `${JSON.stringify(parsed, null, 2)}\n`);
-                  console.log(`📄 Updated sites/${siteName}.json with canonical host information.`);
-                } catch (writeError) {
-                  console.log(
-                    `⚠️  Unable to persist canonical host changes: ${writeError.message}`
-                  );
-                }
-              }
-            } else {
-              const previous = Array.isArray(siteConfig.testPages) ? [...siteConfig.testPages] : [];
-              const discoveredSet = new Set(discovered);
-              const updated = [...discoveredSet].sort((a, b) => a.localeCompare(b));
-
-              const added = updated.filter((pathItem) => !previous.includes(pathItem));
-              const removed = previous.filter((pathItem) => !discoveredSet.has(pathItem));
-
-              siteConfig.testPages = ensureHomepagePresence(
-                updated,
-                siteConfig.name,
-                'sitemap discovery',
-                siteConfig.includeHomepage
-              );
-
-              if (added.length === 0 && removed.length === 0) {
-                console.log(`ℹ️  Sitemap discovery found ${updated.length} page(s); no changes.`);
-              } else {
-                const parts = [];
-                if (added.length > 0) parts.push(`${added.length} added`);
-                if (removed.length > 0) parts.push(`${removed.length} removed`);
-                console.log(`🔍 Sitemap discovery updated test pages (${parts.join(', ')}).`);
-              }
-
-              try {
-                const sitePath = path.join(process.cwd(), 'sites', `${siteName}.json`);
-                const raw = fs.readFileSync(sitePath, 'utf8');
-                const parsed = JSON.parse(raw);
-                parsed.testPages = siteConfig.testPages;
-                if (baseUrlUpdated) {
-                  parsed.baseUrl = siteConfig.baseUrl;
-                }
-                if (siteConfig.discover) {
-                  const mergedDiscover = {
-                    ...(parsed.discover || {}),
-                    ...siteConfig.discover,
-                  };
-                  parsed.discover = mergedDiscover;
-                }
-                fs.writeFileSync(sitePath, `${JSON.stringify(parsed, null, 2)}\n`);
-                console.log(
-                  `📄 Updated sites/${siteName}.json with ${updated.length} test page(s).`
-                );
-              } catch (writeError) {
-                console.log(`⚠️  Unable to persist sitemap results: ${writeError.message}`);
-              }
-            }
-          } catch (error) {
-            console.log(`⚠️  Sitemap discovery skipped: ${error.message}`);
-          }
-        } else if (!siteConfig.discover) {
-          console.log('ℹ️  --discover requested but sitemap discovery is disabled for this site.');
-        } else {
-          console.log('ℹ️  --discover requested but site config has no sitemap strategy.');
-        }
-      } else if (siteConfig.discover && siteConfig.discover.strategy === 'sitemap') {
-        console.log('ℹ️  Sitemap discovery disabled (run with --discover to refresh testPages).');
+        runtimeEnv = this.resolveLocalExecutionEnv(siteName, siteConfig, runtimeEnv);
       }
 
       siteConfig.testPages = ensureHomepagePresence(
@@ -528,25 +308,11 @@ class TestRunner {
       console.log(`Base URL: ${siteConfig.baseUrl}`);
       console.log(`Pages to test: ${siteConfig.testPages.join(', ')}`);
       console.log('');
-
-      if (options.discoverOnly) {
-        console.log('✅ Discovery complete; no Playwright tests executed.');
-        return { code: 0, siteName };
-      }
-
-      // Optional local preflight for ddev-based sites
-      await this.preflightLocalSite(siteConfig);
     } catch (error) {
       console.error(`Error: ${error.message}`);
       console.log('');
       this.displaySites();
       throw error;
-    }
-
-    // Create test-results directory
-    const resultsDir = path.join(process.cwd(), 'test-results', 'screenshots');
-    if (!fs.existsSync(resultsDir)) {
-      fs.mkdirSync(resultsDir, { recursive: true });
     }
 
     // Determine which tests to run (avoid relying on shell glob expansion)
@@ -665,6 +431,15 @@ class TestRunner {
       return { code: 0, siteName };
     }
 
+    // Optional local preflight for ddev-based sites only when a real run will execute.
+    await this.preflightLocalSite(siteConfig, runtimeEnv);
+
+    // Create test-results directory only for real Playwright runs.
+    const resultsDir = path.join(process.cwd(), 'test-results', 'screenshots');
+    if (!fs.existsSync(resultsDir)) {
+      fs.mkdirSync(resultsDir, { recursive: true });
+    }
+
     if (manifestInfo.manifestPath) {
       const relativePath = path.relative(process.cwd(), manifestInfo.manifestPath);
       console.log(`ℹ️  Run manifest saved to ${relativePath}`);
@@ -678,7 +453,7 @@ class TestRunner {
     }
 
     const spawnEnv = {
-      ...process.env,
+      ...runtimeEnv,
       ...(options.envOverrides || {}),
       ...manifestInfo.env,
       SITE_NAME: siteName,
@@ -905,7 +680,7 @@ class TestRunner {
     return false;
   }
 
-  static async preflightLocalSite(siteConfig) {
+  static async preflightLocalSite(siteConfig, env = process.env) {
     const baseUrl = siteConfig.baseUrl;
     const isLocal = /\.ddev\.site|localhost|127\.0\.0\.1/.test(baseUrl);
     if (!isLocal) return;
@@ -913,8 +688,8 @@ class TestRunner {
     const reachable = await this.requestReachable(baseUrl, 3000);
     if (reachable) return;
 
-    const enableDdev = String(process.env.ENABLE_DDEV || '').toLowerCase() === 'true';
-    const ddevPath = process.env.DDEV_PROJECT_PATH;
+    const enableDdev = String(env.ENABLE_DDEV || '').toLowerCase() === 'true';
+    const ddevPath = env.DDEV_PROJECT_PATH;
 
     if (!enableDdev || !ddevPath) {
       console.log(

@@ -258,12 +258,12 @@ async function discoverFromSitemap(siteConfig, discoverConfig = {}) {
   };
   if (Number.isFinite(options.maxPages)) {
     console.log(
-      `ℹ️  --discover: Limiting sitemap ingestion to ${options.maxPages} page(s) (discover.maxPages).`
+      `ℹ️  Discovery: limiting sitemap ingestion to ${options.maxPages} page(s) (discover.maxPages).`
     );
   }
   if (Number.isFinite(options.maxDepth)) {
     console.log(
-      `ℹ️  --discover: Limiting sitemap traversal depth to ${options.maxDepth} level(s) (discover.maxDepth).`
+      `ℹ️  Discovery: limiting sitemap traversal depth to ${options.maxDepth} level(s) (discover.maxDepth).`
     );
   }
   const includePatterns = compilePatterns(discoverConfig.include);

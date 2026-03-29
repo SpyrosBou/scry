@@ -1,13 +1,15 @@
 #!/usr/bin/env node
 
-// CLI helper that scaffolds or refreshes site configs, then runs TestRunner in discovery mode.
+// CLI helper that scaffolds or refreshes site configs through the discovery service.
 
 const minimist = require('minimist');
 const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
 const repoRoot = path.resolve(__dirname, '..', '..');
+const SiteLoader = require(path.join(repoRoot, 'utils', 'site-loader'));
 const TestRunner = require(path.join(repoRoot, 'utils', 'test-runner'));
+const { refreshSiteConfig } = require(path.join(repoRoot, 'utils', 'discovery-service'));
 const {
   SITES_DIR,
   sanitiseSiteKey,
@@ -242,7 +244,7 @@ async function main() {
       '  --yes, -y                  Auto-approve prompts (non-interactive mode)',
       '  --no, -n                   Abort creation if prompted',
       '  --allow-duplicate          Create a new file even if base URL already exists',
-      '  --local                    Enable local DDEV preflight for .ddev.site/localhost hosts',
+      '  --local                    Attempt local DDEV preflight for .ddev.site/localhost hosts',
       '  --help, -h                 Show this help message',
       '',
       'Examples:',
@@ -365,18 +367,14 @@ async function main() {
   }
 
   try {
-    const result = await TestRunner.runTestsForSite(siteKey, {
-      discover: true,
-      discoverOnly: true,
-      local: Boolean(args.local),
-      visual: false,
-      responsive: false,
-      functionality: false,
-      accessibility: false,
-      full: false,
-    });
+    if (args.local) {
+      const siteConfig = SiteLoader.loadSite(siteKey);
+      const runtimeEnv = TestRunner.resolveLocalExecutionEnv(siteKey, siteConfig, process.env);
+      await TestRunner.preflightLocalSite(siteConfig, runtimeEnv);
+    }
 
-    process.exit(result.code);
+    await refreshSiteConfig(siteConfigPath);
+    process.exit(0);
   } catch (error) {
     console.error(`❌ Discovery failed: ${error.message}`);
     process.exit(1);
