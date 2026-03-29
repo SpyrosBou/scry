@@ -26,7 +26,10 @@
     "clean:test-results": "node scripts/maintenance/cleanup.js clean-test-results",
     "styles:build": "node scripts/reporting/build-report-styles.js",
     "site:build": "node site/build.js",
-    "site:dev": "node site/serve.js --open"
+    "site:dev": "node site/serve.js --open",
+    "app:build": "npx @tailwindcss/cli -i site/app/styles/input.css -o site/app/styles/app.css",
+    "app:dev": "npx @tailwindcss/cli -i site/app/styles/input.css -o site/app/styles/app.css --watch & npx serve site/app -l 4401 --no-clipboard",
+    "app:serve": "npx serve site/app -l 4401 --no-clipboard"
   },
   "lint-staged": {},
   "keywords": [
@@ -49,6 +52,7 @@
     "pixelmatch": "^5.3.0",
     "pngjs": "^7.0.0",
     "prettier": "^3.8.1",
+    "serve": "^14.2.6",
     "tailwindcss": "^4.2.2"
   },
   "dependencies": {

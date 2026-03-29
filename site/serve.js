@@ -17,10 +17,10 @@ async function openInBrowser(url) {
 const args = minimist(process.argv.slice(2), {
   alias: { p: 'port', o: 'open' },
   boolean: ['open'],
-  default: { port: process.env.SITE_PORT || 3000 },
+  default: { port: process.env.SITE_PORT || 4400 },
 });
 
-const PORT = Number(args.port) || 3000;
+const PORT = Number(args.port) || 4400;
 const SITE_DIR = __dirname;
 const STYLES_DIR = path.join(SITE_DIR, 'styles');
 const SCSS_SOURCE = path.join(STYLES_DIR, 'landing.scss');
