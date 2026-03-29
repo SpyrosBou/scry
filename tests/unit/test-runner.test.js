@@ -39,4 +39,11 @@ test('prepareRunManifest keeps dry-run manifests inline', () => {
   assert.strictEqual(result.manifestPath, null);
   assert.ok(result.env.SITE_RUN_MANIFEST_INLINE);
   assert.strictEqual(result.env.SITE_RUN_MANIFEST, undefined);
+  assert.strictEqual(result.env.SITE_TEST_PAGES, undefined);
+  assert.strictEqual(result.env.SITE_TEST_PAGES_LIMIT, undefined);
+  assert.deepStrictEqual(result.manifest.siteConfig, {
+    name: 'Example Live',
+    baseUrl: 'https://example.com',
+    testPages: ['/'],
+  });
 });

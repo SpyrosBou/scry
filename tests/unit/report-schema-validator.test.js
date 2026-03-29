@@ -52,6 +52,44 @@ test('assertReportSummaryPayload rejects missing finding arrays for normalised s
   );
 });
 
+test('assertReportSummaryPayload rejects missing metadata.summaryType', () => {
+  const payload = makeVisualPagePayload({ metadata: { summaryType: undefined } });
+
+  assert.throws(
+    () => {
+      assertReportSummaryPayload(payload);
+    },
+    /metadata\.summaryType/
+  );
+});
+
+test('assertReportSummaryPayload rejects presentation escape hatches', () => {
+  const payload = createPageSummaryPayload({
+    baseName: 'wcag-home',
+    title: 'WCAG scan — /home',
+    page: '/home',
+    viewport: 'desktop',
+    summary: {
+      gatingViolations: [],
+      advisoriesList: [],
+      bestPracticesList: [],
+      notes: [],
+      cardHtml: '<p>legacy</p>',
+    },
+    metadata: {
+      spec: 'a11y.audit.wcag',
+      summaryType: 'wcag',
+    },
+  });
+
+  assert.throws(
+    () => {
+      assertReportSummaryPayload(payload);
+    },
+    /summary\.cardHtml/
+  );
+});
+
 test('assertReportSummaryPayload does not require finding arrays for legacy wcag payloads', () => {
   const wcagPayload = createPageSummaryPayload({
     baseName: 'wcag-home',
