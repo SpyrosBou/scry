@@ -1,5 +1,12 @@
 import { redirect } from '@sveltejs/kit';
+import type { PageLoad } from './$types';
 
-export function load() {
-	redirect(307, '/sites/acme-com');
-}
+export const load: PageLoad = async ({ parent }) => {
+	const { session } = await parent();
+
+	if (session) {
+		redirect(307, '/sites/acme-com');
+	} else {
+		redirect(307, '/login');
+	}
+};

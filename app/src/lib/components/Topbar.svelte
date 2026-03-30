@@ -1,5 +1,11 @@
 <script lang="ts">
+	import { page } from '$app/stores';
+
 	const { activePage = 'dashboard' }: { activePage?: 'dashboard' | 'reports' } = $props();
+
+	const session = $derived($page.data.session);
+	const userEmail = $derived(session?.user?.email ?? '');
+	const userInitial = $derived(userEmail ? userEmail[0].toUpperCase() : '?');
 </script>
 
 <header class="fixed top-0 inset-x-0 z-100 h-14 px-5 flex items-center gap-4 bg-primary border-b border-border-subtle">
@@ -30,9 +36,25 @@
 				<path d="M10 1.5v2M10 16.5v2M1.5 10h2M16.5 10h2M3.4 3.4l1.4 1.4M15.2 15.2l1.4 1.4M3.4 16.6l1.4-1.4M15.2 4.8l1.4-1.4" />
 			</svg>
 		</button>
-		<button
-			class="size-8 rounded-full bg-elevated border border-border-default cursor-pointer transition-all duration-150 hover:border-border-strong"
-			aria-label="Account menu"
-		></button>
+
+		{#if session}
+			<form method="POST" action="/auth/signout" class="flex items-center">
+				<button
+					type="submit"
+					class="size-8 rounded-full bg-gold/20 border border-border-gold flex items-center justify-center text-[0.7rem] font-semibold text-gold cursor-pointer transition-all duration-150 hover:bg-gold/30"
+					aria-label="Sign out ({userEmail})"
+					title={userEmail}
+				>
+					{userInitial}
+				</button>
+			</form>
+		{:else}
+			<a
+				href="/login"
+				class="px-3 py-1.5 rounded-sm text-[0.8rem] font-medium text-gold bg-gold-bg no-underline transition-all duration-150 hover:bg-gold/20"
+			>
+				Log In
+			</a>
+		{/if}
 	</div>
 </header>
