@@ -1,1 +1,1 @@
-<!-- Root page redirects to /sites/acme-com via +page.ts -->
+<!-- Server always redirects — this page should never render -->
