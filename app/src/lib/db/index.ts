@@ -1,6 +1,7 @@
 export type {
 	Database,
 	Tables,
+	Json,
 	SuiteSlug,
 	RunStatus,
 	SuiteStatus,
@@ -8,3 +9,5 @@ export type {
 	ProjectWithSites,
 	SiteWithHealth
 } from './types';
+
+export { getUserProjects } from './queries';

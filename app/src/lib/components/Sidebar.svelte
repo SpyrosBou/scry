@@ -1,35 +1,10 @@
 <script lang="ts">
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
+	import type { ProjectWithSites } from '$lib/db';
 	import HealthDot from './HealthDot.svelte';
 
-	interface Site {
-		slug: string;
-		name: string;
-		health: 'green' | 'yellow' | 'red' | 'none';
-	}
-
-	interface Project {
-		name: string;
-		sites: Site[];
-	}
-
-	const projects: Project[] = [
-		{
-			name: 'Acme Corp',
-			sites: [
-				{ slug: 'acme-com', name: 'acme.com', health: 'green' },
-				{ slug: 'blog-acme-com', name: 'blog.acme.com', health: 'yellow' }
-			]
-		},
-		{
-			name: 'Bella Design',
-			sites: [
-				{ slug: 'belladesign-co', name: 'belladesign.co', health: 'green' },
-				{ slug: 'shop-bella-co', name: 'shop.bella.co', health: 'red' }
-			]
-		}
-	];
+	const { projects = [] }: { projects: ProjectWithSites[] } = $props();
 
 	function handleKeydown(e: KeyboardEvent) {
 		const tree = (e.currentTarget as HTMLElement).closest('[role="tree"]');
