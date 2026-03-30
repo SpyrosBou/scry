@@ -1,5 +1,101 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
+
 	let step = $state(1);
+
+	// Form inputs
+	let projectName = $state('');
+	let siteUrl = $state('');
+
+	// Created resource state
+	let projectId = $state('');
+	let siteSlug = $state('');
+
+	// UI state
+	let error = $state('');
+	let loading = $state(false);
+
+	async function createProject() {
+		const name = projectName.trim();
+		if (!name) {
+			error = 'Please enter a project name.';
+			return;
+		}
+
+		error = '';
+		loading = true;
+
+		try {
+			const res = await fetch('/api/projects', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ name })
+			});
+
+			const data = await res.json();
+
+			if (!res.ok) {
+				error = data.error || 'Failed to create project.';
+				return;
+			}
+
+			projectId = data.id;
+			step = 2;
+		} catch {
+			error = 'Something went wrong. Please try again.';
+		} finally {
+			loading = false;
+		}
+	}
+
+	async function addSite() {
+		const url = siteUrl.trim();
+		if (!url) {
+			error = 'Please enter a URL.';
+			return;
+		}
+
+		// Basic URL validation
+		try {
+			new URL(url);
+		} catch {
+			error = 'Please enter a valid URL (e.g., https://example.com).';
+			return;
+		}
+
+		error = '';
+		loading = true;
+
+		try {
+			const res = await fetch('/api/sites', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ project_id: projectId, url })
+			});
+
+			const data = await res.json();
+
+			if (!res.ok) {
+				error = data.error || 'Failed to add site.';
+				return;
+			}
+
+			siteSlug = data.slug;
+			step = 3;
+		} catch {
+			error = 'Something went wrong. Please try again.';
+		} finally {
+			loading = false;
+		}
+	}
+
+	function skipForNow() {
+		if (siteSlug) {
+			goto(`/sites/${siteSlug}`);
+		} else {
+			goto('/');
+		}
+	}
 </script>
 
 <svelte:head>
@@ -43,29 +139,41 @@
 
 		<!-- Step 1: Project name -->
 		{#if step === 1}
-			<label for="project-name" class="block text-[0.85rem] font-medium text-text-primary mb-2">
-				What&rsquo;s your first project called?
-			</label>
-			<input type="text" id="project-name" placeholder="e.g., Acme Corp&hellip;" autocomplete="organization"
-				class="w-full mb-4 rounded-sm bg-elevated border border-border-subtle px-3 py-2 font-body text-sm text-text-primary placeholder:text-text-tertiary focus:border-gold-muted" />
-			<button onclick={() => step = 2}
-				class="w-full inline-flex items-center justify-center gap-2 rounded-md font-body text-sm font-semibold bg-gold text-text-inverse py-3 cursor-pointer transition-all duration-200 hover:-translate-y-0.5 shadow-[0_2px_8px_rgba(0,0,0,0.3),0_0_24px_var(--color-gold-glow)]">
-				Continue
-			</button>
+			<form onsubmit={(e) => { e.preventDefault(); createProject(); }}>
+				<label for="project-name" class="block text-[0.85rem] font-medium text-text-primary mb-2">
+					What&rsquo;s your first project called?
+				</label>
+				<input type="text" id="project-name" placeholder="e.g., Acme Corp&hellip;" autocomplete="organization"
+					bind:value={projectName}
+					class="w-full rounded-sm bg-elevated border border-border-subtle px-3 py-2 font-body text-sm text-text-primary placeholder:text-text-tertiary focus:border-gold-muted {error ? 'mb-1' : 'mb-4'}" />
+				{#if error}
+					<p class="text-[0.8rem] text-status-red mb-3" role="alert">{error}</p>
+				{/if}
+				<button type="submit" disabled={loading}
+					class="w-full inline-flex items-center justify-center gap-2 rounded-md font-body text-sm font-semibold bg-gold text-text-inverse py-3 cursor-pointer transition-all duration-200 hover:-translate-y-0.5 shadow-[0_2px_8px_rgba(0,0,0,0.3),0_0_24px_var(--color-gold-glow)] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0">
+					{loading ? 'Creating...' : 'Continue'}
+				</button>
+			</form>
 		{/if}
 
 		<!-- Step 2: Site URL -->
 		{#if step === 2}
-			<label for="site-url" class="block text-[0.85rem] font-medium text-text-primary mb-2">
-				Site URL
-			</label>
-			<input type="url" id="site-url" placeholder="https://&hellip;" autocomplete="url"
-				class="w-full mb-2 rounded-sm bg-elevated border border-border-subtle px-3 py-2 font-body text-sm text-text-primary placeholder:text-text-tertiary focus:border-gold-muted" />
-			<p class="text-[0.8rem] text-text-tertiary mb-4">We&rsquo;ll discover your pages automatically from your sitemap.</p>
-			<button onclick={() => step = 3}
-				class="w-full inline-flex items-center justify-center gap-2 rounded-md font-body text-sm font-semibold bg-gold text-text-inverse py-3 cursor-pointer transition-all duration-200 hover:-translate-y-0.5 shadow-[0_2px_8px_rgba(0,0,0,0.3),0_0_24px_var(--color-gold-glow)]">
-				Add Site
-			</button>
+			<form onsubmit={(e) => { e.preventDefault(); addSite(); }}>
+				<label for="site-url" class="block text-[0.85rem] font-medium text-text-primary mb-2">
+					Site URL
+				</label>
+				<input type="url" id="site-url" placeholder="https://&hellip;" autocomplete="url"
+					bind:value={siteUrl}
+					class="w-full mb-1 rounded-sm bg-elevated border border-border-subtle px-3 py-2 font-body text-sm text-text-primary placeholder:text-text-tertiary focus:border-gold-muted" />
+				{#if error}
+					<p class="text-[0.8rem] text-status-red mb-1" role="alert">{error}</p>
+				{/if}
+				<p class="text-[0.8rem] text-text-tertiary mb-4">We&rsquo;ll discover your pages automatically from your sitemap.</p>
+				<button type="submit" disabled={loading}
+					class="w-full inline-flex items-center justify-center gap-2 rounded-md font-body text-sm font-semibold bg-gold text-text-inverse py-3 cursor-pointer transition-all duration-200 hover:-translate-y-0.5 shadow-[0_2px_8px_rgba(0,0,0,0.3),0_0_24px_var(--color-gold-glow)] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0">
+					{loading ? 'Adding...' : 'Add Site'}
+				</button>
+			</form>
 		{/if}
 
 		<!-- Step 3: Choose suites -->
@@ -84,14 +192,14 @@
 					</button>
 				{/each}
 			</div>
-			<a href="/sites/acme-com"
-				class="w-full inline-flex items-center justify-center gap-2 rounded-md font-body text-sm font-semibold bg-gold text-text-inverse py-3 no-underline cursor-pointer transition-all duration-200 hover:-translate-y-0.5 shadow-[0_2px_8px_rgba(0,0,0,0.3),0_0_24px_var(--color-gold-glow)]">
+			<button onclick={() => goto(`/sites/${siteSlug}`)}
+				class="w-full inline-flex items-center justify-center gap-2 rounded-md font-body text-sm font-semibold bg-gold text-text-inverse py-3 cursor-pointer transition-all duration-200 hover:-translate-y-0.5 shadow-[0_2px_8px_rgba(0,0,0,0.3),0_0_24px_var(--color-gold-glow)]">
 				Run Your First Audit
-			</a>
+			</button>
 		{/if}
 
-		<a href="/sites/acme-com" class="block text-right mt-6 text-[0.8rem] text-text-tertiary no-underline transition-colors duration-150 hover:text-text-secondary">
+		<button onclick={skipForNow} class="block w-full text-right mt-6 text-[0.8rem] text-text-tertiary bg-transparent border-0 p-0 cursor-pointer transition-colors duration-150 hover:text-text-secondary">
 			Skip for now &rarr;
-		</a>
+		</button>
 	</div>
 </div>
