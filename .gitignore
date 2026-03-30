@@ -11,7 +11,7 @@ example-site/  # Generated when using example-site fallback
 playwright-report/
 
 # Report artifacts
-reports/
+/reports/
 
 # Screenshots and media files (too large for repo, regenerated each test)
 *.png
