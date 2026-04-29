@@ -20,6 +20,11 @@ function writeSiteConfig(sitePath, siteConfig) {
   fs.writeFileSync(sitePath, `${JSON.stringify(siteConfig, null, 2)}\n`);
 }
 
+function arraysEqual(a, b) {
+  if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
+  return a.every((value, index) => value === b[index]);
+}
+
 function withDefaultDiscoverConfig(siteConfig) {
   if (siteConfig.discover && siteConfig.discover.strategy) {
     return {
@@ -55,6 +60,14 @@ async function refreshSiteConfig(sitePath, options = {}) {
     ...persisted,
   });
   const siteConfig = hydratedSiteConfig;
+  siteConfig.testPages = ensureHomepagePresence(
+    siteConfig.testPages,
+    siteLabel,
+    'discovery config',
+    siteConfig.includeHomepage
+  );
+  const initialPagesNormalized = !arraysEqual(siteConfig.testPages, persisted.testPages);
+
   assertValidSiteConfig(siteConfig, {
     contextLabel: `Discovery config ${path.basename(sitePath)}`,
   });
@@ -113,7 +126,7 @@ async function refreshSiteConfig(sitePath, options = {}) {
   const changes = {
     baseUrlUpdated,
     sitemapUrlUpdated,
-    pagesUpdated: false,
+    pagesUpdated: initialPagesNormalized,
     createdDefaultDiscover,
   };
 
@@ -151,7 +164,7 @@ async function refreshSiteConfig(sitePath, options = {}) {
     ...(siteConfig.discover
       ? { discover: { ...(persisted.discover || {}), ...siteConfig.discover } }
       : {}),
-    ...(Array.isArray(siteConfig.testPages) && discovered.length > 0
+    ...(Array.isArray(siteConfig.testPages) && (discovered.length > 0 || initialPagesNormalized)
       ? { testPages: siteConfig.testPages }
       : {}),
   };
@@ -159,7 +172,13 @@ async function refreshSiteConfig(sitePath, options = {}) {
     contextLabel: `Discovery output ${path.basename(sitePath)}`,
   });
 
-  if (createdDefaultDiscover || baseUrlUpdated || sitemapUrlUpdated || discovered.length > 0) {
+  if (
+    createdDefaultDiscover ||
+    baseUrlUpdated ||
+    sitemapUrlUpdated ||
+    initialPagesNormalized ||
+    discovered.length > 0
+  ) {
     writeSiteConfig(sitePath, nextConfig);
     logger.log(`📄 Updated ${path.relative(process.cwd(), sitePath)}.`);
   }
