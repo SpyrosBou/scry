@@ -71,27 +71,54 @@ export interface Database {
 				Row: {
 					id: string;
 					site_id: string;
+					source_kind: string | null;
+					source_artifact_id: string | null;
+					source_run_id: string | null;
+					source_payload_hash: string | null;
+					profile: string | null;
 					status: RunStatus;
 					pages_tested: number;
+					total_tests: number | null;
+					total_tests_planned: number | null;
+					status_counts: Json | null;
 					suites_run: string[];
+					report_relative_path: string | null;
 					started_at: string;
 					completed_at: string | null;
 				};
 				Insert: {
 					id?: string;
 					site_id: string;
+					source_kind?: string | null;
+					source_artifact_id?: string | null;
+					source_run_id?: string | null;
+					source_payload_hash?: string | null;
+					profile?: string | null;
 					status: RunStatus;
 					pages_tested?: number;
+					total_tests?: number | null;
+					total_tests_planned?: number | null;
+					status_counts?: Json;
 					suites_run?: string[];
+					report_relative_path?: string | null;
 					started_at?: string;
 					completed_at?: string | null;
 				};
 				Update: {
 					id?: string;
 					site_id?: string;
+					source_kind?: string | null;
+					source_artifact_id?: string | null;
+					source_run_id?: string | null;
+					source_payload_hash?: string | null;
+					profile?: string | null;
 					status?: RunStatus;
 					pages_tested?: number;
+					total_tests?: number | null;
+					total_tests_planned?: number | null;
+					status_counts?: Json;
 					suites_run?: string[];
+					report_relative_path?: string | null;
 					started_at?: string;
 					completed_at?: string | null;
 				};
@@ -112,6 +139,8 @@ export interface Database {
 					suite: SuiteSlug;
 					score: number | null;
 					status: SuiteStatus;
+					summary_types: string[];
+					summary: Json | null;
 				};
 				Insert: {
 					id?: string;
@@ -119,6 +148,8 @@ export interface Database {
 					suite: SuiteSlug;
 					score?: number | null;
 					status: SuiteStatus;
+					summary_types?: string[];
+					summary?: Json;
 				};
 				Update: {
 					id?: string;
@@ -126,6 +157,8 @@ export interface Database {
 					suite?: SuiteSlug;
 					score?: number | null;
 					status?: SuiteStatus;
+					summary_types?: string[];
+					summary?: Json;
 				};
 				Relationships: [
 					{
@@ -141,27 +174,39 @@ export interface Database {
 				Row: {
 					id: string;
 					run_id: string;
-					suite: string;
+					suite: SuiteSlug;
+					summary_type: string | null;
 					rule: string;
 					severity: Severity;
+					page: string | null;
+					viewport: string | null;
+					source_key: string | null;
 					page_count: number;
 					details: Json;
 				};
 				Insert: {
 					id?: string;
 					run_id: string;
-					suite: string;
+					suite: SuiteSlug;
+					summary_type?: string | null;
 					rule: string;
 					severity: Severity;
+					page?: string | null;
+					viewport?: string | null;
+					source_key?: string | null;
 					page_count?: number;
 					details?: Json;
 				};
 				Update: {
 					id?: string;
 					run_id?: string;
-					suite?: string;
+					suite?: SuiteSlug;
+					summary_type?: string | null;
 					rule?: string;
 					severity?: Severity;
+					page?: string | null;
+					viewport?: string | null;
+					source_key?: string | null;
 					page_count?: number;
 					details?: Json;
 				};
