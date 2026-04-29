@@ -10,13 +10,10 @@ const {
   waitForFormValidationState,
 } = require('../utils/form-helpers');
 const { attachSchemaSummary } = require('../utils/reporting-utils');
-const {
-  buildRunSummaryPayload,
-  buildPageSummaryPayload,
-} = require('../utils/report-summary-builder');
 const { getActiveSiteContext } = require('../utils/test-context');
 const { createAggregationStore } = require('../utils/report-aggregation-store');
 const { waitForReports: waitForReportsHelper } = require('../utils/a11y-aggregation-waiter');
+const { buildInteractiveSchemaPayloads } = require('../utils/report-payloads/site-quality');
 
 const { siteConfig } = getActiveSiteContext();
 const configuredPages = process.env.SMOKE
@@ -45,136 +42,6 @@ const waitForReports = (projectName) =>
     expectedCount: totalPages,
     timeoutMs: Math.max(60000, totalPages * 5000),
   });
-
-const buildInteractiveSchemaPayloads = ({ pages, resourceBudget, projectName }) => {
-  if (!Array.isArray(pages) || pages.length === 0) return null;
-
-  const enrichedPages = pages.map((entry) => {
-    const warningNotes = entry.notes
-      .filter((note) => note.type === 'warning')
-      .map((note) => note.message);
-    const infoNotes = entry.notes
-      .filter((note) => note.type !== 'warning')
-      .map((note) => note.message);
-    const gatingIssues = [
-      ...entry.consoleErrors.map((error) => `Console error: ${error.message}`),
-      ...entry.resourceErrors.map((error) => {
-        if (error.status) {
-          return `Resource ${error.type || 'response'} ${error.status} on ${error.url}`;
-        }
-        if (error.failure) {
-          return `Resource ${error.type || 'request'} failed (${error.failure}) on ${error.url}`;
-        }
-        return `Resource ${error.type || 'request'} issue on ${error.url}`;
-      }),
-    ];
-    return {
-      page: entry.page,
-      status: entry.status,
-      consoleErrors: entry.consoleErrors,
-      resourceErrors: entry.resourceErrors,
-      gating: gatingIssues,
-      warnings: warningNotes,
-      advisories: [],
-      notes: infoNotes,
-    };
-  });
-
-  const totalConsoleErrors = enrichedPages.reduce(
-    (total, entry) => total + entry.consoleErrors.length,
-    0
-  );
-  const totalResourceErrors = enrichedPages.reduce(
-    (total, entry) => total + entry.resourceErrors.length,
-    0
-  );
-  const pagesWithConsoleErrors = enrichedPages.filter(
-    (entry) => entry.consoleErrors.length > 0
-  ).length;
-  const pagesWithResourceErrors = enrichedPages.filter(
-    (entry) => entry.resourceErrors.length > 0
-  ).length;
-  const pagesWithWarnings = enrichedPages.filter((entry) => entry.warnings.length > 0).length;
-  const pagesWithGatingIssues = enrichedPages.filter((entry) => entry.gating.length > 0).length;
-
-  const runPayload = buildRunSummaryPayload({
-    prefix: 'interactive',
-    key: projectName,
-    title: 'Interactive smoke summary',
-    overview: {
-      totalPages: pages.length,
-      totalConsoleErrors,
-      totalResourceErrors,
-      pagesWithConsoleErrors,
-      pagesWithResourceErrors,
-      pagesWithGatingIssues,
-      pagesWithWarnings,
-      resourceErrorBudget: resourceBudget,
-      budgetExceeded: totalResourceErrors > resourceBudget,
-    },
-    metadata: {
-      spec: 'functionality.interactive.smoke',
-      summaryType: 'interactive',
-      projectName,
-      scope: 'project',
-    },
-  });
-
-  runPayload.details = {
-    pages: enrichedPages.map((entry) => ({
-      page: entry.page,
-      status: entry.status,
-      gating: entry.gating,
-      warnings: entry.warnings,
-      advisories: entry.advisories,
-      notes: entry.notes,
-      consoleErrors: entry.consoleErrors.length,
-      resourceErrors: entry.resourceErrors.length,
-    })),
-  };
-
-  const MAX_SAMPLE = 10;
-  const pagePayloads = enrichedPages.map((entry) => {
-    const consoleSample = entry.consoleErrors.slice(0, MAX_SAMPLE).map((error) => ({
-      message: error.message,
-      url: error.url || null,
-    }));
-    const resourceSample = entry.resourceErrors.slice(0, MAX_SAMPLE).map((error) => ({
-      type: error.type,
-      status: error.status ?? null,
-      method: error.method || null,
-      url: error.url,
-      failure: error.failure || null,
-    }));
-
-    return buildPageSummaryPayload({
-      prefix: 'interactive',
-      projectName,
-      viewport: projectName,
-      page: entry.page,
-      title: `Interactive checks – ${entry.page}`,
-      summary: {
-        status: entry.status,
-        gating: entry.gating,
-        warnings: entry.warnings,
-        advisories: entry.advisories,
-        notes: entry.notes,
-        consoleErrors: entry.consoleErrors.length,
-        resourceErrors: entry.resourceErrors.length,
-        consoleSample,
-        resourceSample,
-      },
-      metadata: {
-        spec: 'functionality.interactive.smoke',
-        summaryType: 'interactive',
-        projectName,
-        resourceErrorBudget: resourceBudget,
-      },
-    });
-  });
-
-  return { runPayload, pagePayloads };
-};
 
 const buildIgnoreMatchers = (patterns) => {
   return patterns.map((pattern) => {

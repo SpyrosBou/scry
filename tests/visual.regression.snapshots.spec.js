@@ -3,10 +3,11 @@ const fs = require('fs');
 const { test, expect } = require('../utils/test-fixtures');
 const { safeNavigate, waitForPageStability } = require('../utils/test-helpers');
 const { attachSchemaSummary } = require('../utils/reporting-utils');
-const { createRunSummaryPayload, createPageSummaryPayload } = require('../utils/report-schema');
 const { getActiveSiteContext } = require('../utils/test-context');
 const { createAggregationStore } = require('../utils/report-aggregation-store');
 const { waitForReports: waitForReportsHelper } = require('../utils/a11y-aggregation-waiter');
+const { parseDiffMetrics } = require('../utils/report-classification/site-quality');
+const { buildVisualSchemaPayloads } = require('../utils/report-payloads/site-quality');
 
 const { siteConfig } = getActiveSiteContext();
 const configuredPages = process.env.SMOKE ? siteConfig.testPages.slice(0, 1) : siteConfig.testPages;
@@ -27,12 +28,6 @@ const waitForReports = (projectName) =>
     expectedCount: totalPages,
     timeoutMs: Math.max(60000, totalPages * 5000),
   });
-
-const slugify = (value) =>
-  String(value || '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '') || 'item';
 
 const VIEWPORTS = {
   mobile: { width: 375, height: 667, name: 'mobile' },
@@ -63,191 +58,6 @@ const waitForVisualSettle = async (page) => {
         requestAnimationFrame(() => requestAnimationFrame(resolve));
       })
   );
-};
-
-const parseDiffMetrics = (message) => {
-  if (typeof message !== 'string' || message.length === 0) return null;
-
-  const pixelsRegex =
-    /([\d,]+)\s+pixels\s+\(ratio\s+([\d.]+)\s+of all image pixels\) are different/gi;
-  let pixelsMatch;
-  let lastPixelsMatch = null;
-  while ((pixelsMatch = pixelsRegex.exec(message))) {
-    lastPixelsMatch = pixelsMatch;
-  }
-
-  const dimensionsRegex =
-    /Expected an image\s+(\d+)px by (\d+)px,\s+received\s+(\d+)px by (\d+)px/gi;
-  let dimMatch;
-  let lastDimensionsMatch = null;
-  while ((dimMatch = dimensionsRegex.exec(message))) {
-    lastDimensionsMatch = dimMatch;
-  }
-
-  if (!lastPixelsMatch && !lastDimensionsMatch) return null;
-
-  const metrics = {};
-  if (lastPixelsMatch) {
-    metrics.pixelDiff = Number(lastPixelsMatch[1].replace(/,/g, ''));
-    metrics.pixelRatio = Number(lastPixelsMatch[2]);
-  }
-  if (lastDimensionsMatch) {
-    metrics.expectedSize = {
-      width: Number(lastDimensionsMatch[1]),
-      height: Number(lastDimensionsMatch[2]),
-    };
-    metrics.actualSize = {
-      width: Number(lastDimensionsMatch[3]),
-      height: Number(lastDimensionsMatch[4]),
-    };
-  }
-
-  return metrics;
-};
-
-const buildVisualSchemaPayloads = ({ summaries, viewportName, projectName }) => {
-  if (!Array.isArray(summaries) || summaries.length === 0) return null;
-
-  const enrichedSummaries = summaries.map((entry) => {
-    const diffMetrics = entry.diffMetrics || {};
-    const pixelDiff = Number.isFinite(diffMetrics.pixelDiff) ? diffMetrics.pixelDiff : null;
-    const pixelRatio = Number.isFinite(diffMetrics.pixelRatio) ? diffMetrics.pixelRatio : null;
-    const deltaPercent = pixelRatio !== null ? Math.round(pixelRatio * 10000) / 100 : null;
-    const thresholdPercent =
-      typeof entry.threshold === 'number' ? Math.round(entry.threshold * 10000) / 100 : null;
-    const gating =
-      entry.result === 'diff'
-        ? [
-            deltaPercent !== null && thresholdPercent !== null
-              ? `Visual delta ${deltaPercent}% exceeds ${thresholdPercent}% threshold.`
-              : 'Visual difference exceeded configured threshold.',
-          ]
-        : [];
-    const notes = [];
-    if (entry.result === 'pass') {
-      notes.push('Screenshot matched baseline within configured threshold.');
-    } else if (entry.result === 'skipped' && entry.status) {
-      notes.push(`Screenshot skipped after HTTP ${entry.status}.`);
-    } else if (entry.error) {
-      notes.push(entry.error);
-    }
-    const artifactRefs = {
-      baseline: entry.artifacts?.baseline?.name || null,
-      actual: entry.artifacts?.actual?.name || null,
-      diff: entry.artifacts?.diff?.name || null,
-    };
-    return {
-      ...entry,
-      diffMetrics,
-      pixelDiff,
-      pixelRatio,
-      deltaPercent,
-      thresholdPercent,
-      gating,
-      warnings: [],
-      advisories: [],
-      notes,
-      artifactRefs,
-    };
-  });
-
-  const diffs = enrichedSummaries.filter((entry) => entry.result === 'diff');
-  const passes = enrichedSummaries.filter((entry) => entry.result === 'pass').length;
-  const skipped = enrichedSummaries.filter((entry) => entry.result === 'skipped').length;
-  const thresholds = Array.from(
-    new Set(
-      enrichedSummaries
-        .map((entry) => (typeof entry.threshold === 'number' ? entry.threshold : null))
-        .filter((value) => value !== null)
-    )
-  );
-
-  const pixelDiffs = diffs
-    .map((entry) => entry.pixelDiff)
-    .filter((value) => Number.isFinite(value));
-  const pixelRatios = diffs
-    .map((entry) => entry.pixelRatio)
-    .filter((value) => Number.isFinite(value));
-  const deltaPercents = diffs
-    .map((entry) => entry.deltaPercent)
-    .filter((value) => Number.isFinite(value));
-
-  const runPayload = createRunSummaryPayload({
-    baseName: `visual-${slugify(projectName)}-${slugify(viewportName)}`,
-    title: `Visual regression summary — ${viewportName}`,
-    overview: {
-      viewport: viewportName,
-      totalPages: enrichedSummaries.length,
-      passes,
-      diffs: diffs.length,
-      skipped,
-      thresholdsUsed: thresholds,
-      maxPixelDiff: pixelDiffs.length > 0 ? Math.max(...pixelDiffs) : null,
-      maxPixelRatio: pixelRatios.length > 0 ? Math.max(...pixelRatios) : null,
-      maxDeltaPercent: deltaPercents.length > 0 ? Math.max(...deltaPercents) : null,
-      pagesWithGatingIssues: diffs.length,
-      diffPages: diffs.map((entry) => entry.page),
-    },
-    metadata: {
-      spec: 'visual.regression.snapshots',
-      summaryType: 'visual',
-      projectName,
-      scope: 'project',
-      viewport: viewportName,
-    },
-  });
-
-  runPayload.details = {
-    pages: enrichedSummaries.map((entry) => ({
-      page: entry.page,
-      status: entry.status ?? null,
-      viewport: viewportName,
-      result: entry.result,
-      gating: entry.gating,
-      warnings: entry.warnings,
-      advisories: entry.advisories,
-      notes: entry.notes,
-      deltaPercent: entry.deltaPercent,
-      thresholdPercent: entry.thresholdPercent,
-      pixelDiff: entry.pixelDiff,
-      artifacts: entry.artifactRefs,
-    })),
-  };
-
-  const pagePayloads = enrichedSummaries.map((entry) => {
-    return createPageSummaryPayload({
-      baseName: `visual-${slugify(projectName)}-${slugify(viewportName)}-${slugify(entry.page)}`,
-      title: `Visual regression – ${entry.page} (${viewportName})`,
-      page: entry.page,
-      viewport: viewportName,
-      summary: {
-        status: entry.status ?? null,
-        result: entry.result,
-        threshold: entry.threshold,
-        thresholdPercent: entry.thresholdPercent,
-        pixelDiff: entry.pixelDiff,
-        pixelRatio: entry.pixelRatio,
-        deltaPercent: entry.deltaPercent,
-        expectedSize: entry.diffMetrics.expectedSize || null,
-        actualSize: entry.diffMetrics.actualSize || null,
-        artifacts: entry.artifactRefs,
-        screenshot: entry.screenshot || null,
-        error: entry.error || null,
-        gating: entry.gating,
-        warnings: entry.warnings,
-        advisories: entry.advisories,
-        notes: entry.notes,
-      },
-      metadata: {
-        spec: 'visual.regression.snapshots',
-        summaryType: 'visual',
-        projectName,
-        viewport: viewportName,
-      },
-    });
-  });
-
-  return { runPayload, pagePayloads };
 };
 
 test.describe('Visual Regression', () => {

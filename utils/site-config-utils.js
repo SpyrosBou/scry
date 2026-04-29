@@ -44,12 +44,18 @@ const hostsShareBaseLabel = (a, b) => {
   return stripWww(a) === stripWww(b);
 };
 
-function ensureHomepagePresence(pages, siteName, contextLabel = 'runtime', includeHomepage = true) {
+function ensureHomepagePresence(
+  pages,
+  siteName,
+  contextLabel = 'runtime',
+  includeHomepage = true,
+  logger = console
+) {
   const sourceList = Array.isArray(pages) ? pages.filter((item) => typeof item === 'string') : [];
   const unique = Array.from(new Set(sourceList));
 
   if (unique.length === 0) {
-    console.log(
+    logger.log(
       `⚠️  ${contextLabel}: ${siteName} has no testPages configured; injecting '/' to keep coverage aligned.`
     );
     return ['/'];
@@ -61,7 +67,7 @@ function ensureHomepagePresence(pages, siteName, contextLabel = 'runtime', inclu
 
   const hasRoot = unique.includes('/');
   if (!hasRoot) {
-    console.log(
+    logger.log(
       `⚠️  ${contextLabel}: ${siteName} testPages missing homepage '/'; injecting for this run.`
     );
     unique.unshift('/');

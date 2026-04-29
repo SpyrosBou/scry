@@ -64,7 +64,8 @@ async function refreshSiteConfig(sitePath, options = {}) {
     siteConfig.testPages,
     siteLabel,
     'discovery config',
-    siteConfig.includeHomepage
+    siteConfig.includeHomepage,
+    logger
   );
   const initialPagesNormalized = !arraysEqual(siteConfig.testPages, persisted.testPages);
 
@@ -142,7 +143,8 @@ async function refreshSiteConfig(sitePath, options = {}) {
       updated,
       siteLabel,
       'sitemap discovery',
-      siteConfig.includeHomepage
+      siteConfig.includeHomepage,
+      logger
     );
 
     if (added.length === 0 && removed.length === 0) {

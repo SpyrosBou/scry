@@ -4,127 +4,18 @@ const path = require('path');
 const fs = require('fs');
 const http = require('http');
 const https = require('https');
-
-const RUN_MANIFEST_THRESHOLD = 8192; // bytes
-
-const sanitiseForFilename = (input) =>
-  String(input || 'site')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .substring(0, 60) || 'site';
-
-const toPosixPath = (value) => value.split(path.sep).join('/');
-
-const cloneSiteConfig = (siteConfig) => JSON.parse(JSON.stringify(siteConfig || {}));
-
-function normaliseSpecPattern(specInput) {
-  const raw = String(specInput || '').trim();
-  if (!raw) return null;
-
-  const hasGlob = (() => {
-    const globChars = new Set(['*', '?', '[', ']', '{', '}']);
-    for (const ch of raw) {
-      if (globChars.has(ch)) return true;
-    }
-    return false;
-  })();
-
-  const resolveRelative = (candidate) => {
-    const absolute = path.resolve(process.cwd(), candidate);
-    if (fs.existsSync(absolute)) {
-      return toPosixPath(path.relative(process.cwd(), absolute) || candidate);
-    }
-    return null;
-  };
-
-  if (path.isAbsolute(raw)) {
-    return toPosixPath(path.relative(process.cwd(), raw) || raw);
-  }
-
-  const direct = resolveRelative(raw);
-  if (direct) {
-    return direct;
-  }
-
-  if (!raw.startsWith('tests/')) {
-    const nested = resolveRelative(path.join('tests', raw));
-    if (nested) {
-      return nested;
-    }
-  }
-
-  if (!hasGlob && !raw.startsWith('tests/')) {
-    return toPosixPath(path.join('tests', raw));
-  }
-
-  return toPosixPath(raw);
-}
-
-function prepareRunManifestPayload({
-  siteName,
-  siteConfig,
-  appliedPageLimit,
-  projectArgsList,
-  projectSpecifier,
-  testTargets,
-  requestedSpecs,
-}) {
-  let resolvedProjects;
-  if (projectSpecifier && projectSpecifier.toLowerCase() === 'all') {
-    resolvedProjects = ['all'];
-  } else if (projectArgsList.length > 0) {
-    resolvedProjects = [...projectArgsList];
-  } else {
-    resolvedProjects = ['Chrome'];
-  }
-  const manifest = {
-    timestamp: new Date().toISOString(),
-    limits: {
-      pageLimit: appliedPageLimit != null ? appliedPageLimit : null,
-    },
-    site: {
-      name: siteName,
-      title: siteConfig.name,
-      baseUrl: siteConfig.baseUrl,
-    },
-    siteConfig: cloneSiteConfig(siteConfig),
-    pages: Array.isArray(siteConfig.testPages) ? [...siteConfig.testPages] : [],
-    specs: Array.isArray(testTargets) ? [...testTargets] : [],
-    requestedSpecs: Array.isArray(requestedSpecs) ? [...requestedSpecs] : [],
-    projects: resolvedProjects,
-  };
-
-  return manifest;
-}
-
-function persistManifestIfNeeded(manifest, siteName) {
-  const serialised = JSON.stringify(manifest, null, 2);
-  if (Buffer.byteLength(serialised, 'utf8') <= RUN_MANIFEST_THRESHOLD) {
-    return {
-      env: {
-        SITE_RUN_MANIFEST_INLINE: JSON.stringify(manifest),
-      },
-      manifestPath: null,
-    };
-  }
-
-  const manifestsDir = path.join(process.cwd(), 'reports', 'run-manifests');
-  if (!fs.existsSync(manifestsDir)) {
-    fs.mkdirSync(manifestsDir, { recursive: true });
-  }
-
-  const manifestFileName = `run-manifest-${sanitiseForFilename(siteName)}-${Date.now()}-${process.pid}.json`;
-  const manifestPath = path.join(manifestsDir, manifestFileName);
-  fs.writeFileSync(manifestPath, `${serialised}\n`);
-
-  return {
-    env: {
-      SITE_RUN_MANIFEST: manifestPath,
-    },
-    manifestPath,
-  };
-}
+const {
+  applyPageLimit,
+  prepareRunManifestPayload,
+  selectProjects,
+  selectSpecTargets,
+} = require('./run-plan');
+const {
+  ensureScreenshotResultsDir,
+  persistRunManifestIfNeeded,
+  readLatestReportSummary,
+} = require('./run-artifacts');
+const { buildPlaywrightInvocation } = require('./playwright-invocation');
 
 class TestRunner {
   static prepareRunManifest({
@@ -155,7 +46,7 @@ class TestRunner {
           },
           manifestPath: null,
         }
-      : persistManifestIfNeeded(manifest, siteName);
+      : persistRunManifestIfNeeded(manifest, siteName);
 
     return {
       manifest,
@@ -233,7 +124,7 @@ class TestRunner {
     console.log('  node run-tests.js --site=daygroup-live       # Test live production');
   }
 
-  static resolveLocalExecutionEnv(siteName, siteConfig, baseEnv = process.env) {
+  static resolveLocalExecutionEnv(siteName, siteConfig, baseEnv = process.env, logger = console) {
     const resolvedEnv = { ...baseEnv };
 
     if (!/\.ddev\.site|localhost|127\.0\.0\.1/.test(siteConfig.baseUrl || '')) {
@@ -244,9 +135,7 @@ class TestRunner {
       String(resolvedEnv.ENABLE_DDEV || '').toLowerCase() === 'true' &&
       resolvedEnv.DDEV_PROJECT_PATH
     ) {
-      console.log(
-        `🛠  --local: Using DDEV project path from env: ${resolvedEnv.DDEV_PROJECT_PATH}`
-      );
+      logger.log(`🛠  --local: Using DDEV project path from env: ${resolvedEnv.DDEV_PROJECT_PATH}`);
       return resolvedEnv;
     }
 
@@ -254,9 +143,9 @@ class TestRunner {
     const inferred = this.inferDdevProjectPath(siteName, siteConfig.baseUrl);
     if (inferred) {
       resolvedEnv.DDEV_PROJECT_PATH = inferred;
-      console.log(`🛠  --local: Using inferred DDEV project path: ${inferred}`);
+      logger.log(`🛠  --local: Using inferred DDEV project path: ${inferred}`);
     } else {
-      console.log(
+      logger.log(
         'ℹ️  --local provided but unable to infer DDEV project path. You can set DDEV_PROJECT_PATH explicitly.'
       );
     }
@@ -278,21 +167,11 @@ class TestRunner {
       }
 
       appliedPageLimit = null;
-      if (options.limit != null) {
-        const rawLimit = String(options.limit).trim().toLowerCase();
-        const unlimitedTokens = new Set(['all', 'infinite', 'infinity']);
-        if (rawLimit !== '' && !unlimitedTokens.has(rawLimit)) {
-          const limitNumber = Number.parseInt(rawLimit, 10);
-          if (Number.isFinite(limitNumber) && limitNumber > 0) {
-            siteConfig.testPages = siteConfig.testPages.slice(0, limitNumber);
-            appliedPageLimit = limitNumber;
-            console.log(`ℹ️  Page cap applied: first ${limitNumber} page(s) will be tested.`);
-          } else {
-            console.log('⚠️  Ignoring invalid page cap; all pages will be tested.');
-          }
-        } else {
-          console.log('ℹ️  Page cap disabled; all available pages will be tested.');
-        }
+      const pagePlan = applyPageLimit(siteConfig, options.limit);
+      siteConfig = pagePlan.siteConfig;
+      appliedPageLimit = pagePlan.appliedPageLimit;
+      if (pagePlan.message) {
+        console.log(pagePlan.message);
       }
 
       console.log(`Running tests for: ${siteConfig.name}`);
@@ -307,8 +186,8 @@ class TestRunner {
     }
 
     // Determine which tests to run (avoid relying on shell glob expansion)
-    const specFilters = Array.isArray(options.specs) ? options.specs.filter(Boolean) : [];
-    const specTargets = Array.from(new Set(specFilters.map(normaliseSpecPattern).filter(Boolean)));
+    const specPlan = selectSpecTargets(options);
+    const specTargets = specPlan.requestedSpecs;
 
     if (specTargets.length > 0) {
       console.log('ℹ️  Running explicit spec target(s):');
@@ -317,82 +196,11 @@ class TestRunner {
       }
     }
 
-    let testTargets;
-
-    if (specTargets.length > 0) {
-      testTargets = specTargets;
-    } else {
-      const testsDir = path.join(process.cwd(), 'tests');
-      const testEntries = fs
-        .readdirSync(testsDir, { withFileTypes: true })
-        .filter((entry) => entry.isFile() && entry.name.endsWith('.spec.js'))
-        .map((entry) => path.join('tests', entry.name));
-
-      const groupExplicitlySelected =
-        options.visual ||
-        options.responsive ||
-        options.functionality ||
-        options.accessibility ||
-        options.allGroups;
-
-      const runAllGroups = options.allGroups || !groupExplicitlySelected;
-      const selectedTests = new Set();
-
-      for (const file of testEntries) {
-        const baseName = path.basename(file);
-        const isVisual = baseName.startsWith('visual.');
-        const isResponsiveStructure = baseName.startsWith('responsive.') && !/a11y/i.test(baseName);
-        const isFunctionality = baseName.startsWith('functionality.');
-        const isAccessibility = /accessibility|a11y/i.test(baseName);
-
-        if (runAllGroups) {
-          selectedTests.add(file);
-          continue;
-        }
-
-        if (options.visual && isVisual) {
-          selectedTests.add(file);
-          continue;
-        }
-        if (options.responsive && isResponsiveStructure) {
-          selectedTests.add(file);
-          continue;
-        }
-        if (options.functionality && isFunctionality) {
-          selectedTests.add(file);
-          continue;
-        }
-        if (options.accessibility && isAccessibility) {
-          selectedTests.add(file);
-        }
-      }
-
-      testTargets = selectedTests.size > 0 ? Array.from(selectedTests) : ['tests'];
-    }
-
-    const projectInputRaw = Array.isArray(options.project)
-      ? options.project
-          .map((entry) => String(entry || '').trim())
-          .filter(Boolean)
-          .join(',')
-      : typeof options.project === 'string'
-        ? options.project.trim()
-        : options.project === true
-          ? 'Chrome'
-          : '';
-    const usingDefaultProject = !projectInputRaw;
-    const projectSpecifier = usingDefaultProject ? 'Chrome' : projectInputRaw;
-    const projectArgsList =
-      projectSpecifier.toLowerCase() === 'all'
-        ? []
-        : projectSpecifier
-            .split(',')
-            .map((entry) => entry.trim())
-            .filter(Boolean);
-    if (usingDefaultProject && projectSpecifier.toLowerCase() !== 'all') {
-      console.log('ℹ️  Defaulting to Chrome project (override with --browsers)');
-    } else if (projectSpecifier.toLowerCase() === 'all') {
-      console.log('ℹ️  Running across all configured Playwright projects');
+    const testTargets = specPlan.testTargets;
+    const projectPlan = selectProjects(options.project);
+    const { projectArgsList, projectSpecifier } = projectPlan;
+    if (projectPlan.message) {
+      console.log(projectPlan.message);
     }
 
     const manifestInfo = TestRunner.prepareRunManifest({
@@ -426,10 +234,7 @@ class TestRunner {
     await this.preflightLocalSite(siteConfig, runtimeEnv);
 
     // Create test-results directory only for real Playwright runs.
-    const resultsDir = path.join(process.cwd(), 'test-results', 'screenshots');
-    if (!fs.existsSync(resultsDir)) {
-      fs.mkdirSync(resultsDir, { recursive: true });
-    }
+    ensureScreenshotResultsDir();
 
     if (manifestInfo.manifestPath) {
       const relativePath = path.relative(process.cwd(), manifestInfo.manifestPath);
@@ -467,23 +272,18 @@ class TestRunner {
       spawnEnv.A11Y_RUN_TOKEN = `${Date.now()}`;
     }
 
-    // Run Playwright tests
-    const playwrightArgs = ['test', ...testTargets];
-
-    // Add additional args
-    if (options.debug) playwrightArgs.push('--debug');
-    if (projectArgsList.length > 0) {
-      for (const projectName of projectArgsList) {
-        playwrightArgs.push(`--project=${projectName}`);
-      }
-    }
+    const invocation = buildPlaywrightInvocation({
+      testTargets,
+      debug: options.debug,
+      projectArgsList,
+    });
 
     console.log(`Starting tests...`);
-    console.log(`Command: npx playwright ${playwrightArgs.join(' ')}`);
+    console.log(`Command: ${invocation.displayCommand}`);
     console.log('');
 
     return new Promise((resolve, reject) => {
-      const playwright = spawn('npx', ['playwright', ...playwrightArgs], {
+      const playwright = spawn(invocation.command, invocation.args, {
         stdio: 'inherit',
         env: spawnEnv,
       });
@@ -540,32 +340,7 @@ class TestRunner {
   }
 
   static readLatestReportSummary() {
-    try {
-      const summaryPath = path.join(process.cwd(), 'reports', 'latest-run.json');
-      if (!fs.existsSync(summaryPath)) {
-        return null;
-      }
-      const raw = fs.readFileSync(summaryPath, 'utf8');
-      const data = JSON.parse(raw);
-      const counts = data.statusCounts || {};
-      const runFolder = data.runFolder || null;
-      const reportRelativePath = data.reportRelativePath || null;
-      return {
-        passed: counts.passed ?? 0,
-        failed: counts.failed ?? 0,
-        skipped: counts.skipped ?? 0,
-        timedOut: counts.timedOut ?? 0,
-        interrupted: counts.interrupted ?? 0,
-        flaky: counts.flaky ?? data.flaky ?? 0,
-        reportPath:
-          runFolder ||
-          (reportRelativePath ? reportRelativePath.replace(/\\/g, '/').split('/')[0] : null),
-        reportFile: reportRelativePath,
-      };
-    } catch (error) {
-      console.warn(`⚠️  Unable to read latest report summary: ${error.message}`);
-      return null;
-    }
+    return readLatestReportSummary();
   }
 
   static inferDdevProjectPath(siteName, baseUrl) {
@@ -728,21 +503,16 @@ class TestRunner {
       requestedSpecs: ['tests/visual.regression.snapshots.spec.js'],
     });
 
+    const invocation = buildPlaywrightInvocation({
+      testTargets: ['tests/visual.regression.snapshots.spec.js'],
+      extraArgs: ['--update-snapshots', 'all'],
+    });
+
     return new Promise((resolve, reject) => {
-      const playwright = spawn(
-        'npx',
-        [
-          'playwright',
-          'test',
-          'tests/visual.regression.snapshots.spec.js',
-          '--update-snapshots',
-          'all',
-        ],
-        {
-          stdio: 'inherit',
-          env: { ...process.env, ...manifestInfo.env },
-        }
-      );
+      const playwright = spawn(invocation.command, invocation.args, {
+        stdio: 'inherit',
+        env: { ...process.env, ...manifestInfo.env },
+      });
 
       playwright.on('close', (code) => {
         console.log('');

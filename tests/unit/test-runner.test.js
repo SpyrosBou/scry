@@ -10,7 +10,9 @@ test('resolveLocalExecutionEnv returns a derived env without mutating the input 
     baseUrl: 'https://example.ddev.site',
   };
 
-  const resolved = TestRunner.resolveLocalExecutionEnv('example-local', siteConfig, baseEnv);
+  const resolved = TestRunner.resolveLocalExecutionEnv('example-local', siteConfig, baseEnv, {
+    log: () => {},
+  });
 
   assert.notStrictEqual(resolved, baseEnv);
   assert.strictEqual(baseEnv.ENABLE_DDEV, undefined);
