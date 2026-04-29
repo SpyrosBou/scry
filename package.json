@@ -12,6 +12,7 @@
     "lint:fix": "eslint . --fix",
     "prettier:check": "prettier --check \"*.js\" \"*.json\" \"scripts/**/*.js\" \"utils/**/*.js\"",
     "prettier:write": "prettier --write \"*.js\" \"*.json\" \"scripts/**/*.js\" \"utils/**/*.js\"",
+    "gate:ci": "npm run lint && npm run test:unit && npm run prettier:check && npm run app:lint && npm run app:check && npm run app:build && npm run app:test",
     "lint:teardown": "node scripts/maintenance/check-browser-teardown.js",
     "test:unit": "node --test tests/unit/**/*.test.js",
     "reports:read": "node scripts/reporting/read-reports.js",
@@ -30,7 +31,9 @@
     "app:build": "npm --prefix app run build",
     "app:check": "npm --prefix app run check",
     "app:dev": "npm --prefix app run dev",
+    "app:lint": "npm --prefix app run lint",
     "app:preview": "npm --prefix app run preview",
+    "app:test": "npm --prefix app run test --if-present",
     "app:mock:build": "npx @tailwindcss/cli -i site/app/styles/input.css -o site/app/styles/app.css",
     "app:mock:dev": "npx @tailwindcss/cli -i site/app/styles/input.css -o site/app/styles/app.css --watch & npx serve site/app -l 4401 --no-clipboard",
     "app:mock:serve": "npx serve site/app -l 4401 --no-clipboard"

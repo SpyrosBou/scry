@@ -1,22 +1,18 @@
-name: CI (Manual Smoke)
+name: CI
 
 on:
-  # Manual-only to avoid automatic runs on PR/push/schedule
+  pull_request:
+  push:
+    branches:
+      - main
   workflow_dispatch:
-    inputs:
-      site:
-        description: 'Site config name (e.g., example-site)'
-        required: false
-        type: string
 
 jobs:
-  smoke:
+  gate:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node-version: [18.x, 20.x]
-    env:
-      SITE: ${{ github.event.inputs.site || vars.SMOKE_SITE }}
+        node-version: [20.19.0, 22.12.0]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -30,35 +26,13 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Lint
-        run: npm run lint
+      - name: Install app dependencies
+        run: npm ci
+        working-directory: app
 
-      - name: Install Playwright browsers
-        run: npx playwright install --with-deps
-
-      - name: Start static smoke server (if SITE=static-smoke)
-        if: env.SITE == 'static-smoke'
-        run: |
-          node scripts/maintenance/static-server.js &
-          node scripts/maintenance/wait-url.js http://127.0.0.1:8080
-
-      - name: Run smoke tests (skips if SITE not set)
-        if: env.SITE != ''
-        run: node run-tests.js --site=${{ env.SITE }} --profile=smoke
-
-      - name: Skip notice (SITE not set)
-        if: env.SITE == ''
-        run: |
-          echo "Skipping smoke tests. Set repo variable SMOKE_SITE or provide a 'site' input on manual runs."
-
-      - name: Upload Playwright HTML report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: playwright-report-${{ matrix.node-version }}
-          path: playwright-report
-          if-no-files-found: ignore
+      - name: Run CI gate
+        run: npm run gate:ci
 
     concurrency:
-      group: smoke-${{ github.ref }}
+      group: ci-${{ github.ref }}-${{ matrix.node-version }}
       cancel-in-progress: true
