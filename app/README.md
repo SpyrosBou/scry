@@ -1,42 +1,25 @@
-# sv
+# Scry App
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+SvelteKit shell for the in-app Scry experience. This is the source app; the older `site/app/` files are static mockups used for design reference.
 
-## Creating a project
+## Commands
 
-If you're seeing this, you've probably already done this step. Congrats!
-
-```sh
-# create a new project
-npx sv create my-app
-```
-
-To recreate this project with the same configuration:
-
-```sh
-# recreate this project
-npx sv@0.13.0 create --template minimal --types ts --no-install app
-```
-
-## Developing
-
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
-
-```sh
+```bash
 npm run dev
-
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
-```
-
-## Building
-
-To create a production version of your app:
-
-```sh
+npm run check
 npm run build
 ```
 
-You can preview the production build with `npm run preview`.
+From the repository root, use:
 
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+```bash
+npm run app:dev
+npm run app:check
+npm run app:build
+```
+
+## Notes
+
+- Supabase types live in `src/lib/db/types.ts` and should match the generated database type shape expected by `@supabase/supabase-js`.
+- Routes that need authenticated data should use server load functions and return typed `data` to page components.
+- Keep unfinished UI states honest: placeholder pages are fine, but missing run data should not render as a passing audit.

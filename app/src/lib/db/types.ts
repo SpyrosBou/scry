@@ -30,6 +30,7 @@ export interface Database {
 					slug?: string;
 					created_at?: string;
 				};
+				Relationships: [];
 			};
 			sites: {
 				Row: {
@@ -56,6 +57,15 @@ export interface Database {
 					name?: string;
 					created_at?: string;
 				};
+				Relationships: [
+					{
+						foreignKeyName: 'sites_project_id_fkey';
+						columns: ['project_id'];
+						isOneToOne: false;
+						referencedRelation: 'projects';
+						referencedColumns: ['id'];
+					}
+				];
 			};
 			runs: {
 				Row: {
@@ -85,6 +95,15 @@ export interface Database {
 					started_at?: string;
 					completed_at?: string | null;
 				};
+				Relationships: [
+					{
+						foreignKeyName: 'runs_site_id_fkey';
+						columns: ['site_id'];
+						isOneToOne: false;
+						referencedRelation: 'sites';
+						referencedColumns: ['id'];
+					}
+				];
 			};
 			run_suites: {
 				Row: {
@@ -108,6 +127,15 @@ export interface Database {
 					score?: number | null;
 					status?: SuiteStatus;
 				};
+				Relationships: [
+					{
+						foreignKeyName: 'run_suites_run_id_fkey';
+						columns: ['run_id'];
+						isOneToOne: false;
+						referencedRelation: 'runs';
+						referencedColumns: ['id'];
+					}
+				];
 			};
 			findings: {
 				Row: {
@@ -137,11 +165,21 @@ export interface Database {
 					page_count?: number;
 					details?: Json;
 				};
+				Relationships: [
+					{
+						foreignKeyName: 'findings_run_id_fkey';
+						columns: ['run_id'];
+						isOneToOne: false;
+						referencedRelation: 'runs';
+						referencedColumns: ['id'];
+					}
+				];
 			};
 		};
 		Views: Record<string, never>;
 		Functions: Record<string, never>;
 		Enums: Record<string, never>;
+		CompositeTypes: Record<string, never>;
 	};
 }
 

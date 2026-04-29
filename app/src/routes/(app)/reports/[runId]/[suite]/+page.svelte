@@ -1,9 +1,10 @@
 <script lang="ts">
-	import { page } from '$app/stores';
 	import Button from '$lib/components/Button.svelte';
 
-	const runId = $derived($page.params.runId);
-	const suite = $derived($page.params.suite);
+	let { params }: import('./$types').PageProps = $props();
+
+	const runId = $derived(params.runId);
+	const suite = $derived(params.suite);
 	const suiteName = $derived(suite.charAt(0).toUpperCase() + suite.slice(1));
 </script>
 

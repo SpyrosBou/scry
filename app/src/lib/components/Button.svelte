@@ -15,7 +15,7 @@
 
 	const { variant = 'primary', size = 'default', href, disabled = false, children, onclick }: Props = $props();
 
-	const base = 'inline-flex items-center justify-center gap-2 rounded-md font-body font-semibold leading-none no-underline cursor-pointer transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0';
+	const base = 'group inline-flex items-center justify-center gap-2 rounded-md font-body font-semibold leading-none no-underline cursor-pointer transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0';
 
 	const variants: Record<Variant, string> = {
 		primary: 'bg-gold text-text-inverse shadow-[0_2px_8px_rgba(0,0,0,0.3),0_0_24px_var(--color-gold-glow)] hover:bg-gold-light hover:shadow-[0_8px_24px_rgba(0,0,0,0.4),0_0_40px_var(--color-gold-glow)] disabled:opacity-40 disabled:cursor-not-allowed disabled:translate-y-0 disabled:shadow-none',
@@ -29,7 +29,7 @@
 		sm: 'text-xs min-h-[36px] px-4 py-2'
 	};
 
-	const cls = `${base} ${variants[variant]} ${sizes[size]}`;
+	const cls = $derived(`${base} ${variants[variant]} ${sizes[size]}`);
 </script>
 
 {#if href}

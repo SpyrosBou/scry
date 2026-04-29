@@ -17,8 +17,8 @@ const SVG_HEIGHT = 80;
 interface ScoreEntry {
 	suite: SuiteSlug;
 	value: number | null;
-	status: SuiteStatus | 'pass';
-	href: string;
+	status: SuiteStatus | 'unknown';
+	href?: string;
 }
 
 interface RecentRun {
@@ -118,13 +118,16 @@ export const load: PageServerLoad = async ({ params, locals, parent }) => {
 	const latestRun = safeRuns[0];
 	const scores: ScoreEntry[] = SUITES.map((suite) => {
 		if (!latestRun) {
-			return { suite, value: null, status: 'pass' as const, href: '#' };
+			return { suite, value: null, status: 'unknown' };
 		}
 		const rs = latestRun.run_suites.find((s) => s.suite === suite);
+		if (!rs) {
+			return { suite, value: null, status: 'unknown' };
+		}
 		return {
 			suite,
-			value: rs?.score ?? null,
-			status: (rs?.status ?? 'pass') as SuiteStatus,
+			value: rs.score,
+			status: rs.status as SuiteStatus,
 			href: `/reports/${latestRun.id}/${suite}`
 		};
 	});
@@ -176,6 +179,6 @@ export const load: PageServerLoad = async ({ params, locals, parent }) => {
 		trendPoints,
 		suiteColors: SUITE_COLORS,
 		lastRunLabel,
-		schedule: 'Daily at 6:00 AM'
+		schedule: null
 	};
 };

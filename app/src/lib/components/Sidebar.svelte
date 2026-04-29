@@ -148,25 +148,30 @@
 					{#each project.sites as site}
 						{@const isActive = $page.params.slug === site.slug}
 						<li>
-							<a
-								role="treeitem"
-								aria-selected={isActive}
-								href="/sites/{site.slug}"
-								tabindex={isActive ? 0 : -1}
-								class="group flex items-center gap-2 w-full py-1.5 px-4 text-sm font-body no-underline cursor-pointer transition-all duration-100 min-h-[36px] border-l-3 border-transparent {isActive ? 'bg-gold-bg text-text-primary !border-l-gold' : 'text-text-secondary hover:bg-white/[0.03] hover:text-text-primary'}"
+							<div
+								class="group flex items-center min-h-[36px] border-l-3 border-transparent transition-all duration-100 {isActive ? 'bg-gold-bg !border-l-gold' : 'hover:bg-white/[0.03]'}"
 							>
-								<HealthDot status={site.health} />
-								<span class="flex-1 min-w-0 truncate">{site.name}</span>
+								<a
+									role="treeitem"
+									aria-selected={isActive}
+									href="/sites/{site.slug}"
+									tabindex={isActive ? 0 : -1}
+									class="flex min-w-0 flex-1 items-center gap-2 py-1.5 pl-4 pr-1 text-sm font-body no-underline cursor-pointer transition-colors duration-100 {isActive ? 'text-text-primary' : 'text-text-secondary hover:text-text-primary'}"
+								>
+									<HealthDot status={site.health} />
+									<span class="flex-1 min-w-0 truncate">{site.name}</span>
+								</a>
 								<button
-									class="flex items-center justify-center size-6 rounded-[4px] border-none bg-transparent text-text-tertiary p-0 text-[0.7rem] cursor-pointer transition-all duration-100 opacity-0 group-hover:opacity-100 hover:bg-white/[0.08] hover:text-text-primary"
+									type="button"
+									class="mr-2 flex items-center justify-center size-6 rounded-[4px] border-none bg-transparent text-text-tertiary p-0 text-[0.7rem] cursor-pointer transition-all duration-100 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 hover:bg-white/[0.08] hover:text-text-primary"
 									aria-label="{site.name} settings"
-									onclick={(e) => { e.preventDefault(); e.stopPropagation(); goto(`/sites/${site.slug}/settings`); }}
+									onclick={() => { goto(`/sites/${site.slug}/settings`); }}
 								>
 									<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3">
 										<circle cx="8" cy="8" r="2.5" /><path d="M8 1v2M8 13v2M1 8h2M13 8h2" />
 									</svg>
 								</button>
-							</a>
+							</div>
 						</li>
 					{/each}
 

@@ -1,8 +1,11 @@
 <script lang="ts">
 	import ScoreCards from '$lib/components/ScoreCards.svelte';
 	import Button from '$lib/components/Button.svelte';
+	import type { SuiteSlug } from '$lib/db';
 
-	let { data } = $props();
+	let { data }: import('./$types').PageProps = $props();
+
+	const suites: SuiteSlug[] = ['functionality', 'accessibility', 'responsive', 'visual'];
 
 	const statusColors: Record<string, string> = {
 		Pass: 'bg-status-green',
@@ -19,11 +22,11 @@
 <div class="flex items-start justify-between mb-6">
 	<div>
 		<h1 class="mb-1">{data.site.name}</h1>
-		<div class="flex items-center gap-2 text-[0.8rem] text-text-secondary">
-			<span>Last run: {data.lastRunLabel}</span>
-			<span>&middot;</span>
-			<span>Scheduled: {data.schedule}</span>
-		</div>
+			<div class="flex items-center gap-2 text-[0.8rem] text-text-secondary">
+				<span>Last run: {data.lastRunLabel}</span>
+				<span>&middot;</span>
+				<span>{data.schedule ? `Scheduled: ${data.schedule}` : 'No schedule'}</span>
+			</div>
 	</div>
 	<Button>Run Audit</Button>
 </div>
@@ -34,7 +37,7 @@
 	<div class="rounded-md bg-elevated border border-border-subtle p-4 mb-5">
 		<div class="text-xs text-text-secondary font-medium mb-3">Score Trend (last {data.recentRuns.length} runs)</div>
 		<svg class="w-full h-20" viewBox="0 0 600 80" preserveAspectRatio="none">
-			{#each ['functionality', 'accessibility', 'responsive', 'visual'] as suite}
+			{#each suites as suite}
 				{#if data.trendPoints[suite]}
 					<polyline
 						fill="none"

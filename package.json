@@ -27,9 +27,13 @@
     "styles:build": "node scripts/reporting/build-report-styles.js",
     "site:build": "node site/build.js",
     "site:dev": "node site/serve.js --open",
-    "app:build": "npx @tailwindcss/cli -i site/app/styles/input.css -o site/app/styles/app.css",
-    "app:dev": "npx @tailwindcss/cli -i site/app/styles/input.css -o site/app/styles/app.css --watch & npx serve site/app -l 4401 --no-clipboard",
-    "app:serve": "npx serve site/app -l 4401 --no-clipboard"
+    "app:build": "npm --prefix app run build",
+    "app:check": "npm --prefix app run check",
+    "app:dev": "npm --prefix app run dev",
+    "app:preview": "npm --prefix app run preview",
+    "app:mock:build": "npx @tailwindcss/cli -i site/app/styles/input.css -o site/app/styles/app.css",
+    "app:mock:dev": "npx @tailwindcss/cli -i site/app/styles/input.css -o site/app/styles/app.css --watch & npx serve site/app -l 4401 --no-clipboard",
+    "app:mock:serve": "npx serve site/app -l 4401 --no-clipboard"
   },
   "lint-staged": {},
   "keywords": [

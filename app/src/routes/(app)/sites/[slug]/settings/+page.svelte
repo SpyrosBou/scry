@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { page } from '$app/stores';
+	let { params }: import('./$types').PageProps = $props();
 
-	const slug = $derived($page.params.slug);
+	const slug = $derived(params.slug);
 	const siteName = $derived(slug.replace(/-/g, '.').replace(/\.com$/, '.com'));
 </script>
 
