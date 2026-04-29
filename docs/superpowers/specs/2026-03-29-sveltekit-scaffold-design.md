@@ -50,7 +50,7 @@ app/
 │       └── styles/
 │           └── theme.css                 # @theme design tokens
 ├── static/                               # Static assets
-├── svelte.config.js                      # SvelteKit config (adapter-auto)
+├── svelte.config.js                      # SvelteKit config (adapter-node)
 ├── vite.config.js                        # Vite config (tailwind plugin, port 4401)
 └── package.json                          # SvelteKit + Tailwind deps
 ```

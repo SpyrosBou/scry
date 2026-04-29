@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 
 	let email = $state('');
 	let password = $state('');
@@ -7,7 +7,7 @@
 	let error = $state('');
 	let success = $state(false);
 
-	const supabase = $derived($page.data.supabase);
+	const supabase = $derived(page.data.supabase);
 
 	async function handleSignup(e: SubmitEvent) {
 		e.preventDefault();
@@ -18,7 +18,7 @@
 			email,
 			password,
 			options: {
-				emailRedirectTo: `${$page.url.origin}/auth/callback`
+				emailRedirectTo: `${page.url.origin}/auth/callback`
 			}
 		});
 
@@ -35,7 +35,7 @@
 		const { error: authError } = await supabase.auth.signInWithOAuth({
 			provider: 'google',
 			options: {
-				redirectTo: `${$page.url.origin}/auth/callback`
+				redirectTo: `${page.url.origin}/auth/callback`
 			}
 		});
 		if (authError) {

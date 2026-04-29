@@ -37,7 +37,7 @@
 	<div class="rounded-md bg-elevated border border-border-subtle p-4 mb-5">
 		<div class="text-xs text-text-secondary font-medium mb-3">Score Trend (last {data.recentRuns.length} runs)</div>
 		<svg class="w-full h-20" viewBox="0 0 600 80" preserveAspectRatio="none">
-			{#each suites as suite}
+			{#each suites as suite (suite)}
 				{#if data.trendPoints[suite]}
 					<polyline
 						fill="none"
@@ -53,7 +53,7 @@
 	</div>
 
 	<div class="text-xs text-text-secondary font-medium mb-2">Recent Runs</div>
-	{#each data.recentRuns as run}
+	{#each data.recentRuns as run (run.id)}
 		<a href="/reports/{run.id}" class="flex items-center gap-3 rounded-md bg-elevated border border-border-subtle px-4 py-3 mb-2 no-underline text-text-primary transition-all duration-150 hover:-translate-y-px hover:shadow-sm">
 			<span class="text-[0.8rem] tabular-nums min-w-[140px]">{run.date}</span>
 			<span class="flex items-center gap-1.5 text-xs font-medium">

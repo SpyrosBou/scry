@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import { goto, invalidate } from '$app/navigation';
 	import type { ProjectWithSites } from '$lib/db';
 	import HealthDot from './HealthDot.svelte';
@@ -123,9 +123,8 @@
 	class="w-[220px] min-w-[220px] h-full bg-primary border-r border-border-subtle overflow-y-auto overflow-x-hidden overscroll-contain py-3 flex flex-col"
 	aria-label="Site navigation"
 >
-	<!-- svelte-ignore a11y_no_noninteractive_element_to_interactive_role -->
 	<ul role="tree" aria-label="Projects and sites" onkeydown={handleKeydown}>
-		{#each projects as project}
+		{#each projects as project (project.id)}
 			<li>
 				<span class="group flex items-center px-4 pt-3 pb-1">
 					<span class="flex-1 text-[0.65rem] font-semibold uppercase tracking-[0.08em] text-text-tertiary font-body">
@@ -145,8 +144,8 @@
 					>+</button>
 				</span>
 				<ul role="group">
-					{#each project.sites as site}
-						{@const isActive = $page.params.slug === site.slug}
+					{#each project.sites as site (site.id)}
+						{@const isActive = page.params.slug === site.slug}
 						<li>
 							<div
 								class="group flex items-center min-h-[36px] border-l-3 border-transparent transition-all duration-100 {isActive ? 'bg-gold-bg !border-l-gold' : 'hover:bg-white/[0.03]'}"

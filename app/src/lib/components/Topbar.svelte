@@ -1,9 +1,9 @@
 <script lang="ts">
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 
 	const { activePage = 'dashboard' }: { activePage?: 'dashboard' | 'reports' } = $props();
 
-	const session = $derived($page.data.session);
+	const session = $derived(page.data.session);
 	const userEmail = $derived(session?.user?.email ?? '');
 	const userInitial = $derived(userEmail ? userEmail[0].toUpperCase() : '?');
 </script>

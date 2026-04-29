@@ -1,7 +1,5 @@
 <script lang="ts">
-	import type { Snippet } from 'svelte';
-
-	let { children }: { children: Snippet } = $props();
+	let { children }: import('./$types').LayoutProps = $props();
 </script>
 
 {@render children()}

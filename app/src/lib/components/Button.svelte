@@ -10,7 +10,7 @@
 		href?: string;
 		disabled?: boolean;
 		children: Snippet;
-		onclick?: (e: MouseEvent) => void;
+		onclick?: (_event: MouseEvent) => void;
 	}
 
 	const { variant = 'primary', size = 'default', href, disabled = false, children, onclick }: Props = $props();

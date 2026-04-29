@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 
 	let email = $state('');
@@ -7,8 +7,24 @@
 	let loading = $state(false);
 	let error = $state('');
 
-	const supabase = $derived($page.data.supabase);
-	const redirectTo = $derived($page.url.searchParams.get('redirectTo') ?? '/');
+	const supabase = $derived(page.data.supabase);
+	const redirectTo = $derived(sanitizeAppRedirect(page.url.searchParams.get('redirectTo')));
+
+	function sanitizeAppRedirect(value: string | null, fallback = '/dashboard') {
+		if (!value) return fallback;
+
+		const trimmed = value.trim();
+		if (
+			!trimmed ||
+			!trimmed.startsWith('/') ||
+			trimmed.startsWith('//') ||
+			/[\u0000-\u001F\u007F]/.test(trimmed)
+		) {
+			return fallback;
+		}
+
+		return trimmed;
+	}
 
 	async function handleLogin(e: SubmitEvent) {
 		e.preventDefault();
@@ -30,7 +46,7 @@
 		const { error: authError } = await supabase.auth.signInWithOAuth({
 			provider: 'google',
 			options: {
-				redirectTo: `${$page.url.origin}/auth/callback?next=${encodeURIComponent(redirectTo)}`
+				redirectTo: `${page.url.origin}/auth/callback?next=${encodeURIComponent(redirectTo)}`
 			}
 		});
 		if (authError) {

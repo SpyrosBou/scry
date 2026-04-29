@@ -126,7 +126,7 @@
 
 		<!-- Progress steps -->
 		<div class="flex items-center justify-center gap-3 mb-8">
-			{#each [1, 2, 3] as n}
+			{#each [1, 2, 3] as n (n)}
 				<span
 					class="size-7 rounded-full border-[1.5px] flex items-center justify-center text-[0.7rem] font-semibold font-display transition-all duration-200
 					{n < step ? 'border-status-green text-status-green bg-[rgba(133,153,0,0.1)]' : n === step ? 'border-gold text-gold bg-gold-bg' : 'border-border-default text-text-tertiary'}"
@@ -185,7 +185,7 @@
 					{ name: 'Functionality', desc: 'Links, console, health', border: 'border-l-status-blue' },
 					{ name: 'Responsive', desc: 'Layout, viewports', border: 'border-l-status-yellow' },
 					{ name: 'Visual', desc: 'Pixel diffs, baselines', border: 'border-l-status-red' }
-				] as suite}
+				] as suite (suite.name)}
 					<button class="flex flex-col gap-1.5 rounded-md bg-elevated border border-border-gold border-l-3 {suite.border} p-3.5 text-left font-body bg-gold-bg">
 						<span class="text-[0.85rem] font-semibold text-text-primary">{suite.name}</span>
 						<span class="text-[0.7rem] text-text-tertiary leading-snug">{suite.desc}</span>

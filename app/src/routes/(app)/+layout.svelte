@@ -1,12 +1,11 @@
 <script lang="ts">
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import AppShell from '$lib/components/AppShell.svelte';
-	import type { Snippet } from 'svelte';
 
-	let { data, children }: { data: import('./$types').LayoutServerData; children: Snippet } = $props();
+	let { data, children }: import('./$types').LayoutProps = $props();
 
 	const activePage = $derived(
-		$page.url.pathname.startsWith('/reports') ? 'reports' as const : 'dashboard' as const
+		page.url.pathname.startsWith('/reports') ? 'reports' as const : 'dashboard' as const
 	);
 </script>
 

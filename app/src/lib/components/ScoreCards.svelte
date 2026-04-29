@@ -40,7 +40,7 @@
 </script>
 
 <div class="grid grid-cols-4 gap-3 mb-5 max-md:grid-cols-2 max-sm:grid-cols-1">
-	{#each scores as score}
+	{#each scores as score (score.suite)}
 		{#if score.href}
 			<a
 				href={score.href}

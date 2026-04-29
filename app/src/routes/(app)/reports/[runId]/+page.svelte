@@ -46,7 +46,7 @@
 			<span class="inline-flex items-center rounded-[4px] px-2 py-0.5 font-mono text-[0.65rem] font-semibold uppercase bg-[rgba(220,50,47,0.15)] text-status-red">{data.blockers.length}</span>
 		</button>
 		{#if blockersOpen}
-			{#each data.blockers as finding}
+			{#each data.blockers as finding (finding.id)}
 				<a href="/reports/{data.run.id}/{finding.suite}" class="finding-row finding-row--blocker flex items-center gap-3 rounded-r-sm px-3 py-2.5 no-underline text-text-primary transition-colors duration-100 hover:bg-white/[0.03]" style="border-left: 3px solid var(--color-status-red);">
 					<span class="flex-1 text-[0.85rem] min-w-0 truncate">{finding.rule}</span>
 					<span class="text-[0.7rem] text-text-tertiary tabular-nums whitespace-nowrap">{finding.page_count} {finding.page_count === 1 ? 'page' : 'pages'}</span>
@@ -69,7 +69,7 @@
 			<span class="inline-flex items-center rounded-[4px] px-2 py-0.5 font-mono text-[0.65rem] font-semibold uppercase bg-[rgba(181,137,0,0.15)] text-status-yellow">{data.warnings.length}</span>
 		</button>
 		{#if warningsOpen}
-			{#each data.warnings as finding}
+			{#each data.warnings as finding (finding.id)}
 				<a href="/reports/{data.run.id}/{finding.suite}" class="finding-row finding-row--warning flex items-center gap-3 rounded-r-sm px-3 py-2.5 no-underline text-text-primary transition-colors duration-100 hover:bg-white/[0.03]" style="border-left: 3px solid var(--color-status-yellow);">
 					<span class="flex-1 text-[0.85rem] min-w-0 truncate">{finding.rule}</span>
 					<span class="text-[0.7rem] text-text-tertiary tabular-nums whitespace-nowrap">{finding.page_count} {finding.page_count === 1 ? 'page' : 'pages'}</span>
