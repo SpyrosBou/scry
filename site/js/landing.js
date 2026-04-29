@@ -1,4 +1,3 @@
-/* global IntersectionObserver, document, window */
 /* ---------------------------------------------------------------------------
  * Landing page interactions:
  *   - Scroll-reveal via IntersectionObserver

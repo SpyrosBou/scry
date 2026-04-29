@@ -12,8 +12,11 @@ const nodeSources = [
   'docs/**/*.js',
 ];
 
+const esmNodeSources = ['app/svelte.config.js'];
+const siteNodeSources = ['site/build.js', 'site/serve.js'];
 const unitTestSources = ['tests/unit/**/*.test.js'];
 const playwrightSpecs = ['tests/**/*.spec.js'];
+const browserSources = ['site/js/**/*.js', 'site/app/js/**/*.js'];
 
 const baseLanguageOptions = {
   ecmaVersion: 2022,
@@ -51,6 +54,12 @@ module.exports = [
       'docs/mocks/**',
       'sites/*.json',
       '.github/**',
+      'app/node_modules/**',
+      'app/.svelte-kit/**',
+      'app/build/**',
+      'app/.vercel/**',
+      'app/.netlify/**',
+      'app/.wrangler/**',
     ],
   },
   {
@@ -69,6 +78,30 @@ module.exports = [
     rules: {
       ...baseRules,
       'prettier/prettier': 'warn',
+    },
+  },
+  {
+    files: esmNodeSources,
+    languageOptions: {
+      ...baseLanguageOptions,
+      sourceType: 'module',
+    },
+    rules: {
+      ...baseRules,
+    },
+  },
+  {
+    files: siteNodeSources,
+    languageOptions: baseLanguageOptions,
+    rules: {
+      ...baseRules,
+    },
+  },
+  {
+    files: browserSources,
+    languageOptions: browserLanguageOptions,
+    rules: {
+      ...baseRules,
     },
   },
   {
